@@ -16,7 +16,7 @@ pub type PagePerm = PointsTo<[u8; PAGE_SZ]>;
 
 pub type VAddr = usize;
 pub type PAddr = usize;
-pub type PageEntryPerm = usize;
+// pub type PageEntryPerm = usize;
 
 pub type Pcid = usize;
 pub type IOid = usize;
@@ -64,6 +64,13 @@ pub enum PageState {
     IO,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum PageSize {
+    SZ4K,
+    SZ2M,
+    SZ1G,
+}
+
 // -------------------- End of Types --------------------
 
 // -------------------- Begin of Const --------------------
@@ -92,7 +99,16 @@ pub const READ_WRITE_EXECUTE:usize = 0x0000_0000_0000_0002u64 as usize;
 pub const PCID_ENABLE_MASK:usize = 0x8000_0000_0000_0000u64 as usize;
 
 pub const NUM_CPUS:usize = 32;
-pub const PAGE_ENTRY_PRESENT_MASK:u64 = 0x5; //Hack, force the verified pagetable to map everything as user.
+pub const PAGE_ENTRY_PRESENT_SHIFT:u64 = 0;
+pub const PAGE_ENTRY_WRITE_SHIFT:u64 = 1;
+pub const PAGE_ENTRY_USER_SHIFT:u64 = 2;
+pub const PAGE_ENTRY_PS_SHIFT:u64 = 7;
+pub const PAGE_ENTRY_EXECUTE_SHIFT:u64 = 63;
+pub const PAGE_ENTRY_PRESENT_MASK:u64 = 0x1;
+pub const PAGE_ENTRY_WRITE_MASK:u64 = 0x1u64<<PAGE_ENTRY_WRITE_SHIFT;
+pub const PAGE_ENTRY_USER_MASK:u64 = 0x1u64<<PAGE_ENTRY_USER_SHIFT;
+pub const PAGE_ENTRY_PS_MASK:u64 = 0x1u64<<PAGE_ENTRY_PS_SHIFT;
+pub const PAGE_ENTRY_EXECUTE_MASK:u64 = 0x1u64<<PAGE_ENTRY_EXECUTE_SHIFT;
 // -------------------- End of Const --------------------
 
 // -------------------- Begin of Structs --------------------

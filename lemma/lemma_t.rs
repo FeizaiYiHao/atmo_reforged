@@ -40,4 +40,37 @@ pub proof fn page_ptr_lemma()
     // assert(forall|index:usize| #![auto] page_index_valid(index) ==> (index * 4096) == page_index2page_ptr(index));
     // assert(forall|index:usize| #![auto] page_index_valid(index) ==> page_index2page_ptr(index) % 4096 == 0);
 }
+
+#[verifier(external_body)]
+pub proof fn pagemap_permission_bits_lemma()
+    ensures
+        (0usize & (PAGE_ENTRY_PRESENT_MASK as usize) == 0),
+        (forall|i:usize| #![auto] (i | (PAGE_ENTRY_PRESENT_MASK as usize)) & (PAGE_ENTRY_PRESENT_MASK as usize) == 1),
+        (forall|i:usize| #![auto] page_ptr_valid(i) ==>
+            ((i | (PAGE_ENTRY_PRESENT_MASK as usize)) & (VA_MASK as usize)) == i),
+        (forall|i:usize, j:usize| #![auto] page_ptr_valid(i) && spec_va_perm_bits_valid(j) ==>
+            (
+                ((((i | j) | (PAGE_ENTRY_PRESENT_MASK as usize)) & (VA_MASK as usize)) == i)
+            )
+        ),
+        (forall|i:usize, j:usize| #![auto] page_ptr_valid(i) && spec_va_perm_bits_valid(j) ==>
+            (
+                ((((i | j) | (PAGE_ENTRY_PRESENT_MASK as usize)) & (VA_PERM_MASK as usize)) == j)
+            )
+        ),
+        (forall|i:usize, j:usize| #![auto] page_ptr_valid(i) && spec_va_perm_bits_valid(j) ==>
+            (
+                (((i | j)  & (VA_MASK as usize)) == i)
+            )
+        ),
+        (forall|i:usize, j:usize| #![auto] page_ptr_valid(i) && spec_va_perm_bits_valid(j) ==>
+            (
+                (((i | j)  & (VA_PERM_MASK as usize)) == j)
+            )
+        ),
+        spec_va_perm_bits_valid(0usize) == true,
+    {
+
+    }
+
 }

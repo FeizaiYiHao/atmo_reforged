@@ -3,6 +3,31 @@ verus! {
 use crate::define::*;
 use crate::lemma::lemma_t::*;
 
+pub fn va_perm_bits_valid(perm:usize) -> (ret:bool)
+    ensures
+        ret == spec_va_perm_bits_valid(perm),
+{
+    perm == READ
+    ||
+    perm == READ_WRITE
+    ||
+    perm == READ_EXECUTE
+    ||
+    perm == READ_WRITE_EXECUTE
+}
+
+
+pub open spec fn spec_va_perm_bits_valid(perm:usize) -> bool{
+    perm == READ
+    ||
+    perm == READ_WRITE
+    ||
+    perm == READ_EXECUTE
+    ||
+    perm == READ_WRITE_EXECUTE
+}
+
+
 pub open spec fn spec_page_ptr2page_index(ptr: usize) -> usize
     recommends
         page_ptr_valid(ptr),
