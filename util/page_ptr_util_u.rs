@@ -66,6 +66,11 @@ pub fn page_index2page_ptr(i: usize) -> (ret:usize)
     i * 4096usize
 }
 
+pub open spec fn pa_valid(v: PAddr) -> bool
+{
+    v & (!PA_MASK) as usize == 0
+}
+
 pub open spec fn page_ptr_valid(ptr: usize) -> bool
 {
     ((ptr % 4096) == 0)
