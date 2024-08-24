@@ -317,39 +317,54 @@ impl PageTable{
                 self.l1_tables@.dom().contains(self.l2_tables@[pa].value()[i].addr)
     }
 
-    // pub open spec fn wf_l1(&self) -> bool{
-    //     //all l2 mappings exist in l1
-    //     (
-    //         forall|i: PAddr| #![auto] self.l2_tables@.dom().contains(i) ==> (
-    //             forall|j: L2Index| #![auto] 0<= j < 512 && self.l2_tables@[i]@.value.get_Some_0()[j].is_Some() ==>
-    //                  self.l1_tables@.dom().contains(self.l2_tables@[i]@.value.get_Some_0()[j].get_Some_0().addr)
-    //         )
-    //     )
-    //     &&
-    //     (
-    //         self.l1_tables@.dom().contains(0) == false
-    //     )
-    //     &&
-    //     (
-    //         forall|i: PAddr| #![auto] self.l1_tables@.dom().contains(i) ==> self.l1_tables@[i]@.pptr == i
-    //     )
-    //     &&
-    //     (
-    //         forall|i: PAddr| #![auto] self.l1_tables@.dom().contains(i) ==> self.l1_tables@[i]@.value.is_Some()
-    //     )
-    //     &&
-    //     (
-    //         forall|i: PAddr| #![auto] self.l1_tables@.dom().contains(i) ==> self.l1_tables@[i]@.value.get_Some_0().wf()
-    //     )
-    //     &&
-    //     (
-    //         forall|i: PAddr| #![auto] self.l1_tables@.dom().contains(i) ==>
-    //             (
-    //                 exists|j:PAddr,l2i:L2Index| #![auto] 0<=l2i<512 && self.l2_tables@.dom().contains(j) && self.l2_tables@[j]@.value.get_Some_0()[l2i].is_Some()
-    //                     && self.l2_tables@[j]@.value.get_Some_0()[l2i].get_Some_0().addr == i
-    //             )
-    //     )
-    // }
+    pub open spec fn wf_l1(&self) -> bool{
+        &&&
+        self.l1_tables@.dom().contains(0) == false
+        &&&
+        forall|pa: PAddr| 
+            #![trigger self.l1_tables@[pa].addr()] 
+            self.l1_tables@.dom().contains(pa) ==> self.l1_tables@[pa].addr() == pa
+        &&&
+        forall|pa: PAddr| 
+            #![trigger self.l1_tables@[pa].is_init()] 
+            self.l1_tables@.dom().contains(pa) ==> self.l1_tables@[pa].is_init()
+        &&&
+        forall|pa: PAddr| 
+            #![trigger self.l1_tables@[pa].value().wf()] 
+            self.l1_tables@.dom().contains(pa) ==> self.l1_tables@[pa].value().wf()
+        // all l1 tables exist in l2 mapping
+        &&&
+        forall|pai: PAddr|
+            #![trigger self.l1_tables@.dom().contains(pai)] 
+            self.l1_tables@.dom().contains(pai) ==>
+                exists|paj:PAddr,l2i:L2Index|
+                    #![trigger self.l2_tables@[paj].value()[l2i].perm.present] 
+                    #![trigger self.l2_tables@[paj].value()[l2i].addr] 
+                    0<=l2i<512 && self.l2_tables@.dom().contains(paj) && self.l2_tables@[paj].value()[l2i].perm.present &&
+                    self.l2_tables@[paj].value()[l2i].addr == pai
+        // l1 does not map to page table
+        &&&
+        forall|pa: PAddr, i: L1Index| 
+            #![trigger self.l1_tables@[pa].value()[i].perm.present] 
+            #![trigger self.l1_tables@.dom().contains(self.l1_tables@[pa].value()[i].addr)] 
+            #![trigger self.l2_tables@.dom().contains(self.l1_tables@[pa].value()[i].addr)] 
+            #![trigger self.l3_tables@.dom().contains(self.l1_tables@[pa].value()[i].addr)] 
+            #![trigger self.l1_tables@[pa].value()[i].addr] 
+            self.l1_tables@.dom().contains(pa) && 0 <= i < 512 && self.l1_tables@[pa].value()[i].perm.present ==>
+                self.l1_tables@.dom().contains(self.l2_tables@[pa].value()[i].addr) == false
+                &&
+                self.l2_tables@.dom().contains(self.l2_tables@[pa].value()[i].addr) == false
+                &&
+                self.l3_tables@.dom().contains(self.l2_tables@[pa].value()[i].addr) == false
+                &&
+                self.cr3 != self.l1_tables@[pa].value()[i].addr
+        // no hugepage in l1
+        &&&
+        forall|pa: PAddr, i: L1Index| 
+            #![trigger self.l1_tables@[pa].value()[i].perm.ps] 
+            self.l1_tables@.dom().contains(pa) && 0 <= i < 512 && self.l1_tables@[pa].value()[i].perm.present ==>
+                ! self.l1_tables@[pa].value()[i].perm.ps
+    }
 
     // pub open spec fn no_self_mapping(&self) -> bool
     // {
