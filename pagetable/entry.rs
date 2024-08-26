@@ -22,6 +22,81 @@ pub struct PageEntry{
     // pub ps: bool,
 }
 
+impl PageEntry{
+    pub open spec fn is_empty(&self) -> bool {
+        &&&
+        self.addr == 0
+        &&&
+        self.perm.present == false
+        &&&
+        self.perm.ps == false
+        &&&
+        self.perm.write == false
+        &&&
+        self.perm.execute_disable == false
+        &&&
+        self.perm.user == false
+    }
+}
+
+pub struct MapEntry{
+    pub addr: PAddr,
+    pub write: bool,
+    pub execute_disable: bool,
+}
+
+pub open spec fn spec_page_entry_to_map_entry(p: &PageEntry) -> MapEntry
+{
+    MapEntry{
+        addr: p.addr,
+        write: p.perm.write,
+        execute_disable: p.perm.execute_disable,
+    }
+}
+
+#[verifier(when_used_as_spec(spec_page_entry_to_map_entry))]
+pub fn page_entry_to_map_entry(p: &PageEntry) -> (ret: MapEntry)
+    ensures
+        ret =~= spec_page_entry_to_map_entry(p),
+    {
+        MapEntry{
+            addr: p.addr,
+            write: p.perm.write,
+            execute_disable: p.perm.execute_disable,
+        }
+    }
+
+pub open spec fn spec_map_entry_to_page_entry(m: &MapEntry, ps: bool) -> PageEntry
+{
+    PageEntry{
+        addr: m.addr,
+        perm: PageEntryPerm{
+            present: true,
+            ps: ps,
+            write:m.write,
+            execute_disable: m.execute_disable,
+            user: true,
+        },
+    }
+}
+
+#[verifier(when_used_as_spec(spec_map_entry_to_page_entry))]
+pub fn map_entry_to_page_entry(m: &MapEntry, ps: bool) -> (ret:PageEntry)
+    ensures 
+        ret == spec_map_entry_to_page_entry(m, ps),
+{
+    PageEntry{
+        addr: m.addr,
+        perm: PageEntryPerm{
+            present: true,
+            ps: ps,
+            write:m.write,
+            execute_disable: m.execute_disable,
+            user: true,
+        },
+    }
+}
+
 pub open spec fn usize2present(v:usize) -> bool{
     (v & PAGE_ENTRY_PRESENT_MASK as usize) != 0
 }
@@ -42,6 +117,18 @@ pub open spec fn usize2user(v:usize) -> bool{
     (v & PAGE_ENTRY_USER_MASK as usize) != 0
 }
 
+pub proof fn zero_leads_is_empty_page_entry()
+    ensures
+        spec_usize2page_entry(0).is_empty(),
+{  
+    assert(0usize & 0x0000_ffff_ffff_f000u64 as usize == 0) by (bit_vector);
+    assert(0usize & 0x1 as usize != 0 == false) by (bit_vector);
+    assert(0usize & (0x1u64 << 0x7u64) as usize != 0 == false) by (bit_vector);
+    assert(0usize & (0x1u64 << 0x1u64) as usize != 0 == false) by (bit_vector);
+    assert(0usize & (0x1u64 << 63u64) as usize != 0 == false) by (bit_vector);
+    assert(0usize & (0x1u64 << 0x2u64) as usize != 0 == false) by (bit_vector);
+}
+
 pub open spec fn spec_usize2page_entry_perm(v:usize) -> PageEntryPerm{
     PageEntryPerm{
         present: usize2present(v),
@@ -56,7 +143,13 @@ pub open spec fn spec_usize2page_entry_perm(v:usize) -> PageEntryPerm{
 pub fn usize2page_entry_perm(v:usize) -> (ret:PageEntryPerm)
     ensures
         ret =~= spec_usize2page_entry_perm(v),
+        v == 0 ==> ret.present == false && ret.ps == false && ret.write == false && ret.execute_disable == false && ret.user == false,
 {
+    assert(0usize & 0x1 as usize != 0 == false) by (bit_vector);
+    assert(0usize & (0x1u64 << 0x7u64) as usize != 0 == false) by (bit_vector);
+    assert(0usize & (0x1u64 << 0x1u64) as usize != 0 == false) by (bit_vector);
+    assert(0usize & (0x1u64 << 63u64) as usize != 0 == false) by (bit_vector);
+    assert(0usize & (0x1u64 << 0x2u64) as usize != 0 == false) by (bit_vector);
     PageEntryPerm{
         present: (v & PAGE_ENTRY_PRESENT_MASK as usize) != 0,
         ps: (v & PAGE_ENTRY_PS_MASK as usize) != 0,
@@ -78,7 +171,9 @@ pub open spec fn spec_usize2page_entry(v:usize) -> PageEntry{
 pub fn usize2page_entry(v:usize) -> (ret:PageEntry)
     ensures
         ret =~= spec_usize2page_entry(v),
+        v == 0 ==> ret.addr == 0 && ret.perm.present == false && ret.perm.ps == false && ret.perm.write == false && ret.perm.execute_disable == false && ret.perm.user == false,
 {
+    assert(0usize & 0x0000_ffff_ffff_f000u64 as usize == 0) by (bit_vector);
     PageEntry{
         addr: usize2pa(v),
         perm: usize2page_entry_perm(v),

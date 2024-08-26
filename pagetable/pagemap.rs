@@ -5,7 +5,7 @@ verus! {
 use crate::array::*;
 use crate::util::page_ptr_util_u::*;
 use crate::lemma::lemma_u::*;
-use crate::pagetable::page_entry::*;
+use crate::pagetable::entry::*;
 
 
 pub struct PageMap{
@@ -15,6 +15,41 @@ pub struct PageMap{
 }
 
 impl PageMap{
+
+    pub fn init(&mut self)
+        requires
+            old(self).ar.wf(),
+            old(self).spec_seq@.len() == 512,
+        ensures
+            self.wf(),
+            forall|i:int|
+                #![trigger usize2page_entry(self.ar@[i]).is_empty()]
+                0<=i<512 ==> usize2page_entry(self.ar@[i]).is_empty(),
+            
+    {
+        for i in 0..512
+            invariant
+                0<=i<=512,
+                self.ar.wf(),
+                self.spec_seq@.len() == 512,
+                forall|j:int|
+                    #![trigger usize2page_entry(self.ar@[j])]
+                    0<=j<i ==> (usize2page_entry(self.ar@[j]) =~= self.spec_seq@[j]),
+                forall|j:int|
+                    #![trigger self.ar@[j]]
+                    0<=j<i ==> (usize2page_entry(self.ar@[j]).is_empty() <==> self.ar@[j] == 0),
+                forall|j:int|
+                    #![trigger self.ar@[j]]
+                    0<=j<i ==> usize2page_entry(self.ar@[j]).is_empty(),
+        {
+            self.ar.set(i, 0usize);
+            proof{
+                zero_leads_is_empty_page_entry();
+                self.spec_seq@ = self.spec_seq@.update(i as int,usize2page_entry(0usize));
+            }
+        }
+    }
+
     pub open spec fn wf(&self) -> bool{
         &&&
         self.ar.wf()
@@ -26,8 +61,8 @@ impl PageMap{
             0<=i<512 ==> (usize2page_entry(self.ar@[i]) =~= self.spec_seq@[i])
         &&&
         forall|i:int|
-            #![trigger usize2page_entry(self.ar@[i]).perm.present]
-            0<=i<512 ==> (usize2page_entry(self.ar@[i]).perm.present == false <==> self.ar@[i] == 0)
+            #![trigger usize2page_entry(self.ar@[i]).is_empty()]
+            0<=i<512 ==> (usize2page_entry(self.ar@[i]).is_empty() <==> self.ar@[i] == 0)
         
     }
 
@@ -47,8 +82,8 @@ impl PageMap{
         requires
             old(self).wf(),
             0<=index<512,
-            value.perm.present ==> page_ptr_valid(value.addr),
-            value.perm.present == false ==> usize2page_entry(0) =~= value,
+            value.perm.present ==> MEM_valid(value.addr),
+            value.perm.present == false ==> value.is_empty(),
         ensures
             self.wf(),
             self@ =~= self@.update(index as int,value),
@@ -57,16 +92,14 @@ impl PageMap{
             //     pagemap_permission_bits_lemma();
             // }
             if value.perm.present == false {
-                self.ar.set(index,0);
+                self.ar.set(index,0usize);
                 proof{
-                    self.spec_seq@ = self.spec_seq@.update(index as int,usize2page_entry(0));
+                    zero_leads_is_empty_page_entry();
+                    self.spec_seq@ = self.spec_seq@.update(index as int, usize2page_entry(0usize));
                 }
                 return;
             }
             else{
-                proof{
-                    page_ptr_valid_imply_MEM_valid(value.addr);
-                }
                 let u = page_entry2usize(&value);
                 self.ar.set(index,u);
 

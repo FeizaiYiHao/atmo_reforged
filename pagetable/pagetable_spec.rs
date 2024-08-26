@@ -1,23 +1,13 @@
 use vstd::prelude::*;
 
-// pub const KERNEL_PML4_SIG: Option<PageEntry> = None; // hack @Xiangdong
-
 verus! {
-// use vstd::ptr::PointsTo;
 use crate::define::*;
 use crate::array::*;
-// use crate::page_alloc::*;
 use vstd::simple_pptr::*;
 use crate::util::page_ptr_util_u::*;
-
-use crate::pagetable::page_entry::*;
+use crate::pagetable::pagetable_util::*;
+use crate::pagetable::entry::*;
 use crate::pagetable::pagemap::*;
-
-pub struct MapEntry{
-    pub addr: PAddr,
-    pub write: bool,
-    pub execute_disable: bool,
-}
 
 // pub open spec fn map_entry_equals_to_page_entry_unwrapped(m:MapEntry, p:PageEntry) -> bool{
 //     &&&
@@ -46,9 +36,9 @@ pub struct PageTable{
     pub l2_tables: Tracked<Map<PAddr,PointsTo<PageMap>>>,
     pub l1_tables: Tracked<Map<PAddr,PointsTo<PageMap>>>,
 
-    pub mapping_4k: Ghost<Map<VAddr,Option<MapEntry>>>,
-    pub mapping_2m: Ghost<Map<VAddr,Option<MapEntry>>>,
-    pub mapping_1g: Ghost<Map<VAddr,Option<MapEntry>>>,
+    pub mapping_4K: Ghost<Map<VAddr,Option<MapEntry>>>,
+    pub mapping_2M: Ghost<Map<VAddr,Option<MapEntry>>>,
+    pub mapping_1G: Ghost<Map<VAddr,Option<MapEntry>>>,
 }
 
 
@@ -99,16 +89,16 @@ impl PageTable{
             self.l3_tables@.dom() + self.l2_tables@.dom() + self.l1_tables@.dom() + self.l4_table@.dom()
     }
 
-    pub open spec fn mapping_4k(&self) -> Map<VAddr,Option<MapEntry>> {
-        self.mapping_4k@
+    pub open spec fn mapping_4K(&self) -> Map<VAddr,Option<MapEntry>> {
+        self.mapping_4K@
     }
 
-    pub open spec fn mapping_2m(&self) -> Map<VAddr,Option<MapEntry>> {
-        self.mapping_2m@
+    pub open spec fn mapping_2M(&self) -> Map<VAddr,Option<MapEntry>> {
+        self.mapping_2M@
     }
 
-    pub open spec fn mapping_1g(&self) -> Map<VAddr,Option<MapEntry>> {
-        self.mapping_1g@
+    pub open spec fn mapping_1G(&self) -> Map<VAddr,Option<MapEntry>> {
+        self.mapping_1G@
     }
 
     pub open spec fn wf_l4(&self) -> bool{
@@ -156,7 +146,7 @@ impl PageTable{
         //no hugepage in L4 (hardware limit)        
         &&&
         forall|i: L4Index| 
-            #![trigger self.l4_table@[self.cr3].value()[i].perm.ps ]
+            #![trigger self.l4_table@[self.cr3].value()[i].perm.ps]
             0 <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
                 !self.l4_table@[self.cr3].value()[i].perm.ps 
     }
@@ -188,17 +178,15 @@ impl PageTable{
         //L3 tables unique within
         &&&
         forall|pa: PAddr, l3i: L3Index, l3j: L3Index| 
-            #![trigger self.l3_tables@[pa].value()[l3i].perm.present, self.l3_tables@[pa].value()[l3j].perm.present]
-            #![trigger self.l3_tables@[pa].value()[l3i].addr, self.l3_tables@[pa].value()[l3j].addr]
+            #![trigger paddrs_equal(self.l3_tables@[pa].value()[l3i].addr, self.l3_tables@[pa].value()[l3j].addr)]
             self.l3_tables@.dom().contains(pa) && l3i != l3j && 0 <= l3i < 512 && 0 <= l3j < 512 && self.l3_tables@[pa].value()[l3i].perm.present && self.l3_tables@[pa].value()[l3j].perm.present ==> 
-                self.l3_tables@[pa].value()[l3i].addr != self.l3_tables@[pa].value()[l3j].addr
+                !paddrs_equal(self.l3_tables@[pa].value()[l3i].addr, self.l3_tables@[pa].value()[l3j].addr)
         //L3 tables are disjoint        
         &&&        
-        forall|pai: PAddr, paj: PAddr, l3i: L3Index, l3j: L3Index|  
-            #![trigger self.l3_tables@[pai].value()[l3i].perm.present, self.l3_tables@[paj].value()[l3j].perm.present]
-            #![trigger self.l3_tables@[pai].value()[l3i].addr, self.l3_tables@[paj].value()[l3j].addr]
+        forall|pai: PAddr, paj: PAddr, l3i: L3Index, l3j: L3Index|
+            #![trigger paddrs_equal(self.l3_tables@[pai].value()[l3i].addr, self.l3_tables@[paj].value()[l3j].addr)]
             pai != paj && self.l3_tables@.dom().contains(pai) && self.l3_tables@.dom().contains(paj) && 0 <= l3i < 512 && 0 <= l3j < 512 && self.l3_tables@[pai].value()[l3i].perm.present && self.l3_tables@[paj].value()[l3j].perm.present ==>
-                self.l3_tables@[pai].value()[l3i].addr != self.l3_tables@[paj].value()[l3j].addr
+                !paddrs_equal(self.l3_tables@[pai].value()[l3i].addr, self.l3_tables@[paj].value()[l3j].addr)
         //L3 tables does not map to L4 or L1        
         &&&
         forall|pa: PAddr, i: L3Index| 
@@ -266,24 +254,21 @@ impl PageTable{
         // L2 mappings are unique within
         &&&
         forall|pa: PAddr, l2i: L2Index, l2j: L2Index| 
-            #![trigger self.l2_tables@[pa].value()[l2i].perm.present, self.l2_tables@[pa].value()[l2j].perm.present]
-            #![trigger self.l2_tables@[pa].value()[l2i].addr, self.l2_tables@[pa].value()[l2j].addr]
+            #![trigger paddrs_equal(self.l2_tables@[pa].value()[l2i].addr, self.l2_tables@[pa].value()[l2j].addr)]
             self.l2_tables@.dom().contains(pa) && l2i != l2j && 0 <= l2i < 512 && 0 <= l2j < 512 && self.l2_tables@[pa].value()[l2i].perm.present && self.l2_tables@[pa].value()[l2j].perm.present  ==>
-                self.l2_tables@[pa].value()[l2i].addr != self.l2_tables@[pa].value()[l2j].addr
+                !paddrs_equal(self.l2_tables@[pa].value()[l2i].addr, self.l2_tables@[pa].value()[l2j].addr)
         // L2 mappings are unique
         &&&
         forall|pai: PAddr, paj: PAddr, l2i: L2Index, l2j: L2Index|
-            #![trigger self.l2_tables@[pai].value()[l2i].perm.present, self.l2_tables@[paj].value()[l2j].perm.present]
-            #![trigger self.l2_tables@[pai].value()[l2i].addr, self.l2_tables@[paj].value()[l2j].addr]
+            #![trigger paddrs_equal(self.l2_tables@[pai].value()[l2i].addr, self.l2_tables@[paj].value()[l2j].addr)]
             pai != paj && self.l2_tables@.dom().contains(pai) && self.l2_tables@.dom().contains(paj) && 0 <= l2i < 512 && 0 <= l2j < 512 && self.l2_tables@[pai].value()[l2i].perm.present && self.l2_tables@[paj].value()[l2j].perm.present ==>
-                self.l2_tables@[pai].value()[l2i].addr != self.l2_tables@[paj].value()[l2j].addr
+                !paddrs_equal(self.l2_tables@[pai].value()[l2i].addr, self.l2_tables@[paj].value()[l2j].addr)
         // L2 does not map to L4, L3, or self
         &&&
         forall|pa: PAddr, i: L2Index| 
-            #![trigger self.l2_tables@[pa].value()[i].perm.present] 
-            #![trigger self.l2_tables@.dom().contains(self.l2_tables@[pa].value()[i].addr)] 
-            #![trigger self.l3_tables@.dom().contains(self.l2_tables@[pa].value()[i].addr)] 
-            #![trigger self.l2_tables@[pa].value()[i].addr] 
+            #![trigger self.l2_tables@[pa].value()[i].perm.present, self.l2_tables@.dom().contains(self.l2_tables@[pa].value()[i].addr)] 
+            #![trigger self.l2_tables@[pa].value()[i].perm.present, self.l3_tables@.dom().contains(self.l2_tables@[pa].value()[i].addr)] 
+            #![trigger self.l2_tables@[pa].value()[i].perm.present, self.l2_tables@[pa].value()[i].addr] 
             self.l2_tables@.dom().contains(pa) && 0 <= i < 512 && self.l2_tables@[pa].value()[i].perm.present ==>
                 self.l2_tables@.dom().contains(self.l2_tables@[pa].value()[i].addr) == false
                 &&
@@ -364,7 +349,48 @@ impl PageTable{
                 ! self.l1_tables@[pa].value()[i].perm.ps
     }
 
-    pub open spec fn resolve_mapping_l4(&self, l4i: L4Index) -> Option<PageEntry>
+    pub open spec fn user_only(&self) -> bool{
+        &&&
+        forall|i: L4Index| 
+            #![trigger self.l4_table@[self.cr3].value()[i].perm.user]
+            0 <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
+                self.l4_table@[self.cr3].value()[i].perm.user
+        &&&
+        forall|pa: PAddr, i: L3Index| 
+            #![trigger self.l3_tables@[pa].value()[i].perm.user] 
+            self.l3_tables@.dom().contains(pa) && 0 <= i < 512 && self.l3_tables@[pa].value()[i].perm.present ==>
+                self.l3_tables@[pa].value()[i].perm.user
+        &&&
+        forall|pa: PAddr, i: L2Index| 
+            #![trigger self.l2_tables@[pa].value()[i].perm.user] 
+            self.l2_tables@.dom().contains(pa) && 0 <= i < 512 && self.l2_tables@[pa].value()[i].perm.present ==>
+                self.l2_tables@[pa].value()[i].perm.user
+        &&&
+        forall|pa: PAddr, i: L1Index| 
+            #![trigger self.l1_tables@[pa].value()[i].perm.user] 
+            self.l1_tables@.dom().contains(pa) && 0 <= i < 512 && self.l1_tables@[pa].value()[i].perm.present ==>
+                self.l1_tables@[pa].value()[i].perm.user
+    }
+
+    pub open spec fn rwx_upper_level_entries(&self) -> bool{
+        &&&
+        forall|i: L4Index| 
+            #![trigger self.l4_table@[self.cr3].value()[i].perm.user]
+            0 <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
+                self.l4_table@[self.cr3].value()[i].perm.write && !self.l4_table@[self.cr3].value()[i].perm.execute_disable
+        &&&
+        forall|pa: PAddr, i: L3Index| 
+            #![trigger self.l3_tables@[pa].value()[i].perm.user] 
+            self.l3_tables@.dom().contains(pa) && 0 <= i < 512 && self.l3_tables@[pa].value()[i].perm.present && !self.l3_tables@[pa].value()[i].perm.ps ==>
+                self.l3_tables@[pa].value()[i].perm.write && !self.l3_tables@[pa].value()[i].perm.execute_disable
+        &&&
+        forall|pa: PAddr, i: L2Index| 
+            #![trigger self.l2_tables@[pa].value()[i].perm.user] 
+            self.l2_tables@.dom().contains(pa) && 0 <= i < 512 && self.l2_tables@[pa].value()[i].perm.present && !self.l2_tables@[pa].value()[i].perm.ps ==>
+                self.l2_tables@[pa].value()[i].perm.write && !self.l2_tables@[pa].value()[i].perm.execute_disable
+    }
+
+    pub open spec fn spec_resolve_mapping_l4(&self, l4i: L4Index) -> Option<PageEntry>
         recommends
             0 <= l4i < 512,
     {
@@ -377,142 +403,142 @@ impl PageTable{
         }
     }
 
-    pub open spec fn resolve_mapping_4k_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
+    pub open spec fn spec_resolve_mapping_4K_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
     recommends
         0<= l4i < 512,
         0<= l3i < 512,
     {
-        if self.resolve_mapping_l4(l4i).is_None() {
+        if self.spec_resolve_mapping_l4(l4i).is_None() {
             None
-        }else if !self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.present || self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.ps {
+        }else if !self.l3_tables@[self.spec_resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.present || self.l3_tables@[self.spec_resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.ps {
             None
         }else{
-            Some(self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i])
+            Some(self.l3_tables@[self.spec_resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i])
         }
     }
 
-    pub open spec fn resolve_mapping_4k_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
+    pub open spec fn spec_resolve_mapping_4K_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
     recommends
         0<= l4i < 512,
         0<= l3i < 512,
         0<= l2i < 512,
     {
-        if self.resolve_mapping_4k_l3(l4i,l3i).is_None() {
+        if self.spec_resolve_mapping_4K_l3(l4i,l3i).is_None() {
             None
-        }else if !self.l2_tables@[self.resolve_mapping_4k_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.present || self.l2_tables@[self.resolve_mapping_4k_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.ps {
+        }else if !self.l2_tables@[self.spec_resolve_mapping_4K_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.present || self.l2_tables@[self.spec_resolve_mapping_4K_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.ps {
             None
         }else{
-            Some(self.l2_tables@[self.resolve_mapping_4k_l3(l4i,l3i).get_Some_0().addr].value()[l2i])
+            Some(self.l2_tables@[self.spec_resolve_mapping_4K_l3(l4i,l3i).get_Some_0().addr].value()[l2i])
         }
     }
 
-    pub open spec fn resolve_mapping_4k_l1(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index) -> Option<PageEntry>
+    pub open spec fn spec_resolve_mapping_4K_l1(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index) -> Option<PageEntry>
     recommends
         0<= l4i < 512,
         0<= l3i < 512,
         0<= l2i < 512,
         0<= l1i < 512,
     {
-        if self.resolve_mapping_4k_l2(l4i,l3i,l2i).is_None() {
+        if self.spec_resolve_mapping_4K_l2(l4i,l3i,l2i).is_None() {
             None
-        }else if !self.l1_tables@[self.resolve_mapping_4k_l2(l4i,l3i,l2i).get_Some_0().addr].value()[l1i].perm.present {
+        }else if !self.l1_tables@[self.spec_resolve_mapping_4K_l2(l4i,l3i,l2i).get_Some_0().addr].value()[l1i].perm.present {
             None
         }else{
-            Some(self.l1_tables@[self.resolve_mapping_4k_l2(l4i,l3i,l2i).get_Some_0().addr].value()[l1i])
+            Some(self.l1_tables@[self.spec_resolve_mapping_4K_l2(l4i,l3i,l2i).get_Some_0().addr].value()[l1i])
         }
 
     }
 
-    pub open spec fn resolve_mapping_2m_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
+    pub open spec fn spec_resolve_mapping_2M_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
     recommends
         0<= l4i < 512,
         0<= l3i < 512,
     {
-        if self.resolve_mapping_l4(l4i).is_None() {
+        if self.spec_resolve_mapping_l4(l4i).is_None() {
             None
-        }else if !self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.present || self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.ps {
+        }else if !self.l3_tables@[self.spec_resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.present || self.l3_tables@[self.spec_resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.ps {
             None
         }else{
-            Some(self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i])
+            Some(self.l3_tables@[self.spec_resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i])
         }
     }
 
-    pub open spec fn resolve_mapping_2m_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
+    pub open spec fn spec_resolve_mapping_2M_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
     recommends
         0<= l4i < 512,
         0<= l3i < 512,
         0<= l2i < 512,
     {
-        if self.resolve_mapping_2m_l3(l4i,l3i).is_None() {
+        if self.spec_resolve_mapping_2M_l3(l4i,l3i).is_None() {
             None
-        }else if !self.l2_tables@[self.resolve_mapping_2m_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.present || !self.l2_tables@[self.resolve_mapping_2m_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.ps {
+        }else if !self.l2_tables@[self.spec_resolve_mapping_2M_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.present || !self.l2_tables@[self.spec_resolve_mapping_2M_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.ps {
             None
         }else{
-            Some(self.l2_tables@[self.resolve_mapping_2m_l3(l4i,l3i).get_Some_0().addr].value()[l2i])
+            Some(self.l2_tables@[self.spec_resolve_mapping_2M_l3(l4i,l3i).get_Some_0().addr].value()[l2i])
         }
     }
 
-    pub open spec fn resolve_mapping_1g_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
+    pub open spec fn spec_resolve_mapping_1G_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
     recommends
         0<= l4i < 512,
         0<= l3i < 512,
     {
-        if self.resolve_mapping_l4(l4i).is_None() {
+        if self.spec_resolve_mapping_l4(l4i).is_None() {
             None
-        }else if !self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.present || !self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.ps {
+        }else if !self.l3_tables@[self.spec_resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.present || !self.l3_tables@[self.spec_resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.ps {
             None
         }else{
-            Some(self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i])
+            Some(self.l3_tables@[self.spec_resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i])
         }
     }
 
-    pub open spec fn wf_mapping_4k(&self) -> bool{
+    pub open spec fn wf_mapping_4K(&self) -> bool{
         &&&
         forall|va: VAddr| 
-            #![trigger va_4k_valid(va), self.mapping_4k@.dom().contains(va)]
-            va_4k_valid(va) ==> self.mapping_4k@.dom().contains(va)
+            #![trigger va_4K_valid(va), self.mapping_4K@.dom().contains(va)]
+            va_4K_valid(va) ==> self.mapping_4K@.dom().contains(va)
         &&&
         forall|l4i: L4Index,l3i: L3Index,l2i: L2Index, l1i: L1Index| 
-            #![trigger self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))], self.resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
+            #![trigger self.mapping_4K@[spec_index2va((l4i,l3i,l2i,l1i))], self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i)]
             0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512
-                ==> (self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].is_None() && self.resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).is_None()) 
+                ==> (self.mapping_4K@[spec_index2va((l4i,l3i,l2i,l1i))].is_None() && self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i).is_None()) 
                     ||
-                    (self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].get_Some_0().addr == self.resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().addr &&
-                    self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].get_Some_0().write == self.resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.write &&
-                    self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].get_Some_0().execute_disable == self.resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.execute_disable)
+                    (self.mapping_4K@[spec_index2va((l4i,l3i,l2i,l1i))].get_Some_0().addr == self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i).get_Some_0().addr &&
+                    self.mapping_4K@[spec_index2va((l4i,l3i,l2i,l1i))].get_Some_0().write == self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.write &&
+                    self.mapping_4K@[spec_index2va((l4i,l3i,l2i,l1i))].get_Some_0().execute_disable == self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.execute_disable)
 
     }
 
-    pub open spec fn wf_mapping_2m(&self) -> bool{
+    pub open spec fn wf_mapping_2M(&self) -> bool{
         &&&
         forall|va: VAddr| 
-            #![trigger va_2m_valid(va), self.mapping_2m@.dom().contains(va)]
-            va_2m_valid(va) ==> self.mapping_2m@.dom().contains(va)
+            #![trigger va_2M_valid(va), self.mapping_2M@.dom().contains(va)]
+            va_2M_valid(va) ==> self.mapping_2M@.dom().contains(va)
         &&&
         forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
-            #![trigger self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))], self.resolve_mapping_2m_l2(l4i,l3i,l2i)]
+            #![trigger self.mapping_2M@[spec_index2va((l4i,l3i,l2i,0))], self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i)]
             0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512
-                ==> (self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].is_None() && self.resolve_mapping_2m_l2(l4i,l3i,l2i).is_None()) 
+                ==> (self.mapping_2M@[spec_index2va((l4i,l3i,l2i,0))].is_None() && self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i).is_None()) 
                     ||
-                    (self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].get_Some_0().addr == self.resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().addr &&
-                    self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].get_Some_0().write == self.resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().perm.write &&
-                    self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].get_Some_0().execute_disable == self.resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().perm.execute_disable)
+                    (self.mapping_2M@[spec_index2va((l4i,l3i,l2i,0))].get_Some_0().addr == self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i).get_Some_0().addr &&
+                    self.mapping_2M@[spec_index2va((l4i,l3i,l2i,0))].get_Some_0().write == self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i).get_Some_0().perm.write &&
+                    self.mapping_2M@[spec_index2va((l4i,l3i,l2i,0))].get_Some_0().execute_disable == self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i).get_Some_0().perm.execute_disable)
     }
 
-    pub open spec fn wf_mapping_1g(&self) -> bool{
+    pub open spec fn wf_mapping_1G(&self) -> bool{
         &&&
         forall|va: VAddr| 
-            #![trigger va_1g_valid(va), self.mapping_1g@.dom().contains(va)]
-            va_1g_valid(va) ==> self.mapping_1g@.dom().contains(va)
+            #![trigger va_1G_valid(va), self.mapping_1G@.dom().contains(va)]
+            va_1G_valid(va) ==> self.mapping_1G@.dom().contains(va)
         &&&
         forall|l4i: L4Index,l3i: L3Index| 
-            #![trigger self.mapping_1g@[spec_index2va((l4i,l3i,0,0))], self.resolve_mapping_1g_l3(l4i,l3i)]
+            #![trigger self.mapping_1G@[spec_index2va((l4i,l3i,0,0))], self.spec_resolve_mapping_1G_l3(l4i,l3i)]
             0 <= l4i < 512 && 0 <= l3i < 512
-                ==> (self.mapping_2m@[spec_index2va((l4i,l3i,0,0))].is_None() && self.resolve_mapping_1g_l3(l4i,l3i).is_None()) 
+                ==> (self.mapping_2M@[spec_index2va((l4i,l3i,0,0))].is_None() && self.spec_resolve_mapping_1G_l3(l4i,l3i).is_None()) 
                     ||
-                    (self.mapping_2m@[spec_index2va((l4i,l3i,0,0))].get_Some_0().addr == self.resolve_mapping_1g_l3(l4i,l3i).get_Some_0().addr &&
-                    self.mapping_2m@[spec_index2va((l4i,l3i,0,0))].get_Some_0().write == self.resolve_mapping_1g_l3(l4i,l3i).get_Some_0().perm.write &&
-                    self.mapping_2m@[spec_index2va((l4i,l3i,0,0))].get_Some_0().execute_disable == self.resolve_mapping_1g_l3(l4i,l3i).get_Some_0().perm.execute_disable)
+                    (self.mapping_2M@[spec_index2va((l4i,l3i,0,0))].get_Some_0().addr == self.spec_resolve_mapping_1G_l3(l4i,l3i).get_Some_0().addr &&
+                    self.mapping_2M@[spec_index2va((l4i,l3i,0,0))].get_Some_0().write == self.spec_resolve_mapping_1G_l3(l4i,l3i).get_Some_0().perm.write &&
+                    self.mapping_2M@[spec_index2va((l4i,l3i,0,0))].get_Some_0().execute_disable == self.spec_resolve_mapping_1G_l3(l4i,l3i).get_Some_0().perm.execute_disable)
     }
 
     pub open spec fn wf(&self) -> bool
@@ -526,11 +552,11 @@ impl PageTable{
         &&&
         self.wf_l1()
         &&&
-        self.wf_mapping_4k()
+        self.wf_mapping_4K()
         &&&
-        self.wf_mapping_2m()
+        self.wf_mapping_2M()
         &&&
-        self.wf_mapping_1g()
+        self.wf_mapping_1G()
     }
 
     // pub open spec fn l4_kernel_entries_reserved(&self) -> bool
@@ -543,29 +569,30 @@ impl PageTable{
     pub open spec fn l4_entry_exists(&self, l4i: L4Index) -> bool
         recommends self.wf(),
     {
-        self.resolve_mapping_l4(l4i).is_Some()
+        self.spec_resolve_mapping_l4(l4i).is_Some()
     }
 
-    pub open spec fn l3_2m_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
+    pub open spec fn l3_2M_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
         recommends self.wf(),
                     self.l4_entry_exists(l4i)
     {
-        self.resolve_mapping_2m_l3(l4i,l3i).is_Some()
+        self.spec_resolve_mapping_2M_l3(l4i,l3i).is_Some()
     }
 
-    pub open spec fn l3_4k_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
+    pub open spec fn l3_4K_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
         recommends self.wf(),
                     self.l4_entry_exists(l4i)
     {
-        self.resolve_mapping_4k_l3(l4i,l3i).is_Some()
+        self.spec_resolve_mapping_4K_l3(l4i,l3i).is_Some()
     }
 
-    pub open spec fn l2_4k_entry_exists(&self, l4i: L4Index, l3i :L3Index, l2i :L2Index) -> bool
+    pub open spec fn l2_4K_entry_exists(&self, l4i: L4Index, l3i :L3Index, l2i :L2Index) -> bool
         recommends self.wf(),
-                    self.l3_4k_entry_exists(l4i,l3i)
+                    self.l3_4K_entry_exists(l4i,l3i)
     {
-        self.resolve_mapping_4k_l2(l4i,l3i,l2i).is_Some()
+        self.spec_resolve_mapping_4K_l2(l4i,l3i,l2i).is_Some()
     }
+
 
 }
 

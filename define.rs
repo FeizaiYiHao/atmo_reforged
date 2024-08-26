@@ -71,6 +71,18 @@ pub enum PageSize {
     SZ1G,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum PageTableErrorCode {
+    NoError,
+    L4EntryNotExist,
+    L3EntryNotExist,
+    L2EntryNotExist,
+    L1EntryNotExist,
+    EntryTakenBy4K,
+    EntryTakenBy2M,
+    EntryTakenBy1G,
+}
+
 // -------------------- End of Types --------------------
 
 // -------------------- Begin of Const --------------------
