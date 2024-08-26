@@ -8,6 +8,7 @@ use crate::define::*;
 use crate::array::*;
 // use crate::page_alloc::*;
 use vstd::simple_pptr::*;
+use crate::util::page_ptr_util_u::*;
 
 use crate::pagetable::page_entry::*;
 use crate::pagetable::pagemap::*;
@@ -16,24 +17,26 @@ pub struct MapEntry{
     pub addr: PAddr,
     pub write: bool,
     pub execute_disable: bool,
-    pub size: PageSize,
 }
 
-impl MapEntry{
-    pub open spec fn wf(&self) -> bool{
-        match self.size{
-            PageSize::SZ4K => {
-                self.addr & PA_4K_MASK as usize == 0
-            }
-            PageSize::SZ2M => {
-                self.addr & PA_2M_MASK as usize == 0
-            }
-            PageSize::SZ1G => {
-                self.addr & PA_1G_MASK as usize == 0
-            }
-        }
-    }
-}
+// pub open spec fn map_entry_equals_to_page_entry_unwrapped(m:MapEntry, p:PageEntry) -> bool{
+//     &&&
+//     m.addr == p.addr
+//     &&&
+//     m.write == p.perm.write
+//     &&&
+//     m.execute_disable == p.perm.execute_disable
+// }
+
+// pub open spec fn map_entry_equals_to_page_entry(m:Option<MapEntry>, p:Option<PageEntry>) -> bool {
+//     if m.is_Some() != p.is_Some(){
+//         return false;
+//     }else if m.is_None() && p.is_None() {
+//         return true;
+//     }else{
+//         return map_entry_equals_to_page_entry_unwrapped(m.get_Some_0(), p.get_Some_0());
+//     }
+// }
 
 pub struct PageTable{
     pub cr3: PAddr,
@@ -92,26 +95,21 @@ impl PageTable{
     //         }
     //     }
 
-    // #[verifier(inline)]
-    // pub open spec fn get_pagetable_page_closure(&self) -> Set<PagePtr>{
-    //         self.l3_tables@.dom() + self.l2_tables@.dom() + self.l1_tables@.dom() + self.l4_table@.dom()
-    // }
+    pub open spec fn page_closure(&self) -> Set<PagePtr>{
+            self.l3_tables@.dom() + self.l2_tables@.dom() + self.l1_tables@.dom() + self.l4_table@.dom()
+    }
 
-    // #[verifier(inline)]
-    // pub open spec fn get_pagetable_mapping(&self) -> Map<VAddr,Option<PageEntry>> {
-    //     self.mapping@
-    // }
+    pub open spec fn mapping_4k(&self) -> Map<VAddr,Option<MapEntry>> {
+        self.mapping_4k@
+    }
 
-    // // #[verifier(inline)]
-    // pub open spec fn get_pagetable_mapped_pages(&self) -> Set<PagePtr>{
-    //     Set::<PagePtr>::new(|pa: PagePtr| self.is_pa_mapped(pa))
-    // }
+    pub open spec fn mapping_2m(&self) -> Map<VAddr,Option<MapEntry>> {
+        self.mapping_2m@
+    }
 
-    // // #[verifier(inline)]
-    // pub open spec fn is_pa_mapped(&self, pa:PAddr) -> bool
-    // {
-    //     exists|va:VAddr| #![auto] spec_va_valid(va) && self.get_pagetable_mapping()[va].is_Some() && self.get_pagetable_mapping()[va].get_Some_0().addr == pa
-    // }
+    pub open spec fn mapping_1g(&self) -> Map<VAddr,Option<MapEntry>> {
+        self.mapping_1g@
+    }
 
     pub open spec fn wf_l4(&self) -> bool{
         &&&
@@ -366,169 +364,174 @@ impl PageTable{
                 ! self.l1_tables@[pa].value()[i].perm.ps
     }
 
-    // pub open spec fn no_self_mapping(&self) -> bool
-    // {
-    //     //L1 table only maps to outside of this pagetable
-    //     //L1 tables do not have to be disjoint
-    //     (
-    //         forall|va: VAddr| #![auto] spec_va_valid(va) && self.mapping@[va].is_Some() ==>
-    //                 self.l3_tables@.dom().contains(self.mapping@[va].get_Some_0().addr) == false
-    //     )
-    //     &&
-    //     (
-    //         forall|va: VAddr| #![auto] spec_va_valid(va) && self.mapping@[va].is_Some() ==>
-    //                 self.l2_tables@.dom().contains(self.mapping@[va].get_Some_0().addr) == false
-    //     )
-    //     &&
-    //     (
-    //         forall|va: VAddr| #![auto] spec_va_valid(va) && self.mapping@[va].is_Some() ==>
-    //                 self.l1_tables@.dom().contains(self.mapping@[va].get_Some_0().addr) == false
-    //     )
-    //     &&
-    //     (
-    //         forall|va: VAddr| #![auto] spec_va_valid(va) && self.mapping@[va].is_Some() ==>
-    //             self.cr3 != self.mapping@[va].get_Some_0().addr
-    //     )
-    // }
+    pub open spec fn resolve_mapping_l4(&self, l4i: L4Index) -> Option<PageEntry>
+        recommends
+            0 <= l4i < 512,
+    {
+        if self.cr3 == 0{
+            None
+        }else if !self.l4_table@[self.cr3].value()[l4i].perm.present{
+            None
+        }else{
+            Some(self.l4_table@[self.cr3].value()[l4i])
+        }
+    }
 
-    // // #[verifier(inline)]
-    // pub open spec fn resolve_mapping_l4(&self, l4i: L4Index) -> Option<PageEntry>
-    //     recommends
-    //         KERNEL_MEM_END_L4INDEX <= l4i < 512,
-    // {
-    //     if self.cr3 == 0{
-    //         None
-    //     }else{
-    //         self.l4_table@[self.cr3]@.value.get_Some_0()[l4i]
-    //     }
-    // }
+    pub open spec fn resolve_mapping_4k_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
+    recommends
+        0<= l4i < 512,
+        0<= l3i < 512,
+    {
+        if self.resolve_mapping_l4(l4i).is_None() {
+            None
+        }else if !self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.present || self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.ps {
+            None
+        }else{
+            Some(self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i])
+        }
+    }
 
-    // pub open spec fn resolve_mapping_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
-    // recommends
-    //     KERNEL_MEM_END_L4INDEX<= l4i < 512,
-    //     0<= l3i < 512,
-    // {
-    //     if self.resolve_mapping_l4(l4i).is_None() {
-    //         None
-    //     }else{
-    //         self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr]@.value.get_Some_0()[l3i]
-    //     }
-    // }
+    pub open spec fn resolve_mapping_4k_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
+    recommends
+        0<= l4i < 512,
+        0<= l3i < 512,
+        0<= l2i < 512,
+    {
+        if self.resolve_mapping_4k_l3(l4i,l3i).is_None() {
+            None
+        }else if !self.l2_tables@[self.resolve_mapping_4k_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.present || self.l2_tables@[self.resolve_mapping_4k_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.ps {
+            None
+        }else{
+            Some(self.l2_tables@[self.resolve_mapping_4k_l3(l4i,l3i).get_Some_0().addr].value()[l2i])
+        }
+    }
 
-    // pub open spec fn resolve_mapping_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
-    // recommends
-    //     KERNEL_MEM_END_L4INDEX<= l4i < 512,
-    //     0<= l3i < 512,
-    //     0<= l2i < 512,
-    // {
-    //     if self.resolve_mapping_l3(l4i,l3i).is_None() {
-    //         None
-    //     }else{
-    //         self.l2_tables@[self.resolve_mapping_l3(l4i,l3i).get_Some_0().addr]@.value.get_Some_0()[l2i]
-    //     }
-    // }
+    pub open spec fn resolve_mapping_4k_l1(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index) -> Option<PageEntry>
+    recommends
+        0<= l4i < 512,
+        0<= l3i < 512,
+        0<= l2i < 512,
+        0<= l1i < 512,
+    {
+        if self.resolve_mapping_4k_l2(l4i,l3i,l2i).is_None() {
+            None
+        }else if !self.l1_tables@[self.resolve_mapping_4k_l2(l4i,l3i,l2i).get_Some_0().addr].value()[l1i].perm.present {
+            None
+        }else{
+            Some(self.l1_tables@[self.resolve_mapping_4k_l2(l4i,l3i,l2i).get_Some_0().addr].value()[l1i])
+        }
 
-    // pub open spec fn resolve_mapping_l1(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index) -> Option<PageEntry>
-    // recommends
-    //     KERNEL_MEM_END_L4INDEX<= l4i < 512,
-    //     0<= l3i < 512,
-    //     0<= l2i < 512,
-    //     0<= l1i < 512,
-    // {
-    //     if self.resolve_mapping_l2(l4i,l3i,l2i).is_None() {
-    //         None
-    //     }else{
-    //         self.l1_tables@[self.resolve_mapping_l2(l4i,l3i,l2i).get_Some_0().addr]@.value.get_Some_0()[l1i]
-    //     }
+    }
 
-    // }
+    pub open spec fn resolve_mapping_2m_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
+    recommends
+        0<= l4i < 512,
+        0<= l3i < 512,
+    {
+        if self.resolve_mapping_l4(l4i).is_None() {
+            None
+        }else if !self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.present || self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.ps {
+            None
+        }else{
+            Some(self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i])
+        }
+    }
 
-    // pub proof fn wf_to_wf_mapping(&self)
-    //     requires self.wf_l4(),
-    //              self.wf_l3(),
-    //              self.wf_l2(),
-    //     ensures
-    //         self.wf_l4_mapping(),
-    //         self.wf_l3_mapping(),
-    //         self.wf_l2_mapping()
-    // {
-    //     assert(self.wf_l4_mapping());
-    //     assert(self.wf_l3_mapping());
-    //     assert(self.wf_l2_mapping());
-    // }
+    pub open spec fn resolve_mapping_2m_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
+    recommends
+        0<= l4i < 512,
+        0<= l3i < 512,
+        0<= l2i < 512,
+    {
+        if self.resolve_mapping_2m_l3(l4i,l3i).is_None() {
+            None
+        }else if !self.l2_tables@[self.resolve_mapping_2m_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.present || !self.l2_tables@[self.resolve_mapping_2m_l3(l4i,l3i).get_Some_0().addr].value()[l2i].perm.ps {
+            None
+        }else{
+            Some(self.l2_tables@[self.resolve_mapping_2m_l3(l4i,l3i).get_Some_0().addr].value()[l2i])
+        }
+    }
 
+    pub open spec fn resolve_mapping_1g_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
+    recommends
+        0<= l4i < 512,
+        0<= l3i < 512,
+    {
+        if self.resolve_mapping_l4(l4i).is_None() {
+            None
+        }else if !self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.present || !self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i].perm.ps {
+            None
+        }else{
+            Some(self.l3_tables@[self.resolve_mapping_l4(l4i).get_Some_0().addr].value()[l3i])
+        }
+    }
 
-    // pub open spec fn wf_l4_mapping(&self) -> bool{
-    //     forall|l4i: L4Index, l4j: L4Index| #![auto] (KERNEL_MEM_END_L4INDEX<= l4i < 512) && (KERNEL_MEM_END_L4INDEX<= l4j < 512) && !(l4i == l4j) ==>
-    //     (self.resolve_mapping_l4(l4i).is_None() || self.resolve_mapping_l4(l4j).is_None() || self.resolve_mapping_l4(l4i).get_Some_0().addr != self.resolve_mapping_l4(l4j).get_Some_0().addr)
-    // }
+    pub open spec fn wf_mapping_4k(&self) -> bool{
+        &&&
+        forall|va: VAddr| 
+            #![trigger va_4k_valid(va), self.mapping_4k@.dom().contains(va)]
+            va_4k_valid(va) ==> self.mapping_4k@.dom().contains(va)
+        &&&
+        forall|l4i: L4Index,l3i: L3Index,l2i: L2Index, l1i: L1Index| 
+            #![trigger self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))], self.resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
+            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512
+                ==> (self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].is_None() && self.resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).is_None()) 
+                    ||
+                    (self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].get_Some_0().addr == self.resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().addr &&
+                    self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].get_Some_0().write == self.resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.write &&
+                    self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].get_Some_0().execute_disable == self.resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.execute_disable)
 
-    // pub open spec fn wf_l3_mapping(&self) -> bool{
-    //     forall|l4i: L4Index, l3i: L3Index, l4j: L4Index,l3j: L3Index| #![auto] (KERNEL_MEM_END_L4INDEX<= l4i < 512 && 0<= l3i < 512)
-    //         && (KERNEL_MEM_END_L4INDEX<= l4j < 512 && 0<= l3j < 512)
-    //         && !(l4i == l4j && l3i == l3j) ==>
-    //             (self.resolve_mapping_l3(l4i,l3i).is_None() || self.resolve_mapping_l3(l4j,l3j).is_None() || self.resolve_mapping_l3(l4i,l3i).get_Some_0().addr != self.resolve_mapping_l3(l4j,l3j).get_Some_0().addr)
-    // }
+    }
 
+    pub open spec fn wf_mapping_2m(&self) -> bool{
+        &&&
+        forall|va: VAddr| 
+            #![trigger va_2m_valid(va), self.mapping_2m@.dom().contains(va)]
+            va_2m_valid(va) ==> self.mapping_2m@.dom().contains(va)
+        &&&
+        forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
+            #![trigger self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))], self.resolve_mapping_2m_l2(l4i,l3i,l2i)]
+            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512
+                ==> (self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].is_None() && self.resolve_mapping_2m_l2(l4i,l3i,l2i).is_None()) 
+                    ||
+                    (self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].get_Some_0().addr == self.resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().addr &&
+                    self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].get_Some_0().write == self.resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().perm.write &&
+                    self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].get_Some_0().execute_disable == self.resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().perm.execute_disable)
+    }
 
-    // pub open spec fn wf_l2_mapping(&self) -> bool{
-    //     forall|l4i: L4Index,l3i: L3Index,l2i: L2Index,l4j: L4Index,l3j: L3Index,l2j: L2Index| #![auto] (KERNEL_MEM_END_L4INDEX<= l4i < 512 && 0<= l3i < 512 && 0<= l2i < 512)
-    //     && (KERNEL_MEM_END_L4INDEX<= l4j < 512 && 0<= l3j < 512 && 0<= l2j < 512)
-    //     && !(l4i == l4j && l3i == l3j && l2i == l2j ) ==>
-    //     self.resolve_mapping_l2(l4i,l3i,l2i).is_None() || self.resolve_mapping_l2(l4j,l3j,l2j).is_None() || self.resolve_mapping_l2(l4i,l3i,l2i).get_Some_0().addr != self.resolve_mapping_l2(l4j,l3j,l2j).get_Some_0().addr
+    pub open spec fn wf_mapping_1g(&self) -> bool{
+        &&&
+        forall|va: VAddr| 
+            #![trigger va_1g_valid(va), self.mapping_1g@.dom().contains(va)]
+            va_1g_valid(va) ==> self.mapping_1g@.dom().contains(va)
+        &&&
+        forall|l4i: L4Index,l3i: L3Index| 
+            #![trigger self.mapping_1g@[spec_index2va((l4i,l3i,0,0))], self.resolve_mapping_1g_l3(l4i,l3i)]
+            0 <= l4i < 512 && 0 <= l3i < 512
+                ==> (self.mapping_2m@[spec_index2va((l4i,l3i,0,0))].is_None() && self.resolve_mapping_1g_l3(l4i,l3i).is_None()) 
+                    ||
+                    (self.mapping_2m@[spec_index2va((l4i,l3i,0,0))].get_Some_0().addr == self.resolve_mapping_1g_l3(l4i,l3i).get_Some_0().addr &&
+                    self.mapping_2m@[spec_index2va((l4i,l3i,0,0))].get_Some_0().write == self.resolve_mapping_1g_l3(l4i,l3i).get_Some_0().perm.write &&
+                    self.mapping_2m@[spec_index2va((l4i,l3i,0,0))].get_Some_0().execute_disable == self.resolve_mapping_1g_l3(l4i,l3i).get_Some_0().perm.execute_disable)
+    }
 
-
-    // }
-
-    // pub open spec fn wf_mapping(&self) -> bool{
-    //     (
-    //         forall|va: VAddr| #![auto] spec_va_valid(va) ==> self.mapping@.dom().contains(va)
-    //     )
-    //     // &&
-    //     // (forall|va: usize| #![auto] spec_va_valid(va) ==> self.mapping@[va] == self.resolve_mapping_l1(spec_v2l4index(va),spec_v2l3index(va),spec_v2l2index(va),spec_v2l1index(va)))
-    //     &&
-    //     (forall|l4i: L4Index,l3i: L3Index,l2i: L2Index, l1i: L1Index| #![auto] (KERNEL_MEM_END_L4INDEX<= l4i < 512 && 0<= l3i < 512 && 0<= l2i < 512 && 0<= l1i < 512)
-    //     ==> self.mapping@[spec_index2va((l4i,l3i,l2i,l1i))] == self.resolve_mapping_l1(l4i,l3i,l2i,l1i))
-
-    // }
-
-    // pub open spec fn l4_l3_l2_rwx(&self) -> bool {
-    //     &&&
-    //     (
-    //             forall|l4i: L4Index| #![auto] KERNEL_MEM_END_L4INDEX <= l4i< 512 && self.l4_table@[self.cr3]@.value.get_Some_0()[l4i].is_Some() ==>
-    //                 self.l4_table@[self.cr3]@.value.get_Some_0()[l4i].get_Some_0().perm == READ_WRITE_EXECUTE
-    //     )
-    //     &&&
-    //     (
-    //         forall|i: PAddr| #![auto] self.l3_tables@.dom().contains(i) ==>
-    //             forall|j: L3Index| #![auto] 0 <= j < 512 && self.l3_tables@[i]@.value.get_Some_0()[j].is_Some() ==>
-    //                 self.l3_tables@[i]@.value.get_Some_0()[j].get_Some_0().perm == READ_WRITE_EXECUTE
-    //     )
-    //     &&&
-    //     (
-    //         forall|i: PAddr| #![auto] self.l2_tables@.dom().contains(i) ==>
-    //             forall|j: L2Index| #![auto] 0 <= j < 512 && self.l2_tables@[i]@.value.get_Some_0()[j].is_Some() ==>
-    //                 self.l2_tables@[i]@.value.get_Some_0()[j].get_Some_0().perm == READ_WRITE_EXECUTE
-    //     )
-    // }
-    // pub open spec fn wf(&self) -> bool
-    // {
-    //     self.wf_l4()
-    //     &&
-    //     self.wf_l3()
-    //     &&
-    //     self.wf_l2()
-    //     &&
-    //     self.wf_l1()
-    //     &&
-    //     self.no_self_mapping()
-    //     &&
-    //     self.wf_mapping()
-    //     &&
-    //     self.l4_kernel_entries_reserved()
-    //     &&
-    //     self.l4_l3_l2_rwx()
-    // }
+    pub open spec fn wf(&self) -> bool
+    {
+        &&&
+        self.wf_l4()
+        &&&
+        self.wf_l3()
+        &&&
+        self.wf_l2()
+        &&&
+        self.wf_l1()
+        &&&
+        self.wf_mapping_4k()
+        &&&
+        self.wf_mapping_2m()
+        &&&
+        self.wf_mapping_1g()
+    }
 
     // pub open spec fn l4_kernel_entries_reserved(&self) -> bool
     //     recommends self.wf_l4(),
@@ -537,55 +540,32 @@ impl PageTable{
     // }
 
 
-    // pub open spec fn l4_entry_exists(&self, l4i: L4Index) -> bool
-    //     recommends self.wf(),
-    // {
-    //     self.l4_table@[self.cr3]@.value.get_Some_0()[l4i].is_Some()
-    // }
+    pub open spec fn l4_entry_exists(&self, l4i: L4Index) -> bool
+        recommends self.wf(),
+    {
+        self.resolve_mapping_l4(l4i).is_Some()
+    }
 
-    // pub open spec fn l3_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
-    //     recommends self.wf(),
-    //                 self.l4_entry_exists(l4i)
-    // {
-    //     self.l3_tables@[
-    //         self.l4_table@[self.cr3]@.value.get_Some_0()[l4i].get_Some_0().addr
-    //     ]@.value.get_Some_0()[l3i].is_Some()
-    // }
+    pub open spec fn l3_2m_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
+        recommends self.wf(),
+                    self.l4_entry_exists(l4i)
+    {
+        self.resolve_mapping_2m_l3(l4i,l3i).is_Some()
+    }
 
-    // pub open spec fn l2_entry_exists(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> bool
-    // recommends self.wf(),
-    //             self.l4_entry_exists(l4i),
-    //             self.l3_entry_exists(l4i,l3i)
-    // {
-    //     self.l2_tables@[
-    //         self.l3_tables@[
-    //             self.l4_table@[self.cr3]@.value.get_Some_0()[l4i].get_Some_0().addr
-    //                 ]@.value.get_Some_0()[l3i].get_Some_0().addr
-    //             ]@.value.get_Some_0()[l2i].is_Some()
-    // }
+    pub open spec fn l3_4k_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
+        recommends self.wf(),
+                    self.l4_entry_exists(l4i)
+    {
+        self.resolve_mapping_4k_l3(l4i,l3i).is_Some()
+    }
 
-    // pub open spec fn is_va_entry_exist(&self, va:VAddr) -> bool
-    //     recommends spec_va_valid(va),
-    // {
-    //     let (l4i,l3i,l2i,_) = spec_va2index(va);
-
-    //     self.l4_entry_exists(l4i)
-    //     &&
-    //     self.l3_entry_exists(l4i,l3i)
-    //     &&
-    //     self.l2_entry_exists(l4i,l3i,l2i)
-    // }
-
-    // pub proof fn l4_empty_derive(&self)
-    //     requires
-    //         self.wf(),
-    //         forall|i: L4Index| #![auto] KERNEL_MEM_END_L4INDEX <= i < 512 && self.l4_table@[self.cr3]@.value.get_Some_0()[i].is_None()
-    // {
-    //     assert(self.l3_tables@.dom() =~= Set::empty());
-    //     assert(self.l2_tables@.dom() =~= Set::empty());
-    //     assert(self.l1_tables@.dom() =~= Set::empty());
-    // }
-
+    pub open spec fn l2_4k_entry_exists(&self, l4i: L4Index, l3i :L3Index, l2i :L2Index) -> bool
+        recommends self.wf(),
+                    self.l3_4k_entry_exists(l4i,l3i)
+    {
+        self.resolve_mapping_4k_l2(l4i,l3i,l2i).is_Some()
+    }
 
 }
 

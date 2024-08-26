@@ -90,10 +90,10 @@ pub const MAX_USIZE:u64 = 31*1024*1024*1024;
 pub const PCID_MAX:usize = 4096;
 pub const IOID_MAX:usize = 4096;
 
-pub const PA_MASK:u64 = 0x0000_ffff_ffff_f000;
-pub const PA_4K_MASK:u64 = 0x0000_ffff_ffff_f000;
-pub const PA_2M_MASK:u64 = 0x0000_ffff_ff00_0000;
-pub const PA_1G_MASK:u64 = 0x0000_fff0_0000_0000;
+pub const MEM_MASK:u64 = 0x0000_ffff_ffff_f000;
+pub const MEM_4K_MASK:u64 = 0x0000_ffff_ffff_f000;
+pub const MEM_2M_MASK:u64 = 0x0000_ffff_ff00_0000;
+pub const MEM_1G_MASK:u64 = 0x0000_fff0_0000_0000;
 pub const VA_PERM_MASK:u64 = 0x8000_0000_0000_0002;
 pub const READ:usize = 0x8000_0000_0000_0000u64 as usize;
 pub const READ_WRITE:usize = 0x8000_0000_0000_0002u64 as usize;

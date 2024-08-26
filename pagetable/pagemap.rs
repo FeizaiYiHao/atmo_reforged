@@ -10,7 +10,7 @@ use crate::pagetable::page_entry::*;
 
 pub struct PageMap{
     pub ar: Array<usize,512>,
-    pub spec_seq: Ghost<Seq<Option<PageEntry>>>,
+    pub spec_seq: Ghost<Seq<PageEntry>>,
     // pub level: Ghost<usize>, // not used for now.
 }
 
@@ -22,12 +22,8 @@ impl PageMap{
         self.spec_seq@.len() == 512
         &&&
         forall|i:int|
-            #![trigger self.spec_seq@[i].unwrap()]
-            0<=i<512 && usize2page_entry(self.ar@[i]).perm.present ==> (usize2page_entry(self.ar@[i]) =~= self.spec_seq@[i].unwrap())
-        &&&
-        forall|i:int|
-            #![trigger self.spec_seq@[i].is_None()]
-            0<=i<512 && !usize2page_entry(self.ar@[i]).perm.present ==> self.spec_seq@[i].is_None()
+            #![trigger usize2page_entry(self.ar@[i])]
+            0<=i<512 ==> (usize2page_entry(self.ar@[i]) =~= self.spec_seq@[i])
         &&&
         forall|i:int|
             #![trigger usize2page_entry(self.ar@[i]).perm.present]
@@ -35,19 +31,19 @@ impl PageMap{
         
     }
 
-    pub open spec fn view(&self) -> Seq<Option<PageEntry>>
+    pub open spec fn view(&self) -> Seq<PageEntry>
     {
         self.spec_seq@
     }
 
-    pub open spec fn spec_index(&self, index:usize) -> Option<PageEntry>
+    pub open spec fn spec_index(&self, index:usize) -> PageEntry
         recommends
             0<=index<512,
     {
         self.spec_seq@[index as int]
     }
 
-    pub fn set(&mut self, index:usize, value: Option<PageEntry>)
+    pub fn set(&mut self, index:usize, value:PageEntry)
         requires
             old(self).wf(),
             0<=index<512,
@@ -69,7 +65,7 @@ impl PageMap{
             }
             else{
                 proof{
-                    page_ptr_valid_imply_pa_valid(value.addr);
+                    page_ptr_valid_imply_MEM_valid(value.addr);
                 }
                 let u = page_entry2usize(&value);
                 self.ar.set(index,u);

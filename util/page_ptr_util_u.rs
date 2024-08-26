@@ -66,9 +66,9 @@ pub fn page_index2page_ptr(i: usize) -> (ret:usize)
     i * 4096usize
 }
 
-pub open spec fn pa_valid(v: PAddr) -> bool
+pub open spec fn MEM_valid(v: PAddr) -> bool
 {
-    v & (!PA_MASK) as usize == 0
+    v & (!MEM_MASK) as usize == 0
 }
 
 pub open spec fn page_ptr_valid(ptr: usize) -> bool
@@ -81,6 +81,132 @@ pub open spec fn page_ptr_valid(ptr: usize) -> bool
 pub open spec fn page_index_valid(index: usize) -> bool
 {
     (0<=index<NUM_PAGES)
+}
+
+#[verifier(when_used_as_spec(spec_va_4k_valid))]
+pub fn va_4k_valid(va:usize) -> (ret:bool)
+    ensures
+        ret == spec_va_4k_valid(va),
+{
+    (va & (!MEM_4K_MASK) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= KERNEL_MEM_END_L4INDEX as u64
+}
+
+pub open spec fn spec_va_4k_valid(va: usize) -> bool
+{
+    (va & (!MEM_4K_MASK) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= KERNEL_MEM_END_L4INDEX as u64
+}
+
+#[verifier(when_used_as_spec(spec_va_2m_valid))]
+pub fn va_2m_valid(va:usize) -> (ret:bool)
+    ensures
+        ret == spec_va_2m_valid(va),
+{
+    (va & (!MEM_2M_MASK) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= KERNEL_MEM_END_L4INDEX as u64
+}
+
+pub open spec fn spec_va_2m_valid(va: usize) -> bool
+{
+    (va & (!MEM_2M_MASK) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= KERNEL_MEM_END_L4INDEX as u64
+}
+
+#[verifier(when_used_as_spec(spec_va_2m_valid))]
+pub fn va_1g_valid(va:usize) -> (ret:bool)
+    ensures
+        ret == spec_va_1g_valid(va),
+{
+    (va & (!MEM_1G_MASK) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= KERNEL_MEM_END_L4INDEX as u64
+}
+
+pub open spec fn spec_va_1g_valid(va: usize) -> bool
+{
+    (va & (!MEM_1G_MASK) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= KERNEL_MEM_END_L4INDEX as u64
+}
+
+pub open spec fn spec_v2l1index(va: usize) -> L1Index
+{
+    (va >> 12 & 0x1ff) as usize
+}
+
+pub open spec fn spec_v2l2index(va: usize) -> L2Index
+{
+    (va >> 21 & 0x1ff) as usize
+}
+
+pub open spec fn spec_v2l3index(va: usize) -> L3Index
+{
+    (va >> 30 & 0x1ff) as usize
+}
+
+pub open spec fn spec_v2l4index(va: usize) -> L4Index
+{
+    (va >> 39 & 0x1ff) as usize
+}
+
+pub open spec fn spec_va2index(va: usize) -> (L4Index,L3Index,L2Index,L1Index)
+{
+    (spec_v2l4index(va),spec_v2l3index(va),spec_v2l2index(va),spec_v2l1index(va))
+}
+
+pub open spec fn spec_index2va(i:(L4Index,L3Index,L2Index,L1Index)) -> usize
+    recommends
+    i.0 <= 0x1ff,
+    i.1 <= 0x1ff,
+    i.2 <= 0x1ff,
+    i.3 <= 0x1ff,
+{
+    (i.0 as usize)<<39 & (i.1 as usize)<<30 & (i.2 as usize)<<21 & (i.3 as usize)<<12
+}
+
+#[verifier(when_used_as_spec(spec_v2l1index))]
+pub fn v2l1index(va: usize) -> (ret: L1Index)
+    requires va_4k_valid(va) || va_2m_valid(va) || va_1g_valid(va),
+    ensures  ret == spec_v2l1index(va),
+             ret <= 0x1ff,
+{
+    assert((va as u64 >> 12u64 & 0x1ffu64) as usize <= 0x1ff) by (bit_vector);
+    (va as u64 >> 12u64 & 0x1ffu64) as usize
+}
+
+#[verifier(when_used_as_spec(spec_v2l2index))]
+pub fn v2l2index(va: usize) -> (ret: L2Index)
+    requires va_4k_valid(va) || va_2m_valid(va) || va_1g_valid(va),
+    ensures  ret == spec_v2l2index(va),
+            ret <= 0x1ff,
+{
+    assert((va as u64 >> 21u64 & 0x1ffu64) as usize <= 0x1ff) by (bit_vector);
+    (va as u64 >> 21u64 & 0x1ffu64) as usize
+}
+
+#[verifier(when_used_as_spec(spec_v2l3index))]
+pub fn v2l3index(va: usize) -> (ret: L3Index)
+    requires va_4k_valid(va) || va_2m_valid(va) || va_1g_valid(va),
+    ensures  ret == spec_v2l3index(va),
+            ret <= 0x1ff,
+{
+    assert((va as u64 >> 30u64 & 0x1ffu64) as usize <= 0x1ff) by (bit_vector);
+    (va as u64 >> 30u64 & 0x1ffu64) as usize
+}
+
+#[verifier(when_used_as_spec(spec_v2l4index))]
+pub fn v2l4index(va: usize) -> (ret: L4Index)
+    requires va_4k_valid(va) || va_2m_valid(va) || va_1g_valid(va),
+    ensures  ret == spec_v2l4index(va),
+            KERNEL_MEM_END_L4INDEX <= ret <= 0x1ff,
+{
+    assert((va as u64 >> 39u64 & 0x1ffu64) as usize <= 0x1ff) by (bit_vector);
+    (va as u64 >> 39u64 & 0x1ffu64) as usize
+}
+
+pub fn va2index(va: usize) -> (ret : (L4Index,L3Index,L2Index,L1Index))
+    requires
+        va_4k_valid(va) || va_2m_valid(va) || va_1g_valid(va),
+    ensures
+        ret.0 == spec_v2l4index(va) && KERNEL_MEM_END_L4INDEX <= ret.0 <= 0x1ff,
+        ret.1 == spec_v2l3index(va) && ret.1 <= 0x1ff,
+        ret.2 == spec_v2l2index(va) && ret.2 <= 0x1ff,
+        ret.3 == spec_v2l1index(va) && ret.3 <= 0x1ff,
+{
+    (v2l4index(va),v2l3index(va),v2l2index(va),v2l1index(va))
 }
 
 

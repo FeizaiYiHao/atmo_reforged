@@ -47,10 +47,10 @@ pub proof fn pagemap_permission_bits_lemma()
         (0usize & (PAGE_ENTRY_PRESENT_MASK as usize) == 0),
         (forall|i:usize| #![auto] (i | (PAGE_ENTRY_PRESENT_MASK as usize)) & (PAGE_ENTRY_PRESENT_MASK as usize) == 1),
         (forall|i:usize| #![auto] page_ptr_valid(i) ==>
-            ((i | (PAGE_ENTRY_PRESENT_MASK as usize)) & (PA_MASK as usize)) == i),
+            ((i | (PAGE_ENTRY_PRESENT_MASK as usize)) & (MEM_MASK as usize)) == i),
         (forall|i:usize, j:usize| #![auto] page_ptr_valid(i) && spec_va_perm_bits_valid(j) ==>
             (
-                ((((i | j) | (PAGE_ENTRY_PRESENT_MASK as usize)) & (PA_MASK as usize)) == i)
+                ((((i | j) | (PAGE_ENTRY_PRESENT_MASK as usize)) & (MEM_MASK as usize)) == i)
             )
         ),
         (forall|i:usize, j:usize| #![auto] page_ptr_valid(i) && spec_va_perm_bits_valid(j) ==>
@@ -60,7 +60,7 @@ pub proof fn pagemap_permission_bits_lemma()
         ),
         (forall|i:usize, j:usize| #![auto] page_ptr_valid(i) && spec_va_perm_bits_valid(j) ==>
             (
-                (((i | j)  & (PA_MASK as usize)) == i)
+                (((i | j)  & (MEM_MASK as usize)) == i)
             )
         ),
         (forall|i:usize, j:usize| #![auto] page_ptr_valid(i) && spec_va_perm_bits_valid(j) ==>

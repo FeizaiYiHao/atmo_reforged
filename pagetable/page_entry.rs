@@ -87,23 +87,23 @@ pub fn usize2page_entry(v:usize) -> (ret:PageEntry)
 }
 
 pub open spec fn spec_usize2pa(v:usize) -> PAddr{
-    v & PA_MASK as usize
+    v & MEM_MASK as usize
 }
 
 #[verifier(when_used_as_spec(spec_usize2pa))]
 pub fn usize2pa(v:usize) -> (ret:PAddr)
     ensures
         ret =~= spec_usize2pa(v),
-        pa_valid(ret),
+        MEM_valid(ret),
 {
-    let ret = v & PA_MASK as usize;
+    let ret = v & MEM_MASK as usize;
     assert(  v & 0x0000_ffff_ffff_f000u64 as usize & (!0x0000_ffff_ffff_f000u64) as usize == 0) by (bit_vector);
     return ret;
 }
 
 pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
     requires
-        pa_valid(page_entry.addr),
+        MEM_valid(page_entry.addr),
     ensures
         usize2present(ret) == page_entry.perm.present,
         usize2ps(ret) == page_entry.perm.ps,
@@ -139,7 +139,7 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
 
         assert((ghost_ret@ | 0x1u64 as usize) & (!(0x1u64 | 0x0000_ffff_ffff_f000u64)) as usize == 0) by (bit_vector) requires 
             ghost_ret@ & (!0x0000_ffff_ffff_f000u64) as usize == 0;
-        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PA_MASK)) as usize == 0);
+        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | MEM_MASK)) as usize == 0);
     }else{
         assert((ret & 0x1u64 as usize) == 0) by (bit_vector) requires ret & (!0x0000_ffff_ffff_f000u64) as usize == 0 ; 
         assert(usize2present(ret) == page_entry.perm.present); 
@@ -150,12 +150,12 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
 
         assert(ghost_addr@ & (!(0x1u64 | 0x0000_ffff_ffff_f000u64)) as usize == 0) by (bit_vector) requires 
             ghost_addr@ & (!0x0000_ffff_ffff_f000u64) as usize == 0;
-        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PA_MASK)) as usize == 0);
+        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | MEM_MASK)) as usize == 0);
     }
 
     assert(usize2present(ret) == page_entry.perm.present); 
     assert(usize2pa(ret) == page_entry.addr); 
-    assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PA_MASK)) as usize == 0);
+    assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | MEM_MASK)) as usize == 0);
 
     ghost_ret = Ghost(ret);
 
@@ -178,7 +178,7 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
 
         assert((ghost_ret@ | (0x1u64 << 0x7u64) as usize) & (!(0x1u64 | 0x1u64 << 0x7u64 |0x0000_ffff_ffff_f000u64)) as usize == 0) by (bit_vector) requires 
             ghost_ret@ & (!(0x1u64 | 0x0000_ffff_ffff_f000u64)) as usize == 0;
-        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PA_MASK)) as usize == 0);
+        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | MEM_MASK)) as usize == 0);
     }
     else{
         assert((ret & (0x1u64<<0x7u64) as usize) == 0) by (bit_vector) requires ret & (!(0x1u64 | 0x0000_ffff_ffff_f000u64)) as usize == 0 ; 
@@ -189,13 +189,13 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
 
         assert(ret & (!(0x1u64 | 0x1u64 << 0x7u64 |0x0000_ffff_ffff_f000u64)) as usize == 0) by (bit_vector) requires 
             ret & (!(0x1u64 | 0x0000_ffff_ffff_f000u64)) as usize == 0;
-        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PA_MASK)) as usize == 0);
+        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | MEM_MASK)) as usize == 0);
     } 
 
     assert(usize2present(ret) == page_entry.perm.present);
     assert(usize2ps(ret) == page_entry.perm.ps); 
     assert(usize2pa(ret) == page_entry.addr); 
-    assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PA_MASK)) as usize == 0);
+    assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | MEM_MASK)) as usize == 0);
 
     ghost_ret = Ghost(ret);
 
@@ -223,7 +223,7 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
 
         assert((ghost_ret@ | (0x1u64 << 0x1u64) as usize) & (!(0x1u64 | 0x1u64 << 0x7u64 | 0x1u64 << 0x1u64 |0x0000_ffff_ffff_f000u64)) as usize == 0) by (bit_vector) requires 
             ghost_ret@ & (!(0x1u64 | 0x1u64 << 0x7u64 | 0x0000_ffff_ffff_f000u64)) as usize == 0;
-        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | PA_MASK)) as usize == 0);
+        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | MEM_MASK)) as usize == 0);
     }
     else{
         assert((ret & (0x1u64<<0x1u64) as usize) == 0) by (bit_vector) requires ret & (!(0x1u64 | 0x1u64 << 0x7u64 |0x0000_ffff_ffff_f000u64)) as usize == 0 ; 
@@ -235,14 +235,14 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
 
         assert(ret & (!(0x1u64 | 0x1u64 << 0x7u64 | 0x1u64 << 0x1u64 |0x0000_ffff_ffff_f000u64)) as usize == 0) by (bit_vector) requires 
             ret & (!(0x1u64 | 0x1u64 << 0x7u64 | 0x0000_ffff_ffff_f000u64)) as usize == 0;
-        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | PA_MASK)) as usize == 0);
+        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | MEM_MASK)) as usize == 0);
     } 
 
     assert(usize2present(ret) == page_entry.perm.present);
     assert(usize2ps(ret) == page_entry.perm.ps); 
     assert(usize2write(ret) == page_entry.perm.write); 
     assert(usize2pa(ret) == page_entry.addr); 
-    assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | PA_MASK)) as usize == 0);
+    assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | MEM_MASK)) as usize == 0);
 
     ghost_ret = Ghost(ret);
     
@@ -275,7 +275,7 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
 
         assert((ghost_ret@ | (0x1u64 << 63u64) as usize) & (!(0x1u64 | 0x1u64 << 0x7u64 | 0x1u64 << 0x1u64 | 0x1u64 << 63u64 |0x0000_ffff_ffff_f000u64)) as usize == 0) by (bit_vector) requires 
             ghost_ret@ & (!(0x1u64 | 0x1u64 << 0x7u64 |  0x1u64 << 0x1u64 |0x0000_ffff_ffff_f000u64)) as usize == 0;
-        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | PAGE_ENTRY_EXECUTE_MASK | PA_MASK)) as usize == 0);
+        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | PAGE_ENTRY_EXECUTE_MASK | MEM_MASK)) as usize == 0);
     }
     else{
         assert((ret & (0x1u64<<63u64) as usize) == 0) by (bit_vector) requires ret & (!(0x1u64 | 0x1u64 << 0x7u64 | 0x1u64 << 0x1u64 |0x0000_ffff_ffff_f000u64)) as usize == 0 ; 
@@ -288,7 +288,7 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
 
         assert(ret & (!(0x1u64 | 0x1u64 << 0x7u64 | 0x1u64 << 0x1u64 | 0x1u64 << 63u64 |0x0000_ffff_ffff_f000u64)) as usize == 0) by (bit_vector) requires 
             ret & (!(0x1u64 | 0x1u64 << 0x7u64 |  0x1u64 << 0x1u64 |0x0000_ffff_ffff_f000u64)) as usize == 0;
-        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK |  PAGE_ENTRY_EXECUTE_MASK | PA_MASK)) as usize == 0);
+        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK |  PAGE_ENTRY_EXECUTE_MASK | MEM_MASK)) as usize == 0);
     } 
 
     assert(usize2present(ret) == page_entry.perm.present);
@@ -296,7 +296,7 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
     assert(usize2write(ret) == page_entry.perm.write); 
     assert(usize2execute_disable(ret) == page_entry.perm.execute_disable); 
     assert(usize2pa(ret) == page_entry.addr); 
-    assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK |  PAGE_ENTRY_EXECUTE_MASK | PA_MASK)) as usize == 0);
+    assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK |  PAGE_ENTRY_EXECUTE_MASK | MEM_MASK)) as usize == 0);
 
     ghost_ret = Ghost(ret);
     
@@ -334,7 +334,7 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
 
         assert((ghost_ret@ | (0x1u64 << 2u64) as usize) & (!(0x1u64 | 0x1u64 << 0x7u64 | 0x1u64 << 0x1u64 | 0x1u64 << 63u64 | 0x1u64 << 2u64 |0x0000_ffff_ffff_f000u64)) as usize == 0) by (bit_vector) requires 
             ghost_ret@ & (!(0x1u64 | 0x1u64 << 0x7u64 |  0x1u64 << 0x1u64 | 0x1u64 << 63u64 | 0x0000_ffff_ffff_f000u64)) as usize == 0;
-        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | PAGE_ENTRY_EXECUTE_MASK | PAGE_ENTRY_USER_MASK | PA_MASK)) as usize == 0);
+        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | PAGE_ENTRY_EXECUTE_MASK | PAGE_ENTRY_USER_MASK | MEM_MASK)) as usize == 0);
     }
     else{
         assert((ret & (0x1u64<<2u64) as usize) == 0) by (bit_vector) requires ret & (!(0x1u64 | 0x1u64 << 0x7u64 | 0x1u64 << 0x1u64 | 0x1u64 << 63u64 |0x0000_ffff_ffff_f000u64)) as usize == 0 ; 
@@ -348,7 +348,7 @@ pub fn page_entry2usize(page_entry: &PageEntry) -> (ret:usize)
 
         assert(ret & (!(0x1u64 | 0x1u64 << 0x7u64 | 0x1u64 << 0x1u64 | 0x1u64 << 63u64 | 0x1u64 << 2u64 |0x0000_ffff_ffff_f000u64)) as usize == 0) by (bit_vector) requires 
             ret & (!(0x1u64 | 0x1u64 << 0x7u64 |  0x1u64 << 0x1u64 | 0x1u64 << 63u64 |0x0000_ffff_ffff_f000u64)) as usize == 0;
-        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | PAGE_ENTRY_EXECUTE_MASK | PAGE_ENTRY_USER_MASK | PA_MASK)) as usize == 0);
+        assert(ret & (!(PAGE_ENTRY_PRESENT_MASK | PAGE_ENTRY_PS_MASK | PAGE_ENTRY_WRITE_MASK | PAGE_ENTRY_EXECUTE_MASK | PAGE_ENTRY_USER_MASK | MEM_MASK)) as usize == 0);
     } 
 
     assert(usize2present(ret) == page_entry.perm.present);
