@@ -73,14 +73,28 @@ pub open spec fn MEM_valid(v: PAddr) -> bool
 
 pub open spec fn page_ptr_valid(ptr: usize) -> bool
 {
-    ((ptr % 4096) == 0)
+    ((ptr % 0x1000) == 0)
     &&
-    ((ptr/4096) < NUM_PAGES)
+    ((ptr/0x1000) < NUM_PAGES)
 }
 
 pub open spec fn page_index_valid(index: usize) -> bool
 {
     (0<=index<NUM_PAGES)
+}
+
+pub open spec fn page_ptr_2M_valid(ptr: usize) -> bool
+{
+    ((ptr % (0x200000)) == 0)
+    &&
+    ((ptr/4096) < NUM_PAGES)
+}
+
+pub open spec fn page_ptr_1G_valid(ptr: usize) -> bool
+{
+    ((ptr % (0x40000000)) == 0)
+    &&
+    ((ptr/4096) < NUM_PAGES)
 }
 
 #[verifier(when_used_as_spec(spec_va_4K_valid))]

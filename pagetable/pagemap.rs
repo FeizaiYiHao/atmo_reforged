@@ -23,9 +23,8 @@ impl PageMap{
         ensures
             self.wf(),
             forall|i:int|
-                #![trigger usize2page_entry(self.ar@[i]).is_empty()]
-                0<=i<512 ==> usize2page_entry(self.ar@[i]).is_empty(),
-            
+                #![trigger self@[i].is_empty()]
+                0<=i<512 ==> self@[i].is_empty(),
     {
         for i in 0..512
             invariant
@@ -41,10 +40,16 @@ impl PageMap{
                 forall|j:int|
                     #![trigger self.ar@[j]]
                     0<=j<i ==> usize2page_entry(self.ar@[j]).is_empty(),
+                forall|j:int|
+                    #![trigger self@[j].is_empty()]
+                    0<=j<i ==> self@[j].is_empty(),    
         {
+            let ghost_view = Ghost(self@);
             self.ar.set(i, 0usize);
+            assert(self@ == ghost_view);
             proof{
                 zero_leads_is_empty_page_entry();
+                assert(usize2page_entry(0usize).is_empty());
                 self.spec_seq@ = self.spec_seq@.update(i as int,usize2page_entry(0usize));
             }
         }
@@ -59,10 +64,10 @@ impl PageMap{
         forall|i:int|
             #![trigger usize2page_entry(self.ar@[i])]
             0<=i<512 ==> (usize2page_entry(self.ar@[i]) =~= self.spec_seq@[i])
-        &&&
-        forall|i:int|
-            #![trigger usize2page_entry(self.ar@[i]).is_empty()]
-            0<=i<512 ==> (usize2page_entry(self.ar@[i]).is_empty() <==> self.ar@[i] == 0)
+        // &&&
+        // forall|i:int|
+        //     #![trigger usize2page_entry(self.ar@[i]).is_empty()]
+        //     0<=i<512 ==> (usize2page_entry(self.ar@[i]).is_empty() <==> self.ar@[i] == 0)
         
     }
 
@@ -86,7 +91,7 @@ impl PageMap{
             value.perm.present == false ==> value.is_empty(),
         ensures
             self.wf(),
-            self@ =~= self@.update(index as int,value),
+            self@ =~= old(self)@.update(index as int,value),
         {
             // proof{
             //     pagemap_permission_bits_lemma();

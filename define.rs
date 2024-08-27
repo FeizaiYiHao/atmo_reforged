@@ -16,6 +16,7 @@ pub type PagePerm = PointsTo<[u8; PAGE_SZ]>;
 
 pub type VAddr = usize;
 pub type PAddr = usize;
+pub type PageMapPtr = usize;
 // pub type PageEntryPerm = usize;
 
 pub type Pcid = usize;
