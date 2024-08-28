@@ -4,5 +4,5 @@ pub mod pagetable_util_t;
 pub mod pagetable_proof;
 pub mod entry;
 pub mod pagetable_spec;
-// pub mod pagetable_impl;
+pub mod pagetable_impl;
 pub mod pagetable_util;
