@@ -22,9 +22,12 @@ ensures
     page_map_perm.addr() == page_map_ptr,
     page_map_perm.is_init(),
     page_map_perm.value().wf(),
-    page_map_perm.value()@ =~= old(page_map_perm).value()@.update(index as int,value),
+    forall|i: usize|
+        #![trigger page_map_perm.value()[i]]
+        0 <= i < 512 && i != index ==>
+        page_map_perm.value()[i] =~= old(page_map_perm).value()[i],
+    page_map_perm.value()[index] =~= value
 {
-
 }
 
 }

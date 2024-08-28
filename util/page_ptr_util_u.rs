@@ -223,5 +223,78 @@ pub fn va2index(va: usize) -> (ret : (L4Index,L3Index,L2Index,L1Index))
     (v2l4index(va),v2l3index(va),v2l2index(va),v2l1index(va))
 }
 
+#[verifier(external_body)]
+pub proof fn va_lemma()
+    ensures
+        forall|va:VAddr| 
+            #![trigger spec_va_4K_valid(va), spec_v2l4index(va)] #![trigger spec_va_4K_valid(va), spec_v2l3index(va)] #![trigger spec_va_4K_valid(va), spec_v2l2index(va)] #![trigger spec_va_4K_valid(va), spec_v2l1index(va)]
+            spec_va_4K_valid(va) ==> 
+                0 <= spec_v2l4index(va) < 512
+                &&
+                0 <= spec_v2l3index(va) < 512
+                &&
+                0 <= spec_v2l2index(va) < 512
+                &&
+                0 <= spec_v2l1index(va) < 512,
+        forall|va:VAddr| 
+            #![trigger spec_va_2M_valid(va), spec_v2l4index(va)] #![trigger spec_va_2M_valid(va), spec_v2l3index(va)] #![trigger spec_va_2M_valid(va), spec_v2l2index(va)] #![trigger spec_va_2M_valid(va), spec_v2l1index(va)]
+            spec_va_2M_valid(va) ==> 
+                0 <= spec_v2l4index(va) < 512
+                &&
+                0 <= spec_v2l3index(va) < 512
+                &&
+                0 <= spec_v2l2index(va) < 512
+                &&
+                0 == spec_v2l1index(va),
+        forall|va:VAddr| 
+            #![trigger spec_va_1G_valid(va), spec_v2l4index(va)] #![trigger spec_va_1G_valid(va), spec_v2l3index(va)] #![trigger spec_va_1G_valid(va), spec_v2l2index(va)] #![trigger spec_va_1G_valid(va), spec_v2l1index(va)]
+            spec_va_1G_valid(va) ==> 
+                0 <= spec_v2l4index(va) < 512
+                &&
+                0 <= spec_v2l3index(va) < 512
+                &&
+                0 == spec_v2l2index(va)
+                &&
+                0 == spec_v2l1index(va),
+        forall|l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index, l4j: L4Index, l3j: L3Index, l2j: L2Index, l1j: L1Index| 
+            #![trigger spec_index2va((l4i,l3i,l2i,l1i)), spec_index2va((l4j,l3j,l2j,l1j))]
+            (l4i,l3i,l2i,l1i) =~= (l4j,l3j,l2j,l1j) && 0<=l4i<512 && 0<=l3i<512 && 0<=l2i<512 && 0<=l1i<512 && 0<=l4j<512 && 0<=l3j<512 && 0<=l2j<512 && 0<=l1j<512
+            <==> 
+            spec_index2va((l4i,l3i,l2i,l1i)) == spec_index2va((l4j,l3j,l2j,l1j)),
+        forall|l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index, l4j: L4Index, l3j: L3Index, l2j: L2Index, l1j: L1Index| 
+            #![trigger spec_index2va((l4i,l3i,l2i,l1i)), spec_index2va((l4j,l3j,l2j,l1j))]
+            (l4i,l3i,l2i,l1i) =~= (l4j,l3j,l2j,l1j) == false && 0<=l4i<512 && 0<=l3i<512 && 0<=l2i<512 && 0<=l1i<512 && 0<=l4j<512 && 0<=l3j<512 && 0<=l2j<512 && 0<=l1j<512
+            <==> 
+            spec_index2va((l4i,l3i,l2i,l1i)) != spec_index2va((l4j,l3j,l2j,l1j)),
+{
+    // assert(forall|va:VAddr| #![auto] (va & (!0x0000_fffc_0000_0000u64) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= 1u64 as u64 ==>
+    //     0 <= ((va >> 39 & 0x1ff) as usize) < 512
+    //     &&
+    //     0 <= ((va >> 30 & 0x1ff) as usize) < 512
+    //     &&
+    //     0 == ((va >> 21 & 0x1ff) as usize)
+    //     &&
+    //     0 == ((va >> 12 & 0x1ff) as usize)
+    // ) by (bit_vector);
+    // assert(forall|va:VAddr| #![auto] ((va & (!0x0000_ffff_ffe0_0000u64) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= 1u64 as u64) ==>
+    //     0 <= ((va >> 39 & 0x1ff) as usize) < 512
+    //     &&
+    //     0 <= ((va >> 30 & 0x1ff) as usize) < 512
+    //     &&
+    //     0 <= ((va >> 21 & 0x1ff) as usize) < 512
+    //     &&
+    //     0 == ((va >> 12 & 0x1ff) as usize)
+    // ) by (bit_vector);
+    // assert(forall|va:VAddr| #![auto] (va & (!0x0000_ffff_ffff_f000u64) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= 1u64 as u64 ==>
+    //     0 <= ((va >> 39 & 0x1ff) as usize) < 512
+    //     &&
+    //     0 <= ((va >> 30 & 0x1ff) as usize) < 512
+    //     &&
+    //     0 <= ((va >> 21 & 0x1ff) as usize) < 512
+    //     &&
+    //     0 <= ((va >> 12 & 0x1ff) as usize) < 512
+    // ) by (bit_vector);
+    
+}
 
 }
