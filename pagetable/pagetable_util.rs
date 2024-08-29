@@ -2,9 +2,9 @@ use vstd::prelude::*;
 
 verus! {
 use crate::define::*;
-use crate::array::*;
+// use crate::array::*;
 use vstd::simple_pptr::*;
-use crate::util::page_ptr_util_u::*;
+// use crate::util::page_ptr_util_u::*;
 
 use crate::pagetable::entry::*;
 use crate::pagetable::pagemap::*;

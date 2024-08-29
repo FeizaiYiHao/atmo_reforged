@@ -4,7 +4,7 @@ verus! {
 // use crate::define::*;
 use crate::array::*;
 use crate::util::page_ptr_util_u::*;
-use crate::lemma::lemma_u::*;
+// use crate::lemma::lemma_u::*;
 use crate::pagetable::entry::*;
 
 

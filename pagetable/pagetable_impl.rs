@@ -2,14 +2,14 @@ use vstd::prelude::*;
 
 verus! {
 use crate::define::*;
-use crate::array::*;
+// use crate::array::*;
 use vstd::simple_pptr::*;
 use crate::util::page_ptr_util_u::*;
 
 use crate::pagetable::entry::*;
 use crate::pagetable::pagemap::*;
 use crate::pagetable::pagetable_spec::*;
-use crate::pagetable::pagetable_util::*;
+// use crate::pagetable::pagetable_util::*;
 use crate::pagetable::pagemap_util_t::*;
 use crate::lemma::lemma_u::*;
 
@@ -160,7 +160,46 @@ impl PageTable{
                     old(self).ps_entries_exist_in_mapped_pages();
                 };
         };
-        assert(self.wf_l1());
+        assert(self.wf_l1()) by {
+            assert(forall|p: PageMapPtr|
+                self.l1_tables@.dom().contains(p) ==>
+                    exists|l4i: L4Index, l3i:L3Index, l2i:L2Index|
+                        #![trigger self.spec_resolve_mapping_l2(l4i, l3i, l2i)]
+                        0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 &&
+                        self.spec_resolve_mapping_l2(l4i, l3i, l2i).is_Some() && self.spec_resolve_mapping_l2(l4i, l3i, l2i).get_Some_0().addr == p)
+                by
+                {
+                    assert(forall|p: PageMapPtr|
+                        self.l1_tables@.dom().contains(p) ==>
+                            exists|l4i: L4Index, l3i:L3Index, l2i:L3Index|
+                                #![auto]
+                                0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && l4i != target_l4i &&
+                                old(self).spec_resolve_mapping_l2(l4i, l3i, l2i).is_Some() && old(self).spec_resolve_mapping_l2(l4i, l3i, l2i).get_Some_0().addr == p);
+
+                    assert(forall|l4i: L4Index, l3i:L3Index, l2i:L3Index|
+                                #![auto]
+                                0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && l4i != target_l4i ==>
+                                old(self).spec_resolve_mapping_l2(l4i, l3i, l2i) =~= self.spec_resolve_mapping_l2(l4i, l3i, l2i));
+                };
+            // no l1 tables map to other levels
+            assert(forall|p: PageMapPtr, i: L1Index| 
+                #![trigger self.l1_tables@.dom().contains(p), self.l1_tables@[p].value()[i].perm.present, self.l2_tables@.dom().contains(self.l1_tables@[p].value()[i].addr)] 
+                #![trigger self.l1_tables@.dom().contains(p), self.l1_tables@[p].value()[i].perm.present, self.l3_tables@.dom().contains(self.l1_tables@[p].value()[i].addr)] 
+                #![trigger self.l1_tables@.dom().contains(p), self.l1_tables@[p].value()[i].perm.present, self.l1_tables@[p].value()[i].addr] 
+                self.l1_tables@.dom().contains(p) && 0 <= i < 512 && self.l1_tables@[p].value()[i].perm.present ==>
+                    self.l2_tables@.dom().contains(self.l1_tables@[p].value()[i].addr) == false
+                    &&
+                    self.l3_tables@.dom().contains(self.l1_tables@[p].value()[i].addr) == false
+                    &&
+                    self.cr3 != self.l1_tables@[p].value()[i].addr) by {
+                        old(self).ps_entries_exist_in_mapped_pages();
+                    };
+            // no hugepage in l1
+            assert(forall|p: PageMapPtr, i: L1Index| 
+                #![trigger self.l1_tables@[p].value()[i].perm.ps] 
+                self.l1_tables@.dom().contains(p) && 0 <= i < 512 && self.l1_tables@[p].value()[i].perm.present ==>
+                    ! self.l1_tables@[p].value()[i].perm.ps);
+        };
         assert(self.wf_mapping_4K()) by {
             assert(forall|l4i: L4Index,l3i: L3Index,l2i: L2Index,l1i: L2Index| 
                 #![trigger self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i)]
