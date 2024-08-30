@@ -119,6 +119,63 @@ impl PageTable{
             );
         };
     }
+    pub proof fn internal_resolve_disjoint(&self)
+        requires
+            self.wf(),
+        ensures
+            forall|l4i: L4Index, l4j: L4Index| 
+                #![trigger self.spec_resolve_mapping_l4(l4i), self.spec_resolve_mapping_l4(l4j)]
+                0 <= l4i < 512 && 0 <= l4j < 512 && l4i != l4j && self.spec_resolve_mapping_l4(l4i).is_Some() && self.spec_resolve_mapping_l4(l4j).is_Some() ==>
+                    self.spec_resolve_mapping_l4(l4i).get_Some_0().addr != self.spec_resolve_mapping_l4(l4j).get_Some_0().addr,
+            forall|l4i: L4Index, l3i: L3Index, l4j: L4Index, l3j: L3Index| 
+                #![trigger self.spec_resolve_mapping_l3(l4i,l3i), self.spec_resolve_mapping_l3(l4j,l3j)]
+                0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && (l4i,l3i) != (l4j,l3j) && self.spec_resolve_mapping_l3(l4i,l3i).is_Some() && self.spec_resolve_mapping_l3(l4j,l3j).is_Some() ==>
+                    self.spec_resolve_mapping_l3(l4i,l3i).get_Some_0().addr != self.spec_resolve_mapping_l3(l4j,l3j).get_Some_0().addr,
+            forall|l4i: L4Index, l3i: L3Index, l2i: L3Index, l4j: L4Index, l3j: L3Index, l2j: L2Index| 
+            #![trigger self.spec_resolve_mapping_l2(l4i,l3i,l2i), self.spec_resolve_mapping_l2(l4j,l3j,l2j)]
+                0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && 0 <= l2j < 512 && (l4i,l3i,l2i) != (l4j,l3j,l2j) && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && self.spec_resolve_mapping_l2(l4j,l3j,l2j).is_Some() ==>
+                    self.spec_resolve_mapping_l2(l4i,l3i,l2i).get_Some_0().addr != self.spec_resolve_mapping_l2(l4j,l3j,l2j).get_Some_0().addr
+    {
+        assert(
+            forall|l4i: L4Index, l4j: L4Index| 
+                #![trigger self.spec_resolve_mapping_l4(l4i), self.spec_resolve_mapping_l4(l4j)]
+                0 <= l4i < 512 && 0 <= l4j < 512 && l4i != l4j && self.spec_resolve_mapping_l4(l4i).is_Some() && self.spec_resolve_mapping_l4(l4j).is_Some() ==>
+                    self.spec_resolve_mapping_l4(l4i).get_Some_0().addr != self.spec_resolve_mapping_l4(l4j).get_Some_0().addr
+        );
 
+        assert(
+            forall|l3pi: PageMapPtr, l3i: L3Index,l3pj: PageMapPtr, l3j: L3Index| 
+                #![auto]
+                self.l3_tables@.dom().contains(l3pi) && 0 <= l3i < 512 && self.l3_tables@.dom().contains(l3pj) && 0 <= l3j < 512 && (l3pi,l3i) != (l3pj,l3j)
+                && self.l3_tables@[l3pi].value()[l3i].perm.present && !self.l3_tables@[l3pi].value()[l3i].perm.ps
+                && self.l3_tables@[l3pj].value()[l3j].perm.present && !self.l3_tables@[l3pj].value()[l3j].perm.ps
+                ==>
+                self.l3_tables@[l3pi].value()[l3i].addr != self.l3_tables@[l3pj].value()[l3j].addr
+        );
+
+        assert(
+            forall|l4i: L4Index, l3i: L3Index, l4j: L4Index, l3j: L3Index| 
+                #![auto]
+                0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && (l4i,l3i) != (l4j,l3j) && self.spec_resolve_mapping_l3(l4i,l3i).is_Some() && self.spec_resolve_mapping_l3(l4j,l3j).is_Some() ==>
+                    self.spec_resolve_mapping_l3(l4i,l3i).get_Some_0().addr != self.spec_resolve_mapping_l3(l4j,l3j).get_Some_0().addr
+        );
+        assert(
+            forall|l2pi: PageMapPtr, l2i: L2Index,l2pj: PageMapPtr, l2j: L2Index| 
+                #![auto]
+                self.l2_tables@.dom().contains(l2pi) && 0 <= l2i < 512 && self.l2_tables@.dom().contains(l2pj) && 0 <= l2j < 512 && (l2pi,l2i) != (l2pj,l2j)
+                && self.l2_tables@[l2pi].value()[l2i].perm.present && !self.l2_tables@[l2pi].value()[l2i].perm.ps
+                && self.l2_tables@[l2pj].value()[l2j].perm.present && !self.l2_tables@[l2pj].value()[l2j].perm.ps
+                ==>
+                self.l2_tables@[l2pi].value()[l2i].addr != self.l2_tables@[l2pj].value()[l2j].addr
+        );
+
+        assert(
+            forall|l4i: L4Index, l3i: L3Index, l2i: L3Index, l4j: L4Index, l3j: L3Index, l2j: L2Index| 
+                #![auto]
+                0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && 0 <= l2j < 512 && (l4i,l3i,l2i) != (l4j,l3j,l2j) && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && self.spec_resolve_mapping_l2(l4j,l3j,l2j).is_Some() ==>
+                    self.spec_resolve_mapping_l2(l4i,l3i,l2i).get_Some_0().addr != self.spec_resolve_mapping_l2(l4j,l3j,l2j).get_Some_0().addr
+        );
+
+    }
 }
 }

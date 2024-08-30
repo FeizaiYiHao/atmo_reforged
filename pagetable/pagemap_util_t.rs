@@ -18,6 +18,7 @@ requires
     old(page_map_perm).value().wf(),
     value.perm.present ==> MEM_valid(value.addr),
     value.perm.present == false ==> value.is_empty(),
+    0<=index<512,
 ensures
     page_map_perm.addr() == page_map_ptr,
     page_map_perm.is_init(),
