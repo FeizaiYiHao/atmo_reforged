@@ -32,11 +32,11 @@ pub struct PageTable{
     pub cr3: PageMapPtr,
 
     pub l4_table: Tracked<Map<PageMapPtr,PointsTo<PageMap>>>,
-    pub l3_rev_map: Ghost<Map<PageMapPtr>, (L4Index)>,
+    pub l3_rev_map: Ghost<Map<PageMapPtr, (L4Index)>>,
     pub l3_tables: Tracked<Map<PageMapPtr,PointsTo<PageMap>>>,
-    pub l2_rev_map: Ghost<Map<PageMapPtr>, (L4Index,L3Index)>,
+    pub l2_rev_map: Ghost<Map<PageMapPtr, (L4Index,L3Index)>>,
     pub l2_tables: Tracked<Map<PageMapPtr,PointsTo<PageMap>>>,
-    pub l1_rev_map: Ghost<Map<PageMapPtr>, (L4Index,L3Index,L2Index)>,
+    pub l1_rev_map: Ghost<Map<PageMapPtr, (L4Index,L3Index,L2Index)>>,
     pub l1_tables: Tracked<Map<PageMapPtr,PointsTo<PageMap>>>,
 
     pub mapping_4K: Ghost<Map<VAddr,MapEntry>>,
@@ -206,9 +206,11 @@ impl PageTable{
             self.l3_tables@.dom().contains(p) ==> self.l3_tables@[p].value().wf()
         &&&
         forall|p: PageMapPtr|
-            #![trigger self.l3_tables@.dom().contains(p), self.l3_rev_map@.dom().contains(p), self.resolve_mapping_l4(self.l3_rev_map@[p])]
+            #![trigger self.l3_rev_map@.dom().contains(p)]
+            #![trigger self.l3_rev_map@[p]]
             self.l3_tables@.dom().contains(p) ==>
-                self.l3_rev_map@.dom().contains(p) && self.resolve_mapping_l4(self.l3_rev_map@[p]).is_Some() && self.resolve_mapping_l4(self.l3_rev_map@[p]).get_Some_0().addr == p
+                0 <= self.l3_rev_map@[p] < 512 &&
+                self.l3_rev_map@.dom().contains(p) && self.spec_resolve_mapping_l4(self.l3_rev_map@[p]).is_Some() && self.spec_resolve_mapping_l4(self.l3_rev_map@[p]).get_Some_0().addr == p
         //L3 tables unique within
         &&&
         forall|p: PageMapPtr, l3i: L3Index, l3j: L3Index| 
@@ -264,9 +266,12 @@ impl PageTable{
         // all l2 tables exist in l3 mapping
         &&&
         forall|p: PageMapPtr|
-            #![trigger self.l2_tables@.dom().contains(p), self.l2_rev_map@.dom().contains(p), self.resolve_mapping_l3(self.l2_rev_map@[p])]
+            #![trigger self.l2_rev_map@[p]]
+            #![trigger self.l2_rev_map@.dom().contains(p)]
             self.l2_tables@.dom().contains(p) ==>
-                self.l2_rev_map@.dom().contains(p) && self.resolve_mapping_l3(self.l2_rev_map@[p]).is_Some() && self.resolve_mapping_l3(self.l2_rev_map@[p]).get_Some_0().addr == p
+                self.l2_rev_map@.dom().contains(p) && 
+                0 <= self.l2_rev_map@[p].0 < 512 && 0 <= self.l2_rev_map@[p].1 < 512 &&
+                self.spec_resolve_mapping_l3(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1).is_Some() && self.spec_resolve_mapping_l3(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1).get_Some_0().addr == p
         // L2 mappings are unique within
         &&&
         forall|p: PageMapPtr, l2i: L2Index, l2j: L2Index| 
@@ -323,9 +328,12 @@ impl PageTable{
         // all l1 tables exist in l2 mapping
         &&&
         forall|p: PageMapPtr|
-            #![trigger self.l1_tables@.dom().contains(p), self.l1_rev_map@.dom().contains(p), self.resolve_mapping_l2(self.l1_rev_map@[p])]
+            #![trigger self.l1_rev_map@.dom().contains(p)]
+            #![trigger self.l1_rev_map@[p]]
             self.l1_tables@.dom().contains(p) ==>
-                self.l1_rev_map@.dom().contains(p) && self.resolve_mapping_l2(self.l1_rev_map@[p]).is_Some() && self.resolve_mapping_l2(self.l1_rev_map@[p]).get_Some_0().addr == p
+                self.l1_rev_map@.dom().contains(p) && 
+                0<=self.l1_rev_map@[p].0<512 && 0<=self.l1_rev_map@[p].1<512 && 0<=self.l1_rev_map@[p].2<512 &&
+                self.spec_resolve_mapping_l2(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2).is_Some() && self.spec_resolve_mapping_l2(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2).get_Some_0().addr == p
         // no l1 tables map to other levels
         &&&
         forall|p: PageMapPtr, i: L1Index| 
