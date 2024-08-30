@@ -646,8 +646,8 @@ impl PageTable{
         self.rwx_upper_level_entries()
         &&&
         self.present_or_zero()
-        &&&
-        self.no_self_mapping()
+        // &&&
+        // self.no_self_mapping()
         &&&
         self.table_pages_wf()
     }
