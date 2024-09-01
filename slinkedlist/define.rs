@@ -1,14 +1,14 @@
 use vstd::prelude::*;
 verus! {
+use crate::define::SLLIndex;
 
-pub type Index = i32;
 pub const NULL_POINTER: usize = 0;
 
 #[derive(Debug)]
 pub struct Node{
     pub value:usize,
-    pub next:Index,
-    pub prev:Index,
+    pub next:SLLIndex,
+    pub prev:SLLIndex,
 }
 
 }

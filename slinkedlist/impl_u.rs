@@ -2,22 +2,23 @@ use vstd::prelude::*;
 verus! {
 use crate::slinkedlist::define::*;
 use crate::slinkedlist::spec::*;
+use crate::define::SLLIndex;
 use vstd::seq_lib::lemma_seq_contains_after_push;
 
-    impl<const N: usize> MarsStaticLinkedList<N> {
+    impl<const N: usize> StaticLinkedList<N> {
 
         pub fn init(&mut self)
         requires
             old(self).arr_seq@.len() == N,
             N>2,
-            N<Index::MAX,
+            N<SLLIndex::MAX,
         ensures
             self.wf(),
             self.len() == 0,
             self@ =~= Seq::empty(),
         {
             // assume(N>2);
-            // assume(N<Index::MAX);
+            // assume(N<SLLIndex::MAX);
             self.value_list = Ghost(Seq::empty());
             self.value_list_head = -1;
             self.value_list_tail = -1;
@@ -48,10 +49,10 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             // assert(self.wf_free_node_tail());
             // assert(self.free_list_len == self.free_list@.len());
             assert(self.free_list_wf());
-            for index in 1..N as Index
+            for index in 1..N as SLLIndex
                 invariant
                     1<= index <= N,
-                    N<Index::MAX,
+                    N<SLLIndex::MAX,
                     self.value_list@ =~= Seq::empty(),
                     self.value_list@.len() == 0,
                     self.spec_seq@.len() == 0,
@@ -60,7 +61,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                     self.value_list_wf(),
                     self.free_list_wf(),
                     index == self.free_list@.len(),
-                    forall|i: Index|  #![auto] 0 <= i < self.free_list@.len() ==> (self.free_list@[i as int] == i),
+                    forall|i: SLLIndex|  #![auto] 0 <= i < self.free_list@.len() ==> (self.free_list@[i as int] == i),
                     self.arr_seq@[0].prev == -1,
                     self.arr_seq@[(index - 1) as int].next == -1,
                     forall|i: int|  #![auto] 0 <= i < index ==> self.arr_seq@[i].prev == i - 1,
@@ -68,12 +69,12 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                     forall|i: int|  #![auto] 0 <= i < index ==> self.arr_seq@[i].value == 0,
                     self.free_list_len == index,
                     self.free_list_len + self.value_list_len == index,
-                    forall|i: Index|  #![auto] 0 <= i < index ==> self.free_list@.contains(i),
-                    forall|i: Index| #![auto] 0 <= i < index ==> self.arr_seq@[i as int].value == NULL_POINTER,
+                    forall|i: SLLIndex|  #![auto] 0 <= i < index ==> self.free_list@.contains(i),
+                    forall|i: SLLIndex| #![auto] 0 <= i < index ==> self.arr_seq@[i as int].value == NULL_POINTER,
                 // ensures
                 //     self.free_list_len == N,
                 //     self.free_list_wf(),
-                //     forall|i: Index|  #![auto] 0 <= i < N ==> (self.free_list@[i as int] == i),
+                //     forall|i: SLLIndex|  #![auto] 0 <= i < N ==> (self.free_list@[i as int] == i),
                 //     self.value_list@ =~= Seq::empty(),
                 //     self.value_list@.len() == 0,
                 //     self.spec_seq@.len() == 0,
@@ -81,17 +82,17 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                 //     self.spec_seq_wf(),
                 //     self.value_list_wf(),
                 //     self.free_list_wf(),
-                //     forall|i: Index|  #![auto] 0 <= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
-                //     forall|i: Index| #![auto] 0 <= i < N ==> self.arr_seq@[i as int].value == NULL_POINTER,
+                //     forall|i: SLLIndex|  #![auto] 0 <= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
+                //     forall|i: SLLIndex| #![auto] 0 <= i < N ==> self.arr_seq@[i as int].value == NULL_POINTER,
                 //     self.wf(),
             {
                 proof{
-                    assert forall |s: Seq<Index>, v: Index, x: Index| v==x || s.contains(x) implies #[trigger] s.push(v).contains(x) by {
+                    assert forall |s: Seq<SLLIndex>, v: SLLIndex, x: SLLIndex| v==x || s.contains(x) implies #[trigger] s.push(v).contains(x) by {
                         lemma_seq_contains_after_push(s, v, x);
                     }
                 }
 
-                self.free_list = Ghost(self.free_list@.push((index as Index)));
+                self.free_list = Ghost(self.free_list@.push((index as SLLIndex)));
                 self.set_prev(index,(index - 1));
                 self.set_next(index,-1);
                 self.set_next((index - 1), index);
@@ -109,19 +110,19 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                 assert(self.free_list_len == self.free_list@.len());
             }
             // assert(self.free_list@.len() == N);
-            // assert(forall|i: Index|  #![auto] 0 <= i < N ==> self.free_list@[i as int] == i);
-            // assert(forall|i: Index|  #![auto] 0 <= i < N ==> self.free_list@.index_of(i) == i as int);
-            // assert(forall|i: Index|  #![auto] 0 <= i < N ==> self.free_list@.contains(i));
+            // assert(forall|i: SLLIndex|  #![auto] 0 <= i < N ==> self.free_list@[i as int] == i);
+            // assert(forall|i: SLLIndex|  #![auto] 0 <= i < N ==> self.free_list@.index_of(i) == i as int);
+            // assert(forall|i: SLLIndex|  #![auto] 0 <= i < N ==> self.free_list@.contains(i));
         }
 
         //helper function for push()
-        fn alloc_node_index(&mut self) -> (index: Index)
+        fn alloc_node_index(&mut self) -> (index: SLLIndex)
         requires old(self).value_list_len < old(self).size,
                 old(self).array_wf(),
                 old(self).free_list_len + old(self).value_list_len == N,
                 old(self).value_list_wf(),
                 old(self).free_list_wf(),
-                forall|i:Index| #![auto] 0<= i < N ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i),
+                forall|i:SLLIndex| #![auto] 0<= i < N ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i),
                 old(self).spec_seq_wf(),
                 old(self).free_list_ptr_all_null(),
         ensures self.free_list_len == old(self).free_list_len - 1,
@@ -129,7 +130,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                 self.value_list_len ==  old(self).value_list_len,
                 self.value_list_wf(),
                 self.free_list_wf(),
-                forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
+                forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
                 self.free_list@.contains(index) == false,
                 self.value_list@.contains(index) == false,
                 self.spec_seq_wf(),
@@ -147,7 +148,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             //assert(self.wf_free_node_head());
             assert(self.free_list_head != -1);
             assert(self.free_list_tail != -1);
-            let mut node_index:Index = -1;
+            let mut node_index:SLLIndex = -1;
             if self.free_list_len == 1{
                 assert(self.free_list_head == self.free_list_tail);
                 node_index = self.free_list_head;
@@ -220,12 +221,12 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             return node_index;
         }
 
-        fn put_node_index(&mut self, index: Index, new_ptr:usize)
+        fn put_node_index(&mut self, index: SLLIndex, new_ptr:usize)
             requires
                 old(self).array_wf(),
                 old(self).value_list_wf(),
                 old(self).free_list_wf(),
-                forall|i:Index| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i),
+                forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i),
                 old(self).free_list@.contains(index) == false,
                 old(self).value_list@.contains(index) == false,
                 old(self).spec_seq_wf(),
@@ -236,7 +237,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                 self.array_wf(),
                 self.value_list_wf(),
                 self.free_list_wf(),
-                forall|i:Index| #![auto] 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
+                forall|i:SLLIndex| #![auto] 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
                 self.free_list == old(self).free_list,
                 self.value_list@ == old(self).value_list@.push(index),
                 self.spec_seq@ == old(self).spec_seq@.push(new_ptr),
@@ -346,16 +347,16 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             assert(self.spec_seq_wf());
             assert(self.free_list@.contains(index) == false);
             assert(self.value_list@.contains(index) == true);
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i));
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
-            assert(forall|i:Index| #![auto] 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
         }
 
 
-        pub fn push(&mut self, new_ptr: usize) -> (free_node_index : Index)
+        pub fn push(&mut self, new_ptr: usize) -> (free_node_index : SLLIndex)
             requires old(self).wf(),
                     old(self).len() < old(self).size,
-                    old(self).no_duplicates(),
+                    old(self).unique(),
                     old(self)@.contains(new_ptr) == false,
             ensures self.wf(),
                     self@ == old(self)@.push(new_ptr),
@@ -364,10 +365,10 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                     self.arr_seq@[free_node_index as int].value == new_ptr,
                     self.node_ref_valid(free_node_index),
                     self.node_ref_resolve(free_node_index) == new_ptr,
-                    forall|index:Index| #[trigger] old(self).node_ref_valid(index) ==> self.node_ref_valid(index),
-                    forall|index:Index| #[trigger] old(self).node_ref_valid(index) ==> index != free_node_index,
-                    forall|index:Index| #[trigger] old(self).node_ref_valid(index) ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
-                    self.no_duplicates(),
+                    forall|index:SLLIndex| #[trigger] old(self).node_ref_valid(index) ==> self.node_ref_valid(index),
+                    forall|index:SLLIndex| #[trigger] old(self).node_ref_valid(index) ==> index != free_node_index,
+                    forall|index:SLLIndex| #[trigger] old(self).node_ref_valid(index) ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                    self.unique(),
                     forall| ptr: usize| ptr != new_ptr ==> old(self)@.contains(ptr) == #[trigger] self@.contains(ptr),
                     self@.contains(new_ptr),
         {
@@ -378,7 +379,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             assert(self.value_list_len ==  old(self).value_list_len);
             assert(self.value_list_wf());
             assert(self.free_list_wf());
-            assert(forall|i:Index| #![auto] 0<= i < N && i != free_node_index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != free_node_index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
             assert(self.free_list@.contains(free_node_index) == false);
             assert(self.value_list@.contains(free_node_index) == false);
             assert(self.spec_seq_wf());
@@ -389,7 +390,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             assert(self.free_list_len + self.value_list_len == N);
             assert(self.value_list_wf());
             assert(self.free_list_wf());
-            assert(forall|i:Index| #![auto] 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
             assert(self.spec_seq_wf());
             assert(self.spec_seq@ == old(self).spec_seq@.push(new_ptr));
             assert(old(self).spec_seq@=~=self.spec_seq@.subrange(0,self.spec_seq@.len() - 1));
@@ -402,13 +403,13 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
 
 
         //helper function for pop()
-        fn pop_value(&mut self) -> (index: Index)
+        fn pop_value(&mut self) -> (index: SLLIndex)
             requires old(self).value_list_len > 0,
                     old(self).array_wf(),
                     old(self).free_list_len + old(self).value_list_len == N,
                     old(self).value_list_wf(),
                     old(self).free_list_wf(),
-                    forall|i:Index| #![auto] 0<= i < N ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i),
+                    forall|i:SLLIndex| #![auto] 0<= i < N ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i),
                     old(self).spec_seq_wf(),
                     //old(self).free_list_ptr_all_null(),
             ensures self.free_list_len == old(self).free_list_len,
@@ -416,7 +417,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                     self.value_list_len ==  old(self).value_list_len - 1,
                     self.value_list_wf(),
                     self.free_list_wf(),
-                    forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
+                    forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
                     self.free_list@.contains(index) == false,
                     self.value_list@.contains(index) == false,
                     self.spec_seq@ == old(self).spec_seq@.subrange(1,old(self).spec_seq@.len() as int),
@@ -426,13 +427,13 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                     index == old(self).value_list@[0],
                     forall|i:int| #![auto] 0<=i<self.arr_seq@.len() ==>
                         self.arr_seq@[i].value == old(self).arr_seq@[i].value,
-                    forall|i:Index| #![auto] i != index ==>
+                    forall|i:SLLIndex| #![auto] i != index ==>
                         old(self).value_list@.contains(i) == self.value_list@.contains(i),
                     //self.free_list_ptr_all_null(),
         {
             assert(self.value_list_head != -1);
             assert(self.value_list_tail != -1);
-            let mut node_index:Index = -1;
+            let mut node_index:SLLIndex = -1;
             if self.value_list_len == 1{
                 assert(self.value_list_head == self.value_list_tail);
                 node_index = self.value_list_head;
@@ -506,7 +507,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
 
                 assert(self.spec_seq_wf());
             }
-            assert(forall|i:Index| #![auto] 0<= i < N && i != node_index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != node_index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i));
             // assert(self.free_list@.contains(node_index) == false);
             // assert(self.value_list@.contains(node_index) == false);
             assert(self.free_list == old(self).free_list);
@@ -514,28 +515,28 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             assert(node_index == old(self).value_list@[0]);
             assert(old(self).value_list@.index_of(node_index) == 0);
             assert(0<= node_index < N);
-            assert(forall|i:Index| #![auto] 0<= i < N && i != node_index ==> old(self).free_list@.contains(i) == self.free_list@.contains(i));
-            assert(forall|i:Index| #![auto] 0<= i < N && i != node_index && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != node_index ==> old(self).free_list@.contains(i) == self.free_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != node_index && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
             assert(old(self).value_list@.contains(node_index) && !self.value_list@.contains(node_index));
 
-            assert(forall|i:Index| #![auto] 0<= i < N && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
 
             assert(forall|i:int| #![auto] 0<= i <self.value_list@.len() ==> old(self).value_list@.index_of(self.value_list@[i]) == i + 1);
             assert(forall|i:int| #![auto] 1<= i <old(self).value_list@.len() ==> old(self).value_list@[i] == self.value_list@[i - 1]);
             assert(forall|i:int| #![auto] 1<= i <old(self).value_list@.len() ==> self.value_list@.index_of(old(self).value_list@[i]) == i - 1);
             assert(forall|i:int| #![auto] 1<= i <old(self).value_list@.len() ==> self.value_list@.contains(old(self).value_list@[i]));
-            assert(forall|i:Index| #![auto] 0<= i < N && i != node_index && old(self).value_list@.contains(i) ==> self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != node_index && old(self).value_list@.contains(i) ==> self.value_list@.contains(i));
 
-            assert(forall|i:Index| #![auto] 0<= i < N && i != node_index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != node_index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
             return node_index;
         }
 
-        fn free_node(&mut self, index: Index)
+        fn free_node(&mut self, index: SLLIndex)
             requires
                 old(self).array_wf(),
                 old(self).value_list_wf(),
                 old(self).free_list_wf(),
-                forall|i:Index| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i),
+                forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i),
                 old(self).free_list@.contains(index) == false,
                 old(self).value_list@.contains(index) == false,
                 old(self).spec_seq_wf(),
@@ -545,7 +546,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                 self.array_wf(),
                 self.value_list_wf(),
                 self.free_list_wf(),
-                forall|i:Index| #![auto] 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
+                forall|i:SLLIndex| #![auto] 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
                 self.spec_seq_wf(),
                 self.free_list_len == old(self).free_list_len + 1,
                 self.value_list_len == old(self).value_list_len,
@@ -647,9 +648,9 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             assert(self.spec_seq_wf());
             assert(self.free_list@.contains(index) == true);
             assert(self.value_list@.contains(index) == false);
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i));
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
-            assert(forall|i:Index| #![auto] 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
 
         }
 
@@ -658,7 +659,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
         pub fn pop(&mut self) -> (ret: usize)
             requires old(self).wf(),
                     old(self).len() > 0,
-                    old(self).no_duplicates(),
+                    old(self).unique(),
             ensures
                     self.wf(),
                     self.value_list_len == old(self).value_list_len - 1,
@@ -666,14 +667,14 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                     self@ == old(self)@.subrange(1, old(self).spec_seq@.len() as int),
                     ret == old(self)@[0],
                     old(self)@.contains(ret),
-                    self.no_duplicates(),
-                    forall|index:Index| 
+                    self.unique(),
+                    forall|index:SLLIndex| 
                         #![trigger old(self).node_ref_valid(index)]
                         #![trigger old(self).node_ref_resolve(index)]
                         #![trigger self.node_ref_valid(index)]
                         old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret ==> self.node_ref_valid(index),
-                    //forall|index:Index| old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) == ret ==> !self.node_ref_valid(index),
-                    forall|index:Index| 
+                    //forall|index:SLLIndex| old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) == ret ==> !self.node_ref_valid(index),
+                    forall|index:SLLIndex| 
                         #![trigger old(self).node_ref_valid(index)]
                         #![trigger old(self).node_ref_resolve(index)]
                         #![trigger self.node_ref_resolve(index)]
@@ -694,9 +695,9 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
 
                 assert(self.free_list_ptr_all_null());
 
-                assert(forall|index:Index| old(self).node_ref_valid(index) && index != pop_index ==> self.node_ref_valid(index));
+                assert(forall|index:SLLIndex| old(self).node_ref_valid(index) && index != pop_index ==> self.node_ref_valid(index));
                 assert(old(self).node_ref_resolve(pop_index) == ret);
-                assert(forall|index:Index| old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index));
+                assert(forall|index:SLLIndex| old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index));
 
                 self.free_node(pop_index);
                 assert(self.free_list_len == old(self).free_list_len + 1);
@@ -704,11 +705,11 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                 assert(self.wf());
 
                 assert(self.node_ref_valid(pop_index) == false);
-                assert(forall|index:Index| old(self).node_ref_valid(index) && index != pop_index ==> self.node_ref_valid(index));
+                assert(forall|index:SLLIndex| old(self).node_ref_valid(index) && index != pop_index ==> self.node_ref_valid(index));
                 assert(old(self).node_ref_resolve(pop_index) == ret);
-                assert(forall|index:Index| old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index));
+                assert(forall|index:SLLIndex| old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index));
 
-                assert(old(self).no_duplicates());
+                assert(old(self).unique());
                 assert(ret == old(self).spec_seq@[0]);
                 assert(self.spec_seq@ == old(self).spec_seq@.subrange(1, old(self).spec_seq@.len() as int));
                 assert(forall| i: int| 0<= i <self.spec_seq@.len() ==> self.spec_seq@[i] == old(self).spec_seq@[i+1]);
@@ -734,7 +735,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                 return ret;
             }
 
-        fn remove_value_by_index_helper1(&mut self, index: Index)
+        fn remove_value_by_index_helper1(&mut self, index: SLLIndex)
             requires old(self).wf(),
                     old(self).value_list@.contains(index),
                     old(self).value_list_head == index,
@@ -743,7 +744,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                     self.value_list_len ==  old(self).value_list_len - 1,
                     self.value_list_wf(),
                     self.free_list_wf(),
-                    forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
+                    forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
                     self.free_list@.contains(index) == false,
                     self.value_list@.contains(index) == false,
                     self.spec_seq@ == old(self).spec_seq@.subrange(0,old(self).value_list@.index_of(index)).add(old(self).spec_seq@.subrange(old(self).value_list@.index_of(index) + 1, old(self).spec_seq@.len() as int)),
@@ -826,7 +827,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
 
                 assert(self.spec_seq_wf());
             }
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) ^ old(self).value_list@.contains(i));
             // assert(self.free_list@.contains(node_index) == false);
             // assert(self.value_list@.contains(node_index) == false);
             assert(self.free_list == old(self).free_list);
@@ -834,26 +835,26 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             assert(index == old(self).value_list@[0]);
             assert(old(self).value_list@.index_of(index) == 0);
             assert(0<= index < N);
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) == self.free_list@.contains(i));
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) == self.free_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
             assert(old(self).value_list@.contains(index) && !self.value_list@.contains(index));
 
-            assert(forall|i:Index| #![auto] 0<= i < N && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
 
             assert(forall|i:int| #![auto] 0<= i <self.value_list@.len() ==> old(self).value_list@.index_of(self.value_list@[i]) == i + 1);
             assert(forall|i:int| #![auto] 1<= i <old(self).value_list@.len() ==> old(self).value_list@[i] == self.value_list@[i - 1]);
             assert(forall|i:int| #![auto] 1<= i <old(self).value_list@.len() ==> self.value_list@.index_of(old(self).value_list@[i]) == i - 1);
             assert(forall|i:int| #![auto] 1<= i <old(self).value_list@.len() ==> self.value_list@.contains(old(self).value_list@[i]));
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index && old(self).value_list@.contains(i) ==> self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index && old(self).value_list@.contains(i) ==> self.value_list@.contains(i));
 
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
 
             assert(self.free_list_len == old(self).free_list_len);
             assert(self.array_wf());
             assert(self.value_list_len ==  old(self).value_list_len - 1);
             assert(self.value_list_wf());
             assert(self.free_list_wf());
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
             assert(self.free_list@.contains(index) == false);
             assert(self.value_list@.contains(index) == false);
 
@@ -871,15 +872,15 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             assert(self.value_list@ == old(self).value_list@.subrange(1, old(self).value_list@.len() as int));
             assert(old(self).value_list@.index_of(index) == 0);
             assert(self.value_list@ == old(self).value_list@.subrange(1,old(self).value_list@.len() as int));
-            assert(Seq::<Index>::empty().len() == 0);
-            assert(self.value_list@=~=Seq::<Index>::empty().add(old(self).value_list@.subrange(1,old(self).value_list@.len() as int)));
+            assert(Seq::<SLLIndex>::empty().len() == 0);
+            assert(self.value_list@=~=Seq::<SLLIndex>::empty().add(old(self).value_list@.subrange(1,old(self).value_list@.len() as int)));
             assert(old(self).value_list@.subrange(0,old(self).value_list@.index_of(index)).len() == 0);
-            assert( old(self).value_list@.subrange(0,old(self).value_list@.index_of(index))=~=Seq::<Index>::empty());
+            assert( old(self).value_list@.subrange(0,old(self).value_list@.index_of(index))=~=Seq::<SLLIndex>::empty());
             assert(self.value_list@ == old(self).value_list@.subrange(0,old(self).value_list@.index_of(index)).add(old(self).value_list@.subrange(old(self).value_list@.index_of(index) + 1, old(self).value_list@.len() as int)));
             assert(forall|i:int| #![auto] 0<=i<self.arr_seq@.len() ==> self.arr_seq@[i].value == old(self).arr_seq@[i].value);
         }
 
-        fn remove_value_by_index_helper2(&mut self, index: Index)
+        fn remove_value_by_index_helper2(&mut self, index: SLLIndex)
         requires old(self).wf(),
                  old(self).value_list@.contains(index),
                  old(self).value_list_head != index,
@@ -889,7 +890,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                  self.value_list_len ==  old(self).value_list_len - 1,
                  self.value_list_wf(),
                  self.free_list_wf(),
-                 forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
+                 forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
                  self.free_list@.contains(index) == false,
                  self.value_list@.contains(index) == false,
                  self.spec_seq@ == old(self).spec_seq@.subrange(0,old(self).value_list@.index_of(index)).add(old(self).spec_seq@.subrange(old(self).value_list@.index_of(index) + 1, old(self).spec_seq@.len() as int)),
@@ -950,14 +951,14 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
         assert(self.free_list_wf());
 
         assert(self.free_list@.contains(index) == false);
-        assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+        assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
 
         assert(self.free_list_len == old(self).free_list_len);
         assert(self.array_wf());
         assert(self.value_list_len ==  old(self).value_list_len - 1);
         assert(self.value_list_wf());
         assert(self.free_list_wf());
-        assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+        assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
         assert(self.free_list@.contains(index) == false);
         assert(self.value_list@.contains(index) == false);
 
@@ -976,15 +977,15 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
         assert(0 <= index < N);
         assert(self.value_list@ == old(self).value_list@.drop_last());
         assert(self.value_list@ == old(self).value_list@.subrange(0,old(self).value_list@.index_of(index)));
-        assert(Seq::<Index>::empty().len() == 0);
-        assert(self.value_list@=~~=old(self).value_list@.subrange(0,old(self).value_list@.index_of(index)).add(Seq::<Index>::empty()));
+        assert(Seq::<SLLIndex>::empty().len() == 0);
+        assert(self.value_list@=~~=old(self).value_list@.subrange(0,old(self).value_list@.index_of(index)).add(Seq::<SLLIndex>::empty()));
         assert(old(self).value_list@.subrange(old(self).value_list@.index_of(index) + 1, old(self).value_list@.len() as int).len() == 0);
-        assert(old(self).value_list@.subrange(old(self).value_list@.index_of(index) + 1, old(self).value_list@.len() as int)=~=Seq::<Index>::empty());
+        assert(old(self).value_list@.subrange(old(self).value_list@.index_of(index) + 1, old(self).value_list@.len() as int)=~=Seq::<SLLIndex>::empty());
         assert(self.value_list@ == old(self).value_list@.subrange(0,old(self).value_list@.index_of(index)).add(old(self).value_list@.subrange(old(self).value_list@.index_of(index) + 1, old(self).value_list@.len() as int)));
         assert(forall|i:int| #![auto] 0<=i<self.arr_seq@.len() ==> self.arr_seq@[i].value == old(self).arr_seq@[i].value);
     }
 
-    fn remove_value_by_index_helper3(&mut self, index: Index)
+    fn remove_value_by_index_helper3(&mut self, index: SLLIndex)
     requires old(self).wf(),
              old(self).value_list@.contains(index),
              old(self).value_list_head != index,
@@ -994,7 +995,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
              self.value_list_len ==  old(self).value_list_len - 1,
              self.value_list_wf(),
              self.free_list_wf(),
-             forall|i:Index| 0<= i < N && i != index ==> #[trigger] self.free_list@.contains(i) ^ self.value_list@.contains(i),
+             forall|i:SLLIndex| 0<= i < N && i != index ==> #[trigger] self.free_list@.contains(i) ^ self.value_list@.contains(i),
              self.free_list@.contains(index) == false,
              self.value_list@.contains(index) == false,
              self.spec_seq@ == old(self).spec_seq@.subrange(0,old(self).value_list@.index_of(index)).add(old(self).spec_seq@.subrange(old(self).value_list@.index_of(index) + 1, old(self).spec_seq@.len() as int)),
@@ -1072,11 +1073,11 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             assert(index == old(self).value_list@[index_in_list@]);
             assert(old(self).value_list@.index_of(index) == index_in_list@);
             assert(0<= index < N);
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) == self.free_list@.contains(i));
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> old(self).free_list@.contains(i) == self.free_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
             assert(old(self).value_list@.contains(index) && !self.value_list@.contains(index));
 
-            assert(forall|i:Index| #![auto] 0<= i < N && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && !old(self).value_list@.contains(i) ==> !self.value_list@.contains(i));
 
             assert(forall|i:int| #![auto] 0<= i < index_in_list@ ==> old(self).value_list@.index_of(self.value_list@[i]) == i);
             assert(forall|i:int| #![auto] index_in_list@ <= i < self.value_list@.len() ==> old(self).value_list@.index_of(self.value_list@[i]) == i + 1);
@@ -1084,16 +1085,16 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             assert(forall|i:int| #![auto] index_in_list@ + 1<= i < old(self).value_list@.len() ==> old(self).value_list@[i] == self.value_list@[i - 1]);
             // assert(forall|i:int| #![auto] 1<= i <old(self).value_list@.len() ==> self.value_list@.index_of(old(self).value_list@[i]) == i - 1);
             // assert(forall|i:int| #![auto] 1<= i <old(self).value_list@.len() && i != index_in_list@ ==> self.value_list@.contains(old(self).value_list@[i]));
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index && old(self).value_list@.contains(i) ==> self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index && old(self).value_list@.contains(i) ==> self.value_list@.contains(i));
 
-            assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+            assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
         }
         // assert(self.free_list_len == old(self).free_list_len);
         // assert(self.array_wf());
         // assert(self.value_list_len ==  old(self).value_list_len - 1);
         // assert(self.value_list_wf());
         // assert(self.free_list_wf());
-        // assert(forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+        // assert(forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
         // assert(self.free_list@.contains(index) == false);
         // assert(self.value_list@.contains(index) == false);
         // assert(self.spec_seq@ == old(self).spec_seq@.subrange(0,old(self).value_list@.index_of(index)).add(old(self).spec_seq@.subrange(old(self).value_list@.index_of(index) + 1, old(self).spec_seq@.len() as int)));
@@ -1103,7 +1104,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
         // assert(forall|i:int| #![auto] 0<=i<self.arr_seq@.len() ==> self.arr_seq@[i].value == old(self).arr_seq@[i].value);
     }
 
-    fn remove_value_by_index(&mut self, index: Index)
+    fn remove_value_by_index(&mut self, index: SLLIndex)
         requires old(self).wf(),
                  old(self).value_list@.contains(index),
         ensures self.free_list_len == old(self).free_list_len,
@@ -1111,7 +1112,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                 self.value_list_len ==  old(self).value_list_len - 1,
                 self.value_list_wf(),
                 self.free_list_wf(),
-                forall|i:Index| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
+                forall|i:SLLIndex| #![auto] 0<= i < N && i != index ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
                 self.free_list@.contains(index) == false,
                 self.value_list@.contains(index) == false,
                 self.spec_seq@ == old(self).spec_seq@.subrange(0,old(self).value_list@.index_of(index)).add(old(self).spec_seq@.subrange(old(self).value_list@.index_of(index) + 1, old(self).spec_seq@.len() as int)),
@@ -1136,10 +1137,10 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
     }
 
 
-    pub fn remove(&mut self, index: Index) -> (ret: usize)
+    pub fn remove(&mut self, index: SLLIndex) -> (ret: usize)
         requires old(self).wf(),
                  old(self).node_ref_valid(index),
-                 old(self).no_duplicates(),
+                 old(self).unique(),
         ensures self.wf(),
                 self.value_list_len == old(self).value_list_len - 1,
                 ret == old(self).node_ref_resolve(index),
@@ -1150,24 +1151,24 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                     #![trigger self@.contains(value)]
                     ret != value ==> old(self)@.contains(value) == self@.contains(value),
                 self.spec_seq@.contains(ret) == false,
-                forall|_index:Index| 
+                forall|_index:SLLIndex| 
                     #![trigger old(self).node_ref_valid(_index) ]
                     #![trigger self.node_ref_valid(_index)]
                     old(self).node_ref_valid(_index) && _index != index ==> self.node_ref_valid(_index),
-                forall|_index:Index|
+                forall|_index:SLLIndex|
                     #![trigger old(self).node_ref_valid(_index) ]
                     #![trigger self.node_ref_resolve(_index)]
                     #![trigger old(self).node_ref_resolve(_index)]
                     old(self).node_ref_valid(_index) && _index != index ==> self.node_ref_resolve(_index) == old(self).node_ref_resolve(_index),
-                self.no_duplicates(),
+                self.unique(),
         {
             self.remove_value_by_index(index);
             let ret = self.get_ptr(index);
             self.set_ptr(index, NULL_POINTER);
             // assert(self.arr_seq@[index as int].value == NULL_POINTER);
-            // assert( forall|i: Index| #![auto] 0 <= i < N && i != index ==> self.arr_seq@[i as int].value == old(self).arr_seq@[i as int].value);
-            // assert( forall|i: Index| #![auto] old(self).value_list@.contains(i) && i != index ==> self.value_list@.contains(i));
-            // assert( forall|i: Index| #![auto] 0 <= i < N && self.arr_seq@[i as int].value != NULL_POINTER ==> self.value_list@.contains(i));
+            // assert( forall|i: SLLIndex| #![auto] 0 <= i < N && i != index ==> self.arr_seq@[i as int].value == old(self).arr_seq@[i as int].value);
+            // assert( forall|i: SLLIndex| #![auto] old(self).value_list@.contains(i) && i != index ==> self.value_list@.contains(i));
+            // assert( forall|i: SLLIndex| #![auto] 0 <= i < N && self.arr_seq@[i as int].value != NULL_POINTER ==> self.value_list@.contains(i));
             let ghost_index:Ghost<int> = Ghost(old(self).value_list@.index_of(index));
             // assert(forall|i:int|#![auto] 0 <= i < old(self).value_list@.len() && i != ghost_index@ ==> old(self).value_list@[i] != index);
             // assert(ghost_index@ == old(self).value_list@.index_of(index));
@@ -1177,10 +1178,10 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             // assert(forall|i:int|#![auto] old(self).value_list@.index_of(index)  < i < old(self).value_list@.len() ==> self.value_list@[i - 1] == old(self).value_list@[i]);
             // assert(forall|i:int|#![auto] old(self).value_list@.index_of(index)  < i < old(self).value_list@.len() ==> self.value_list@.index_of(old(self).value_list@[i]) == i - 1);
 
-            // assert(forall| _index:Index|  #![auto] old(self).value_list@.contains(_index) &&  index != _index ==> self.value_list@.contains(_index));
-            // assert(forall| _index:Index|  #![auto] old(self).value_list@.contains(_index) == false  ==> self.value_list@.contains(_index) == false);
+            // assert(forall| _index:SLLIndex|  #![auto] old(self).value_list@.contains(_index) &&  index != _index ==> self.value_list@.contains(_index));
+            // assert(forall| _index:SLLIndex|  #![auto] old(self).value_list@.contains(_index) == false  ==> self.value_list@.contains(_index) == false);
 
-            // assert(forall| _index:Index|  #![auto]  index != _index ==> old(self).value_list@.contains(_index) == self.value_list@.contains(_index));
+            // assert(forall| _index:SLLIndex|  #![auto]  index != _index ==> old(self).value_list@.contains(_index) == self.value_list@.contains(_index));
             // assert(self.free_list_ptr_all_null());
 
             // assert(self.value_list_len == old(self).value_list_len - 1);
@@ -1225,7 +1226,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
             assert(forall|i:int|#![auto] old(self).value_list@.index_of(index)  < i < old(self).value_list@.len() ==> self.value_list@[i - 1] == old(self).value_list@[i]);
             assert(forall|i:int|#![auto] old(self).value_list@.index_of(index)  < i < old(self).value_list@.len() ==> self.value_list@.index_of(old(self).value_list@[i]) == i - 1);
 
-            assert(forall| _index:Index|  #![auto] old(self).value_list@.contains(_index) &&  index != _index ==> self.value_list@.contains(_index));
+            assert(forall| _index:SLLIndex|  #![auto] old(self).value_list@.contains(_index) &&  index != _index ==> self.value_list@.contains(_index));
             assert(self.wf());
             return ret;
         }

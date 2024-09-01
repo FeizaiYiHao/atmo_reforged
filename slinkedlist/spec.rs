@@ -1,18 +1,19 @@
 use vstd::prelude::*;
 verus! {
 use crate::slinkedlist::define::*;
+use crate::define::SLLIndex;
 
-    pub struct MarsStaticLinkedList<const N: usize>{
+    pub struct StaticLinkedList<const N: usize>{
         pub ar: [Node;N],
         pub spec_seq: Ghost<Seq<usize>>,
     
-        pub value_list: Ghost<Seq<Index>>,
-        pub value_list_head: Index,
-        pub value_list_tail: Index,
+        pub value_list: Ghost<Seq<SLLIndex>>,
+        pub value_list_head: SLLIndex,
+        pub value_list_tail: SLLIndex,
         pub value_list_len: usize,
-        pub free_list: Ghost<Seq<Index>>,
-        pub free_list_head: Index,
-        pub free_list_tail: Index,
+        pub free_list: Ghost<Seq<SLLIndex>>,
+        pub free_list_head: SLLIndex,
+        pub free_list_tail: SLLIndex,
         pub free_list_len: usize,
     
         pub size: usize,
@@ -21,7 +22,7 @@ use crate::slinkedlist::define::*;
         pub arr_seq: Ghost<Seq<Node>>,
     }
 
-    impl<const N: usize> MarsStaticLinkedList<N> {
+    impl<const N: usize> StaticLinkedList<N> {
         pub open spec fn spec_len(&self) -> usize{
             self.value_list_len
         }
@@ -34,7 +35,7 @@ use crate::slinkedlist::define::*;
             self.value_list_len
         }
 
-        pub open spec fn spec_get_ptr(&self, index: Index) -> (ptr:usize)
+        pub open spec fn spec_get_ptr(&self, index: SLLIndex) -> (ptr:usize)
             recommends
                 self.wf(),
                 0 <= index < N,
@@ -50,8 +51,11 @@ use crate::slinkedlist::define::*;
             self.arr_seq@[i]
         }
     
-        pub open spec fn no_duplicates(&self) -> bool {
-            self.spec_seq@.no_duplicates()
+        pub open spec fn unique(&self) -> bool {
+            forall|i:int, j:int| 
+                #![trigger self.value_list_len, self.spec_seq@[i], self.spec_seq@[j]]
+                0 <= i < self.value_list_len && 0 <= j < self.value_list_len && i != j
+                    ==> self.spec_seq@[i] != self.spec_seq@[j]
         }
     
         pub open spec fn view(&self) -> Seq<usize>
@@ -60,11 +64,11 @@ use crate::slinkedlist::define::*;
             self.spec_seq@
         }
     
-        pub open spec fn node_ref_valid(&self, index: Index) -> bool{
+        pub open spec fn node_ref_valid(&self, index: SLLIndex) -> bool{
             self.value_list@.contains(index)
         }
     
-        pub open spec fn node_ref_resolve(&self, index: Index) -> usize
+        pub open spec fn node_ref_resolve(&self, index: SLLIndex) -> usize
             recommends self.node_ref_valid(index)
         {
             self.arr_seq@[index as int].value
@@ -121,7 +125,10 @@ use crate::slinkedlist::define::*;
             &&
             (forall|i: nat| 0 <= i < self.free_list@.len() ==> #[trigger] self.free_list@[i as int] >= 0)
             &&
-            self.free_list@.no_duplicates()
+            forall|i:int, j:int| 
+                #![trigger self.free_list_len, self.spec_seq@[i], self.spec_seq@[j]]
+                0 <= i < self.free_list_len && 0 <= j < self.free_list_len && i != j
+                    ==> self.free_list@[i] != self.free_list@[j]
             &&
             self.wf_free_node_head()
             &&
@@ -182,7 +189,7 @@ use crate::slinkedlist::define::*;
             &&
             (forall|i: nat| 0 <= i < self.value_list@.len() ==> #[trigger] self.value_list@[i as int] >= 0)
             &&
-            self.value_list@.no_duplicates()
+            self.unique()
             &&
             self.wf_value_node_head()
             &&
@@ -193,7 +200,7 @@ use crate::slinkedlist::define::*;
     
         pub open spec fn free_list_ptr_all_null(&self) -> bool
         {
-            forall|i: Index|
+            forall|i: SLLIndex|
                 #![trigger self.arr_seq@[i as int].value]
                 #![trigger self.value_list@.contains(i)]
                 0 <= i < N && #[trigger] self.arr_seq@[i as int].value != NULL_POINTER ==> self.value_list@.contains(i)
@@ -221,7 +228,7 @@ use crate::slinkedlist::define::*;
             &&
             (self.free_list_wf())
             &&
-            (forall|i:Index|                
+            (forall|i:SLLIndex|                
                 #![trigger self.free_list@.contains(i)]
                 #![trigger self.value_list@.contains(i)]
                 0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i))

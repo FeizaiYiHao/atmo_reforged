@@ -27,6 +27,9 @@ pub type L3Index = usize;
 pub type L2Index = usize;
 pub type L1Index = usize;
 
+
+pub type SLLIndex = i32;
+
 #[derive(Clone, Copy, Debug)]
 pub enum ErrorCodeType {
     NoErrorCode,
@@ -57,19 +60,23 @@ pub enum PageType {
 
 #[derive(Clone, Copy, Debug)]
 pub enum PageState {
-    UNAVAILABLE,
-    FREE,
-    PAGETABLE,
-    ALLOCATED,
-    MAPPED,
-    IO,
+    Unavailable,
+    Pagetable,
+    Allocated,
+    Free4k,
+    Free2m,
+    Free1g,
+    Mapped4k,
+    Mapped2m,
+    Mapped1g,
+    Io,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum PageSize {
-    SZ4K,
-    SZ2M,
-    SZ1G,
+    SZ4k,
+    SZ2m,
+    SZ1g,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -79,9 +86,9 @@ pub enum PageTableErrorCode {
     L3EntryNotExist,
     L2EntryNotExist,
     L1EntryNotExist,
-    EntryTakenBy4K,
-    EntryTakenBy2M,
-    EntryTakenBy1G,
+    EntryTakenBy4k,
+    EntryTakenBy2m,
+    EntryTakenBy1g,
 }
 
 // -------------------- End of Types --------------------
@@ -104,9 +111,9 @@ pub const PCID_MAX:usize = 4096;
 pub const IOID_MAX:usize = 4096;
 
 pub const MEM_MASK:u64 = 0x0000_ffff_ffff_f000;
-pub const MEM_4K_MASK:u64 = 0x0000_ffff_ffff_f000;
-pub const MEM_2M_MASK:u64 = 0x0000_ffff_ffe0_0000;
-pub const MEM_1G_MASK:u64 = 0x0000_fffc_0000_0000;
+pub const MEM_4k_MASK:u64 = 0x0000_ffff_ffff_f000;
+pub const MEM_2m_MASK:u64 = 0x0000_ffff_ffe0_0000;
+pub const MEM_1g_MASK:u64 = 0x0000_fffc_0000_0000;
 pub const VA_PERM_MASK:u64 = 0x8000_0000_0000_0002;
 pub const READ:usize = 0x8000_0000_0000_0000u64 as usize;
 pub const READ_WRITE:usize = 0x8000_0000_0000_0002u64 as usize;

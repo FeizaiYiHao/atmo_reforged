@@ -2,9 +2,10 @@ use vstd::prelude::*;
 verus! {
 use crate::slinkedlist::define::*;
 use crate::slinkedlist::spec::*;
+use crate::define::SLLIndex;
 use core::mem::MaybeUninit;
 
-    impl<const N: usize> MarsStaticLinkedList<N> {
+    impl<const N: usize> StaticLinkedList<N> {
 
         #[verifier(external_body)]
         pub fn new() -> (ret: Self)
@@ -36,7 +37,7 @@ use core::mem::MaybeUninit;
         }
 
         #[verifier(external_body)]
-        pub fn set_ptr(&mut self, index: Index, v: usize)
+        pub fn set_ptr(&mut self, index: SLLIndex, v: usize)
             requires
                 old(self).array_wf(),
             ensures
@@ -63,7 +64,7 @@ use core::mem::MaybeUninit;
         }
 
         #[verifier(external_body)]
-        pub fn set_next(&mut self, index: Index, v: Index)
+        pub fn set_next(&mut self, index: SLLIndex, v: SLLIndex)
             requires
                 old(self).array_wf(),
             ensures
@@ -88,7 +89,7 @@ use core::mem::MaybeUninit;
         }
 
         #[verifier(external_body)]
-        pub fn set_prev(&mut self, index: Index, v: Index)
+        pub fn set_prev(&mut self, index: SLLIndex, v: SLLIndex)
             requires
                 old(self).array_wf(),
             ensures
@@ -137,7 +138,7 @@ use core::mem::MaybeUninit;
         }
     
         #[verifier(external_body)]
-        pub fn get_ptr(&self, index: Index) -> (ptr:usize)
+        pub fn get_ptr(&self, index: SLLIndex) -> (ptr:usize)
             requires
                 0 <= index < N,
                 self.array_wf(),
@@ -148,7 +149,7 @@ use core::mem::MaybeUninit;
         }
     
         #[verifier(external_body)]
-        pub fn get_next(&self, index: Index) -> (next:Index)
+        pub fn get_next(&self, index: SLLIndex) -> (next:SLLIndex)
             requires
                 0 <= index < N,
                 self.array_wf(),
@@ -159,7 +160,7 @@ use core::mem::MaybeUninit;
         }
     
         #[verifier(external_body)]
-        pub fn get_prev(&self, index: Index) -> (prev:Index)
+        pub fn get_prev(&self, index: SLLIndex) -> (prev:SLLIndex)
             requires
                 0 <= index < N,
                 self.array_wf(),

@@ -14,7 +14,7 @@ pub struct Node{
     pub prev:Index,
 }
 
-pub struct MarsStaticLinkedList<const N: usize>{
+pub struct StaticLinkedList<const N: usize>{
     pub ar: [Node;N],
     pub spec_seq: Ghost<Seq<usize>>,
 
@@ -33,7 +33,7 @@ pub struct MarsStaticLinkedList<const N: usize>{
     pub arr_seq: Ghost<Seq<Node>>,
 }
 
-impl<const N: usize> MarsStaticLinkedList<N> {
+impl<const N: usize> StaticLinkedList<N> {
 
     #[verifier(external_body)]
     pub fn new() -> (ret: Self)
@@ -1613,7 +1613,7 @@ impl<const N: usize> MarsStaticLinkedList<N> {
             return ret;
         }
 
-    // fn test(sll: &mut MarsStaticLinkedList<2>)
+    // fn test(sll: &mut StaticLinkedList<2>)
     //     requires
     //         old(sll).wf(),
     //         old(sll).arr_seq@.len() == 2,

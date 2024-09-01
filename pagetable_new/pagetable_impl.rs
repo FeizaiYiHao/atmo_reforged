@@ -42,12 +42,12 @@ impl PageTable{
         ensures
             self.wf(),
             self.page_closure() =~= old(self).page_closure().insert(page_map_ptr),
-            self.mapping_4K() =~= old(self).mapping_4K(),
-            self.mapping_2M() =~= old(self).mapping_2M(),
-            self.mapping_1G() =~= old(self).mapping_1G(),
-            self.mapped_4K_pages() =~= old(self).mapped_4K_pages(),
-            self.mapped_2M_pages() =~= old(self).mapped_2M_pages(),
-            self.mapped_1G_pages() =~= old(self).mapped_1G_pages(),
+            self.mapping_4k() =~= old(self).mapping_4k(),
+            self.mapping_2m() =~= old(self).mapping_2m(),
+            self.mapping_1g() =~= old(self).mapping_1g(),
+            self.mapped_4k_pages() =~= old(self).mapped_4k_pages(),
+            self.mapped_2m_pages() =~= old(self).mapped_2m_pages(),
+            self.mapped_1g_pages() =~= old(self).mapped_1g_pages(),
             self.spec_resolve_mapping_l4(target_l4i).is_Some(),
             self.spec_resolve_mapping_l4(target_l4i).get_Some_0().addr == page_map_ptr,
     {
@@ -211,26 +211,26 @@ impl PageTable{
                 self.l1_tables@.dom().contains(p) && 0 <= i < 512 && self.l1_tables@[p].value()[i].perm.present ==>
                     ! self.l1_tables@[p].value()[i].perm.ps);
         };
-        assert(self.wf_mapping_4K()) by {
+        assert(self.wf_mapping_4k()) by {
             assert(forall|l4i: L4Index,l3i: L3Index,l2i: L2Index,l1i: L2Index| 
-                #![trigger self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i)]
-                #![trigger old(self).spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i)]
+                #![trigger self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
+                #![trigger old(self).spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
                 0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 ==>
-                    old(self).spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i) == self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i));
+                    old(self).spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i) == self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i));
         };
-        assert(self.wf_mapping_2M()) by {
+        assert(self.wf_mapping_2m()) by {
             assert(forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
-                #![trigger self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i)]
-                #![trigger old(self).spec_resolve_mapping_2M_l2(l4i,l3i,l2i)]
+                #![trigger self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
+                #![trigger old(self).spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
                 0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 ==>
-                    old(self).spec_resolve_mapping_2M_l2(l4i,l3i,l2i) == self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i));
+                    old(self).spec_resolve_mapping_2m_l2(l4i,l3i,l2i) == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i));
         };
-        assert(self.wf_mapping_1G())by {
+        assert(self.wf_mapping_1g())by {
             assert(forall|l4i: L4Index,l3i: L3Index| 
-                #![trigger self.spec_resolve_mapping_1G_l3(l4i,l3i)]
-                #![trigger old(self).spec_resolve_mapping_1G_l3(l4i,l3i)]
+                #![trigger self.spec_resolve_mapping_1g_l3(l4i,l3i)]
+                #![trigger old(self).spec_resolve_mapping_1g_l3(l4i,l3i)]
                 0 <= l4i < 512 && 0 <= l3i < 512 ==>
-                    old(self).spec_resolve_mapping_1G_l3(l4i,l3i) == self.spec_resolve_mapping_1G_l3(l4i,l3i));
+                    old(self).spec_resolve_mapping_1g_l3(l4i,l3i) == self.spec_resolve_mapping_1g_l3(l4i,l3i));
         };
         assert(self.user_only());
         assert(self.rwx_upper_level_entries());
@@ -247,7 +247,7 @@ impl PageTable{
             old(self).spec_resolve_mapping_l4(target_l4i).is_Some(),
             old(self).spec_resolve_mapping_l4(target_l4i).get_Some_0().addr == target_l3_p,
             old(self).spec_resolve_mapping_l3(target_l4i, target_l3i).is_None(),
-            old(self).spec_resolve_mapping_1G_l3(target_l4i, target_l3i).is_None(),
+            old(self).spec_resolve_mapping_1g_l3(target_l4i, target_l3i).is_None(),
             page_ptr_valid(page_map_ptr),
             old(self).page_closure().contains(page_map_ptr) == false,
             old(self).page_not_mapped(page_map_ptr),
@@ -375,26 +375,26 @@ impl PageTable{
                         old(self).ps_entries_exist_in_mapped_pages();
                     };
         };
-        assert(self.wf_mapping_4K()) by {
+        assert(self.wf_mapping_4k()) by {
             assert(forall|l4i: L4Index,l3i: L3Index,l2i: L2Index,l1i: L2Index| 
-                #![trigger self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i)]
-                #![trigger old(self).spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i)]
+                #![trigger self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
+                #![trigger old(self).spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
                 0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 ==>
-                    old(self).spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i) == self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i));
+                    old(self).spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i) == self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i));
         };
-        assert(self.wf_mapping_2M()) by {
+        assert(self.wf_mapping_2m()) by {
             assert(forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
-                #![trigger self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i)]
-                #![trigger old(self).spec_resolve_mapping_2M_l2(l4i,l3i,l2i)]
+                #![trigger self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
+                #![trigger old(self).spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
                 0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 ==>
-                    old(self).spec_resolve_mapping_2M_l2(l4i,l3i,l2i) == self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i));
+                    old(self).spec_resolve_mapping_2m_l2(l4i,l3i,l2i) == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i));
         };
-        assert(self.wf_mapping_1G())by {
+        assert(self.wf_mapping_1g())by {
             assert(forall|l4i: L4Index,l3i: L3Index| 
-                #![trigger self.spec_resolve_mapping_1G_l3(l4i,l3i)]
-                #![trigger old(self).spec_resolve_mapping_1G_l3(l4i,l3i)]
+                #![trigger self.spec_resolve_mapping_1g_l3(l4i,l3i)]
+                #![trigger old(self).spec_resolve_mapping_1g_l3(l4i,l3i)]
                 0 <= l4i < 512 && 0 <= l3i < 512 && (l4i,l3i) != (target_l4i, target_l3i) ==>
-                    old(self).spec_resolve_mapping_1G_l3(l4i,l3i) =~= self.spec_resolve_mapping_1G_l3(l4i,l3i));
+                    old(self).spec_resolve_mapping_1g_l3(l4i,l3i) =~= self.spec_resolve_mapping_1g_l3(l4i,l3i));
         };
         assert(self.user_only());
         assert(self.rwx_upper_level_entries());

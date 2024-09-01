@@ -20,24 +20,24 @@ impl PageTable{
             self.wf(),
         ensures      
             forall|p: PageMapPtr, i: L3Index| 
-            #![trigger self.mapped_1G_pages().contains(self.l3_tables@[p].value()[i].addr)]
+            #![trigger self.mapped_1g_pages().contains(self.l3_tables@[p].value()[i].addr)]
             self.l3_tables@.dom().contains(p) && 0 <= i < 512 && self.l3_tables@[p].value()[i].perm.present && self.l3_tables@[p].value()[i].perm.ps ==>
-                self.mapped_1G_pages().contains(self.l3_tables@[p].value()[i].addr),
+                self.mapped_1g_pages().contains(self.l3_tables@[p].value()[i].addr),
             forall|p: PageMapPtr, i: L2Index| 
-            #![trigger self.mapped_2M_pages().contains(self.l2_tables@[p].value()[i].addr)]
+            #![trigger self.mapped_2m_pages().contains(self.l2_tables@[p].value()[i].addr)]
             self.l2_tables@.dom().contains(p) && 0 <= i < 512 && self.l2_tables@[p].value()[i].perm.present && self.l2_tables@[p].value()[i].perm.ps ==>
-                self.mapped_2M_pages().contains(self.l2_tables@[p].value()[i].addr),
+                self.mapped_2m_pages().contains(self.l2_tables@[p].value()[i].addr),
             forall|p: PageMapPtr, i: L2Index| 
-            #![trigger self.mapped_4K_pages().contains(self.l1_tables@[p].value()[i].addr)]
+            #![trigger self.mapped_4k_pages().contains(self.l1_tables@[p].value()[i].addr)]
             self.l1_tables@.dom().contains(p) && 0 <= i < 512 && self.l1_tables@[p].value()[i].perm.present ==>
-                self.mapped_4K_pages().contains(self.l1_tables@[p].value()[i].addr),
+                self.mapped_4k_pages().contains(self.l1_tables@[p].value()[i].addr),
     {
         assert(
             forall|p: PageMapPtr, i: L3Index| 
             // #![auto]
             #![trigger self.l3_tables@[p].value()[i]]
             self.l3_tables@.dom().contains(p) && 0 <= i < 512 && self.l3_tables@[p].value()[i].perm.present && self.l3_tables@[p].value()[i].perm.ps ==>
-                self.mapped_1G_pages().contains(self.l3_tables@[p].value()[i].addr)
+                self.mapped_1g_pages().contains(self.l3_tables@[p].value()[i].addr)
         )
             by{
                 assert(forall|p: PageMapPtr, i: L3Index| 
@@ -50,17 +50,17 @@ impl PageTable{
                             &&
                             self.spec_resolve_mapping_l4(self.l3_rev_map@[p]).is_Some() && self.spec_resolve_mapping_l4(self.l3_rev_map@[p]).get_Some_0().addr == p 
                             &&
-                            self.spec_resolve_mapping_1G_l3(self.l3_rev_map@[p],i).is_Some() && self.spec_resolve_mapping_1G_l3(self.l3_rev_map@[p],i).get_Some_0().addr == self.l3_tables@[p].value()[i].addr 
+                            self.spec_resolve_mapping_1g_l3(self.l3_rev_map@[p],i).is_Some() && self.spec_resolve_mapping_1g_l3(self.l3_rev_map@[p],i).get_Some_0().addr == self.l3_tables@[p].value()[i].addr 
                             &&
-                            self.mapping_1G@.dom().contains(spec_index2va((self.l3_rev_map@[p],i,0,0))) 
+                            self.mapping_1g@.dom().contains(spec_index2va((self.l3_rev_map@[p],i,0,0))) 
                             &&
-                            self.mapping_1G@[spec_index2va((self.l3_rev_map@[p],i,0,0))].addr == self.l3_tables@[p].value()[i].addr 
+                            self.mapping_1g@[spec_index2va((self.l3_rev_map@[p],i,0,0))].addr == self.l3_tables@[p].value()[i].addr 
                             &&
-                            self.mapping_1G().dom().contains(spec_index2va((self.l3_rev_map@[p],i,0,0))) 
+                            self.mapping_1g().dom().contains(spec_index2va((self.l3_rev_map@[p],i,0,0))) 
                             &&
-                            self.mapping_1G()[spec_index2va((self.l3_rev_map@[p],i,0,0))].addr == self.l3_tables@[p].value()[i].addr 
+                            self.mapping_1g()[spec_index2va((self.l3_rev_map@[p],i,0,0))].addr == self.l3_tables@[p].value()[i].addr 
                             &&
-                            self.mapped_1G_pages().contains(self.l3_tables@[p].value()[i].addr)
+                            self.mapped_1g_pages().contains(self.l3_tables@[p].value()[i].addr)
                 );
             };
 
@@ -68,7 +68,7 @@ impl PageTable{
             forall|p: PageMapPtr, i: L2Index| 
             #![trigger self.l2_tables@[p].value()[i]]
             self.l2_tables@.dom().contains(p) && 0 <= i < 512 && self.l2_tables@[p].value()[i].perm.present && self.l2_tables@[p].value()[i].perm.ps ==>
-                self.mapped_2M_pages().contains(self.l2_tables@[p].value()[i].addr)
+                self.mapped_2m_pages().contains(self.l2_tables@[p].value()[i].addr)
         ) by {
             assert(forall|p: PageMapPtr, i: L2Index| 
                 #![trigger self.l2_tables@[p].value()[i]]
@@ -81,20 +81,20 @@ impl PageTable{
                         &&
                         self.spec_resolve_mapping_l3(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1).is_Some() && self.spec_resolve_mapping_l3(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1).get_Some_0().addr == p 
                         &&
-                        self.spec_resolve_mapping_2M_l2(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1,i).is_Some() && self.spec_resolve_mapping_2M_l2(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1,i).get_Some_0().addr == self.l2_tables@[p].value()[i].addr 
+                        self.spec_resolve_mapping_2m_l2(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1,i).is_Some() && self.spec_resolve_mapping_2m_l2(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1,i).get_Some_0().addr == self.l2_tables@[p].value()[i].addr 
                         &&
-                        self.mapping_2M@.dom().contains(spec_index2va((self.l2_rev_map@[p].0,self.l2_rev_map@[p].1,i,0))) 
+                        self.mapping_2m@.dom().contains(spec_index2va((self.l2_rev_map@[p].0,self.l2_rev_map@[p].1,i,0))) 
                         &&
-                        self.mapping_2M@[spec_index2va((self.l2_rev_map@[p].0,self.l2_rev_map@[p].1,i,0))].addr == self.l2_tables@[p].value()[i].addr 
+                        self.mapping_2m@[spec_index2va((self.l2_rev_map@[p].0,self.l2_rev_map@[p].1,i,0))].addr == self.l2_tables@[p].value()[i].addr 
                         &&
-                        self.mapping_2M().dom().contains(spec_index2va((self.l2_rev_map@[p].0,self.l2_rev_map@[p].1,i,0))) 
+                        self.mapping_2m().dom().contains(spec_index2va((self.l2_rev_map@[p].0,self.l2_rev_map@[p].1,i,0))) 
             );
         };
         assert(
             forall|p: PageMapPtr, i: L1Index| 
             #![trigger self.l1_tables@[p].value()[i]]
             self.l1_tables@.dom().contains(p) && 0 <= i < 512 && self.l1_tables@[p].value()[i].perm.present ==>
-                self.mapped_4K_pages().contains(self.l1_tables@[p].value()[i].addr)
+                self.mapped_4k_pages().contains(self.l1_tables@[p].value()[i].addr)
         ) by {
             assert(forall|p: PageMapPtr, i: L1Index| 
                 #![trigger self.l1_tables@[p].value()[i]]
@@ -105,17 +105,17 @@ impl PageTable{
                         &&
                         self.spec_resolve_mapping_l2(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2).is_Some() && self.spec_resolve_mapping_l2(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2).get_Some_0().addr == p 
                         &&
-                        self.spec_resolve_mapping_4K_l1(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2,i).is_Some() && self.spec_resolve_mapping_4K_l1(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2,i).get_Some_0().addr == self.l1_tables@[p].value()[i].addr 
+                        self.spec_resolve_mapping_4k_l1(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2,i).is_Some() && self.spec_resolve_mapping_4k_l1(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2,i).get_Some_0().addr == self.l1_tables@[p].value()[i].addr 
                         &&
-                        self.mapping_4K@.dom().contains(spec_index2va((self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2,i))) 
+                        self.mapping_4k@.dom().contains(spec_index2va((self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2,i))) 
                         &&
-                        self.mapping_4K@[spec_index2va((self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2,i))].addr == self.l1_tables@[p].value()[i].addr 
+                        self.mapping_4k@[spec_index2va((self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2,i))].addr == self.l1_tables@[p].value()[i].addr 
                         &&
-                        self.mapping_4K().dom().contains(spec_index2va((self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2,i))) 
+                        self.mapping_4k().dom().contains(spec_index2va((self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2,i))) 
                         // &&
-                        // self.mapping_2M()[spec_index2va((l4i,l3i,l2i,i))].addr == self.l2_tables@[p].value()[i].addr 
+                        // self.mapping_2m()[spec_index2va((l4i,l3i,l2i,i))].addr == self.l2_tables@[p].value()[i].addr 
                         // &&
-                        // self.mapped_2M_pages().contains(self.l2_tables@[p].value()[i].addr)
+                        // self.mapped_2m_pages().contains(self.l2_tables@[p].value()[i].addr)
             );
         };
     }

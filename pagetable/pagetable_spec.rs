@@ -39,9 +39,9 @@ pub struct PageTable{
     pub l1_rev_map: Ghost<Map<PageMapPtr, (L4Index,L3Index,L2Index)>>,
     pub l1_tables: Tracked<Map<PageMapPtr,PointsTo<PageMap>>>,
 
-    pub mapping_4K: Ghost<Map<VAddr,MapEntry>>,
-    pub mapping_2M: Ghost<Map<VAddr,MapEntry>>,
-    pub mapping_1G: Ghost<Map<VAddr,MapEntry>>,
+    pub mapping_4k: Ghost<Map<VAddr,MapEntry>>,
+    pub mapping_2m: Ghost<Map<VAddr,MapEntry>>,
+    pub mapping_1g: Ghost<Map<VAddr,MapEntry>>,
 }
 
 
@@ -92,51 +92,51 @@ impl PageTable{
             self.l3_tables@.dom() + self.l2_tables@.dom() + self.l1_tables@.dom() + self.l4_table@.dom()
     }
 
-    pub open spec fn mapping_4K(&self) -> Map<VAddr,MapEntry> {
-        self.mapping_4K@
+    pub open spec fn mapping_4k(&self) -> Map<VAddr,MapEntry> {
+        self.mapping_4k@
     }
 
-    pub open spec fn mapping_2M(&self) -> Map<VAddr,MapEntry> {
-        self.mapping_2M@
+    pub open spec fn mapping_2m(&self) -> Map<VAddr,MapEntry> {
+        self.mapping_2m@
     }
 
-    pub open spec fn mapping_1G(&self) -> Map<VAddr,MapEntry> {
-        self.mapping_1G@
+    pub open spec fn mapping_1g(&self) -> Map<VAddr,MapEntry> {
+        self.mapping_1g@
     }
 
     pub open spec fn page_not_mapped(&self, pa: PAddr) -> bool{
         &&&
-        self.mapped_4K_pages().contains(pa) == false
+        self.mapped_4k_pages().contains(pa) == false
         &&&
-        self.mapped_2M_pages().contains(pa) == false
+        self.mapped_2m_pages().contains(pa) == false
         &&&
-        self.mapped_1G_pages().contains(pa) == false
+        self.mapped_1g_pages().contains(pa) == false
     }
 
-    pub open spec fn mapped_4K_pages(&self) -> Set<PAddr>{
-        Set::<PAddr>::new(|pa: PAddr| self.is_4K_pa_mapped(pa))
+    pub open spec fn mapped_4k_pages(&self) -> Set<PAddr>{
+        Set::<PAddr>::new(|pa: PAddr| self.is_4k_pa_mapped(pa))
     }
 
-    pub open spec fn is_4K_pa_mapped(&self, pa:PAddr) -> bool
+    pub open spec fn is_4k_pa_mapped(&self, pa:PAddr) -> bool
     {
-        exists|va:VAddr| #![auto] self.mapping_4K().dom().contains(va) && self.mapping_4K()[va].addr == pa
+        exists|va:VAddr| #![auto] self.mapping_4k().dom().contains(va) && self.mapping_4k()[va].addr == pa
     }
 
-    pub open spec fn mapped_2M_pages(&self) -> Set<PAddr>{
-        Set::<PAddr>::new(|pa: PAddr| self.is_2M_pa_mapped(pa))
+    pub open spec fn mapped_2m_pages(&self) -> Set<PAddr>{
+        Set::<PAddr>::new(|pa: PAddr| self.is_2m_pa_mapped(pa))
     }
 
-    pub open spec fn is_2M_pa_mapped(&self, pa:PAddr) -> bool
+    pub open spec fn is_2m_pa_mapped(&self, pa:PAddr) -> bool
     {
-        exists|va:VAddr| #![auto] self.mapping_2M().dom().contains(va) && self.mapping_2M()[va].addr == pa
+        exists|va:VAddr| #![auto] self.mapping_2m().dom().contains(va) && self.mapping_2m()[va].addr == pa
     }
-    pub open spec fn mapped_1G_pages(&self) -> Set<PAddr>{
-        Set::<PAddr>::new(|pa: PAddr| self.is_1G_pa_mapped(pa))
+    pub open spec fn mapped_1g_pages(&self) -> Set<PAddr>{
+        Set::<PAddr>::new(|pa: PAddr| self.is_1g_pa_mapped(pa))
     }
 
-    pub open spec fn is_1G_pa_mapped(&self, pa:PAddr) -> bool
+    pub open spec fn is_1g_pa_mapped(&self, pa:PAddr) -> bool
     {
-        exists|va:VAddr| #![auto] self.mapping_1G().dom().contains(va) && self.mapping_1G()[va].addr == pa
+        exists|va:VAddr| #![auto] self.mapping_1g().dom().contains(va) && self.mapping_1g()[va].addr == pa
     }
 
     pub open spec fn wf_l4(&self) -> bool{
@@ -444,19 +444,19 @@ impl PageTable{
     pub open spec fn no_self_mapping(&self)-> bool{
         &&&
         forall|va: VAddr| 
-        #![trigger self.mapping_1G@.dom().contains(va), self.page_closure().contains(self.mapping_1G@[va].addr)]
-            self.mapping_1G@.dom().contains(va) ==> 
-                self.page_closure().contains(self.mapping_1G@[va].addr) == false
+        #![trigger self.mapping_1g@.dom().contains(va), self.page_closure().contains(self.mapping_1g@[va].addr)]
+            self.mapping_1g@.dom().contains(va) ==> 
+                self.page_closure().contains(self.mapping_1g@[va].addr) == false
         &&&
         forall|va: VAddr| 
-        #![trigger self.mapping_2M@.dom().contains(va), self.page_closure().contains(self.mapping_2M@[va].addr)]
-            self.mapping_2M@.dom().contains(va) ==> 
-                self.page_closure().contains(self.mapping_2M@[va].addr) == false
+        #![trigger self.mapping_2m@.dom().contains(va), self.page_closure().contains(self.mapping_2m@[va].addr)]
+            self.mapping_2m@.dom().contains(va) ==> 
+                self.page_closure().contains(self.mapping_2m@[va].addr) == false
         &&&
         forall|va: VAddr| 
-        #![trigger self.mapping_4K@.dom().contains(va), self.page_closure().contains(self.mapping_4K@[va].addr)]
-            self.mapping_4K@.dom().contains(va) ==> 
-                self.page_closure().contains(self.mapping_4K@[va].addr) == false
+        #![trigger self.mapping_4k@.dom().contains(va), self.page_closure().contains(self.mapping_4k@[va].addr)]
+            self.mapping_4k@.dom().contains(va) ==> 
+                self.page_closure().contains(self.mapping_4k@[va].addr) == false
     }
 
     // #[verifier(inline)]
@@ -471,7 +471,7 @@ impl PageTable{
         }
     }
 
-    pub open spec fn spec_resolve_mapping_1G_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
+    pub open spec fn spec_resolve_mapping_1g_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
     recommends
         0<= l4i < 512,
         0<= l3i < 512,
@@ -499,7 +499,7 @@ impl PageTable{
         }
     }
     
-    pub open spec fn spec_resolve_mapping_2M_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
+    pub open spec fn spec_resolve_mapping_2m_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
         recommends
             0<= l4i < 512,
             0<= l3i < 512,
@@ -528,7 +528,7 @@ impl PageTable{
         }
     }
 
-    pub open spec fn spec_resolve_mapping_4K_l1(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index) -> Option<PageEntry>
+    pub open spec fn spec_resolve_mapping_4k_l1(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index) -> Option<PageEntry>
     recommends
         0<= l4i < 512,
         0<= l3i < 512,
@@ -545,80 +545,80 @@ impl PageTable{
 
     }
 
-    pub open spec fn wf_mapping_4K(&self) -> bool{
+    pub open spec fn wf_mapping_4k(&self) -> bool{
         &&&
         forall|va: VAddr| 
-            #![trigger va_4K_valid(va), self.mapping_4K@.dom().contains(va)]
-                self.mapping_4K@.dom().contains(va) ==> va_4K_valid(va)
+            #![trigger va_4k_valid(va), self.mapping_4k@.dom().contains(va)]
+                self.mapping_4k@.dom().contains(va) ==> va_4k_valid(va)
         &&&
         forall|l4i: L4Index,l3i: L3Index,l2i: L2Index,l1i: L2Index| 
-            #![trigger self.mapping_4K@[spec_index2va((l4i,l3i,l2i,l1i))]]
-            #![trigger self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i)]
+            #![trigger self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))]]
+            #![trigger self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
             0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 ==>
-                self.mapping_4K@.dom().contains(spec_index2va((l4i,l3i,l2i,l1i))) == self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i).is_Some()
+                self.mapping_4k@.dom().contains(spec_index2va((l4i,l3i,l2i,l1i))) == self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).is_Some()
         &&&
         forall|l4i: L4Index,l3i: L3Index,l2i: L2Index,l1i: L2Index| 
-            #![trigger self.mapping_4K@[spec_index2va((l4i,l3i,l2i,l1i))]]
-            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 && self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i).is_Some()
-                ==> self.mapping_4K@[spec_index2va((l4i,l3i,l2i,l1i))].addr == self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i).get_Some_0().addr &&
-                    self.mapping_4K@[spec_index2va((l4i,l3i,l2i,l1i))].write == self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.write &&
-                    self.mapping_4K@[spec_index2va((l4i,l3i,l2i,l1i))].execute_disable == self.spec_resolve_mapping_4K_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.execute_disable
+            #![trigger self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))]]
+            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 && self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).is_Some()
+                ==> self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].addr == self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().addr &&
+                    self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].write == self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.write &&
+                    self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].execute_disable == self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.execute_disable
         &&&
         forall|va: VAddr| 
-            #![trigger self.mapping_4K@.dom().contains(va), page_ptr_valid(self.mapping_4K@[va].addr)]
-                self.mapping_4K@.dom().contains(va) ==>
-                page_ptr_valid(self.mapping_4K@[va].addr)
+            #![trigger self.mapping_4k@.dom().contains(va), page_ptr_valid(self.mapping_4k@[va].addr)]
+                self.mapping_4k@.dom().contains(va) ==>
+                page_ptr_valid(self.mapping_4k@[va].addr)
     }
 
-    pub open spec fn wf_mapping_2M(&self) -> bool{
+    pub open spec fn wf_mapping_2m(&self) -> bool{
         &&&
         forall|va: VAddr| 
-            #![trigger va_2M_valid(va), self.mapping_2M@.dom().contains(va)]
-                self.mapping_2M@.dom().contains(va) ==> va_2M_valid(va)
+            #![trigger va_2m_valid(va), self.mapping_2m@.dom().contains(va)]
+                self.mapping_2m@.dom().contains(va) ==> va_2m_valid(va)
         &&&
         forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
-            #![trigger self.mapping_2M@[spec_index2va((l4i,l3i,l2i,0))]]
-            #![trigger self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i)]
+            #![trigger self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))]]
+            #![trigger self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
             0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 ==>
-                self.mapping_2M@.dom().contains(spec_index2va((l4i,l3i,l2i,0))) == self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i).is_Some()
+                self.mapping_2m@.dom().contains(spec_index2va((l4i,l3i,l2i,0))) == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).is_Some()
         &&&
         forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
-            #![trigger self.mapping_2M@[spec_index2va((l4i,l3i,l2i,0))]]
-            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i).is_Some()
-                ==> self.mapping_2M@[spec_index2va((l4i,l3i,l2i,0))].addr == self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i).get_Some_0().addr &&
-                    self.mapping_2M@[spec_index2va((l4i,l3i,l2i,0))].write == self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i).get_Some_0().perm.write &&
-                    self.mapping_2M@[spec_index2va((l4i,l3i,l2i,0))].execute_disable == self.spec_resolve_mapping_2M_l2(l4i,l3i,l2i).get_Some_0().perm.execute_disable
+            #![trigger self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))]]
+            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).is_Some()
+                ==> self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].addr == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().addr &&
+                    self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].write == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().perm.write &&
+                    self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].execute_disable == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().perm.execute_disable
         &&&
         forall|va: VAddr| 
-            #![trigger self.mapping_2M@.dom().contains(va), page_ptr_2M_valid(self.mapping_2M@[va].addr)]
-                self.mapping_2M@.dom().contains(va) ==>
-                page_ptr_2M_valid(self.mapping_2M@[va].addr)
+            #![trigger self.mapping_2m@.dom().contains(va), page_ptr_2m_valid(self.mapping_2m@[va].addr)]
+                self.mapping_2m@.dom().contains(va) ==>
+                page_ptr_2m_valid(self.mapping_2m@[va].addr)
     }
 
-    pub open spec fn wf_mapping_1G(&self) -> bool{
+    pub open spec fn wf_mapping_1g(&self) -> bool{
         &&&
         forall|va: VAddr| 
-            #![trigger va_1G_valid(va), self.mapping_1G@.dom().contains(va)]
-                self.mapping_1G@.dom().contains(va) ==> va_1G_valid(va)
+            #![trigger va_1g_valid(va), self.mapping_1g@.dom().contains(va)]
+                self.mapping_1g@.dom().contains(va) ==> va_1g_valid(va)
         &&&
         forall|l4i: L4Index,l3i: L3Index| 
-            #![trigger self.mapping_1G@[spec_index2va((l4i,l3i,0,0))]]
-            #![trigger self.spec_resolve_mapping_1G_l3(l4i,l3i)]
+            #![trigger self.mapping_1g@[spec_index2va((l4i,l3i,0,0))]]
+            #![trigger self.spec_resolve_mapping_1g_l3(l4i,l3i)]
             0 <= l4i < 512 && 0 <= l3i < 512 ==>
-                self.mapping_1G@.dom().contains(spec_index2va((l4i,l3i,0,0))) == self.spec_resolve_mapping_1G_l3(l4i,l3i).is_Some()
+                self.mapping_1g@.dom().contains(spec_index2va((l4i,l3i,0,0))) == self.spec_resolve_mapping_1g_l3(l4i,l3i).is_Some()
         &&&
         forall|l4i: L4Index,l3i: L3Index| 
-            #![trigger self.mapping_1G@[spec_index2va((l4i,l3i,0,0))]]
-            #![trigger self.spec_resolve_mapping_1G_l3(l4i,l3i)]
-            0 <= l4i < 512 && 0 <= l3i < 512 && self.spec_resolve_mapping_1G_l3(l4i,l3i).is_Some()
-                ==> self.mapping_1G@[spec_index2va((l4i,l3i,0,0))].addr == self.spec_resolve_mapping_1G_l3(l4i,l3i).get_Some_0().addr &&
-                    self.mapping_1G@[spec_index2va((l4i,l3i,0,0))].write == self.spec_resolve_mapping_1G_l3(l4i,l3i).get_Some_0().perm.write &&
-                    self.mapping_1G@[spec_index2va((l4i,l3i,0,0))].execute_disable == self.spec_resolve_mapping_1G_l3(l4i,l3i).get_Some_0().perm.execute_disable
+            #![trigger self.mapping_1g@[spec_index2va((l4i,l3i,0,0))]]
+            #![trigger self.spec_resolve_mapping_1g_l3(l4i,l3i)]
+            0 <= l4i < 512 && 0 <= l3i < 512 && self.spec_resolve_mapping_1g_l3(l4i,l3i).is_Some()
+                ==> self.mapping_1g@[spec_index2va((l4i,l3i,0,0))].addr == self.spec_resolve_mapping_1g_l3(l4i,l3i).get_Some_0().addr &&
+                    self.mapping_1g@[spec_index2va((l4i,l3i,0,0))].write == self.spec_resolve_mapping_1g_l3(l4i,l3i).get_Some_0().perm.write &&
+                    self.mapping_1g@[spec_index2va((l4i,l3i,0,0))].execute_disable == self.spec_resolve_mapping_1g_l3(l4i,l3i).get_Some_0().perm.execute_disable
         &&&
         forall|va: VAddr| 
-            #![trigger self.mapping_1G@.dom().contains(va), page_ptr_1G_valid(self.mapping_1G@[va].addr)]
-                self.mapping_1G@.dom().contains(va) ==>
-                page_ptr_1G_valid(self.mapping_1G@[va].addr)
+            #![trigger self.mapping_1g@.dom().contains(va), page_ptr_1g_valid(self.mapping_1g@[va].addr)]
+                self.mapping_1g@.dom().contains(va) ==>
+                page_ptr_1g_valid(self.mapping_1g@[va].addr)
     }
 
     pub open spec fn wf(&self) -> bool
@@ -632,11 +632,11 @@ impl PageTable{
         &&&
         self.wf_l1()
         &&&
-        self.wf_mapping_4K()
+        self.wf_mapping_4k()
         &&&
-        self.wf_mapping_2M()
+        self.wf_mapping_2m()
         &&&
-        self.wf_mapping_1G()
+        self.wf_mapping_1g()
         &&&
         self.user_only()
         &&&
@@ -662,23 +662,23 @@ impl PageTable{
         self.spec_resolve_mapping_l4(l4i).is_Some()
     }
 
-    pub open spec fn l3_2M_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
+    pub open spec fn l3_2m_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
         recommends self.wf(),
                     self.l4_entry_exists(l4i)
     {
         self.spec_resolve_mapping_l3(l4i,l3i).is_Some()
     }
 
-    pub open spec fn l3_4K_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
+    pub open spec fn l3_4k_entry_exists(&self, l4i: L4Index, l3i :L3Index) -> bool
         recommends self.wf(),
                     self.l4_entry_exists(l4i)
     {
         self.spec_resolve_mapping_l3(l4i,l3i).is_Some()
     }
 
-    pub open spec fn l2_4K_entry_exists(&self, l4i: L4Index, l3i :L3Index, l2i :L2Index) -> bool
+    pub open spec fn l2_4k_entry_exists(&self, l4i: L4Index, l3i :L3Index, l2i :L2Index) -> bool
         recommends self.wf(),
-                    self.l3_4K_entry_exists(l4i,l3i)
+                    self.l3_4k_entry_exists(l4i,l3i)
     {
         self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some()
     }

@@ -36,9 +36,9 @@ pub struct PageTable{
     pub l2_tables: Tracked<Map<(L4Index,L3Index),PointsTo<PageMap>>>,
     pub l1_tables: Tracked<Map<(L4Index,L3Index,L2Index),PointsTo<PageMap>>>,
 
-    pub mapping_4K: Ghost<Map<VAddr,MapEntry>>,
-    pub mapping_2M: Ghost<Map<VAddr,MapEntry>>,
-    pub mapping_1G: Ghost<Map<VAddr,MapEntry>>,
+    pub mapping_4k: Ghost<Map<VAddr,MapEntry>>,
+    pub mapping_2m: Ghost<Map<VAddr,MapEntry>>,
+    pub mapping_1g: Ghost<Map<VAddr,MapEntry>>,
 }
 
 

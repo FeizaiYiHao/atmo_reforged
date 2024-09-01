@@ -16,7 +16,7 @@ pub open spec fn paddrs_equal(u:PAddr, v:PAddr) -> bool{
 
 impl PageTable{
 
-    pub open spec fn spec_4K_entry_useable(&self, l4i:L4Index, l3i:L3Index, l2i:L2Index, l1i:L2Index) -> bool
+    pub open spec fn spec_4k_entry_useable(&self, l4i:L4Index, l3i:L3Index, l2i:L2Index, l1i:L2Index) -> bool
         recommends    
             self.wf(),
             0 <= l4i < 512,
@@ -25,11 +25,11 @@ impl PageTable{
             0 <= l1i < 512,
     {
         &&&
-        self.spec_resolve_mapping_1G_l3(l4i, l3i).is_None() 
+        self.spec_resolve_mapping_1g_l3(l4i, l3i).is_None() 
         &&&
-        self.spec_resolve_mapping_2M_l2(l4i, l3i, l2i).is_None()         
+        self.spec_resolve_mapping_2m_l2(l4i, l3i, l2i).is_None()         
         &&&
-        self.spec_resolve_mapping_4K_l1(l4i, l3i, l2i, l1i).is_None() 
+        self.spec_resolve_mapping_4k_l1(l4i, l3i, l2i, l1i).is_None() 
     }
 
     pub fn resolve_mapping_l4(&self, l4i:L4Index) -> (ret: Option<PageEntry>)
@@ -50,7 +50,7 @@ impl PageTable{
         }
     }
 
-    pub fn resolve_mapping_4K_l3(&self, l4i:L4Index, l3i:L3Index) -> (ret: (Option<PageEntry>, PageTableErrorCode))
+    pub fn resolve_mapping_4k_l3(&self, l4i:L4Index, l3i:L3Index) -> (ret: (Option<PageEntry>, PageTableErrorCode))
         requires    
             self.wf(),
             0 <= l4i < 512,
@@ -59,9 +59,9 @@ impl PageTable{
             ret.0 =~= self.spec_resolve_mapping_l3(l4i, l3i),
             ret.0.is_Some() <==> ret.1 == PageTableErrorCode::NoError,
             ret.1 == PageTableErrorCode::L4EntryNotExist <==> self.spec_resolve_mapping_l4(l4i).is_None(),
-            ret.1 == PageTableErrorCode::L3EntryNotExist <==> self.spec_resolve_mapping_1G_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l4(l4i).is_Some(),
-            ret.1 == PageTableErrorCode::EntryTakenBy1G <==> self.spec_resolve_mapping_1G_l3(l4i, l3i).is_Some(),
-            ret.1 != PageTableErrorCode::EntryTakenBy2M,
+            ret.1 == PageTableErrorCode::L3EntryNotExist <==> self.spec_resolve_mapping_1g_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l4(l4i).is_Some(),
+            ret.1 == PageTableErrorCode::EntryTakenBy1g <==> self.spec_resolve_mapping_1g_l3(l4i, l3i).is_Some(),
+            ret.1 != PageTableErrorCode::EntryTakenBy2m,
             ret.1 != PageTableErrorCode::L2EntryNotExist,
             ret.1 != PageTableErrorCode::L1EntryNotExist,
     {
@@ -76,7 +76,7 @@ impl PageTable{
                 if !l3_entry.perm.present {
                     (None, PageTableErrorCode::L3EntryNotExist)
                 }else if l3_entry.perm.ps{
-                    (None, PageTableErrorCode::EntryTakenBy1G) 
+                    (None, PageTableErrorCode::EntryTakenBy1g) 
                 }
                 else {
                     (Some(l3_entry), PageTableErrorCode::NoError)
@@ -85,7 +85,7 @@ impl PageTable{
         }
     }
 
-    pub fn resolve_mapping_4K_l2(&self, l4i:L4Index, l3i:L3Index, l2i:L2Index) -> (ret: (Option<PageEntry>, PageTableErrorCode))
+    pub fn resolve_mapping_4k_l2(&self, l4i:L4Index, l3i:L3Index, l2i:L2Index) -> (ret: (Option<PageEntry>, PageTableErrorCode))
         requires    
             self.wf(),
             0 <= l4i < 512,
@@ -95,13 +95,13 @@ impl PageTable{
             ret.0 =~= self.spec_resolve_mapping_l2(l4i, l3i, l2i),
             ret.0.is_Some() <==> ret.1 == PageTableErrorCode::NoError,
             ret.1 == PageTableErrorCode::L4EntryNotExist <==> self.spec_resolve_mapping_l4(l4i).is_None(),
-            ret.1 == PageTableErrorCode::L3EntryNotExist <==> self.spec_resolve_mapping_1G_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l4(l4i).is_Some(),
-            ret.1 == PageTableErrorCode::L2EntryNotExist <==> self.spec_resolve_mapping_2M_l2(l4i, l3i, l2i).is_None() && self.spec_resolve_mapping_l2(l4i, l3i, l2i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_Some(),
-            ret.1 == PageTableErrorCode::EntryTakenBy1G <==> self.spec_resolve_mapping_1G_l3(l4i, l3i).is_Some(),
-            ret.1 == PageTableErrorCode::EntryTakenBy2M <==> self.spec_resolve_mapping_2M_l2(l4i, l3i, l2i).is_Some(),
+            ret.1 == PageTableErrorCode::L3EntryNotExist <==> self.spec_resolve_mapping_1g_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l4(l4i).is_Some(),
+            ret.1 == PageTableErrorCode::L2EntryNotExist <==> self.spec_resolve_mapping_2m_l2(l4i, l3i, l2i).is_None() && self.spec_resolve_mapping_l2(l4i, l3i, l2i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_Some(),
+            ret.1 == PageTableErrorCode::EntryTakenBy1g <==> self.spec_resolve_mapping_1g_l3(l4i, l3i).is_Some(),
+            ret.1 == PageTableErrorCode::EntryTakenBy2m <==> self.spec_resolve_mapping_2m_l2(l4i, l3i, l2i).is_Some(),
             ret.1 != PageTableErrorCode::L1EntryNotExist,
     {
-        match self.resolve_mapping_4K_l3(l4i,l3i){
+        match self.resolve_mapping_4k_l3(l4i,l3i){
             (None, error_code) => {
                 (None, error_code)
             },
@@ -112,7 +112,7 @@ impl PageTable{
                 if !l2_entry.perm.present {
                     (None, PageTableErrorCode::L2EntryNotExist)
                 }else if l2_entry.perm.ps{
-                    (None, PageTableErrorCode::EntryTakenBy2M) 
+                    (None, PageTableErrorCode::EntryTakenBy2m) 
                 }
                 else {
                     (Some(l2_entry), PageTableErrorCode::NoError)
@@ -121,7 +121,7 @@ impl PageTable{
         }
     }
     
-    pub fn resolve_mapping_4K_l1(&self, l4i:L4Index, l3i:L3Index, l2i:L2Index, l1i:L2Index) -> (ret: (Option<PageEntry>, PageTableErrorCode, Option<MapEntry>))
+    pub fn resolve_mapping_4k_l1(&self, l4i:L4Index, l3i:L3Index, l2i:L2Index, l1i:L2Index) -> (ret: (Option<PageEntry>, PageTableErrorCode, Option<MapEntry>))
         requires    
             self.wf(),
             0 <= l4i < 512,
@@ -129,19 +129,19 @@ impl PageTable{
             0 <= l2i < 512,
             0 <= l1i < 512,
         ensures
-            ret.0 =~= self.spec_resolve_mapping_4K_l1(l4i, l3i, l2i, l1i),
+            ret.0 =~= self.spec_resolve_mapping_4k_l1(l4i, l3i, l2i, l1i),
             ret.0.is_Some() <==> ret.1 == PageTableErrorCode::NoError,
             ret.0.is_Some() == ret.2.is_Some(),
             ret.0.is_Some() && ret.2.is_Some() ==> ret.2.get_Some_0() =~= page_entry_to_map_entry(&ret.0.get_Some_0()),
             ret.1 == PageTableErrorCode::L4EntryNotExist <==> self.spec_resolve_mapping_l4(l4i).is_None(),
-            ret.1 == PageTableErrorCode::L3EntryNotExist ==> self.spec_resolve_mapping_1G_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l4(l4i).is_Some(),
-            ret.1 == PageTableErrorCode::L2EntryNotExist ==> self.spec_resolve_mapping_2M_l2(l4i, l3i, l2i).is_None() && self.spec_resolve_mapping_l2(l4i, l3i, l2i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_Some(),
-            ret.1 == PageTableErrorCode::L1EntryNotExist ==> self.spec_resolve_mapping_4K_l1(l4i, l3i, l2i, l1i).is_None() && self.spec_resolve_mapping_l2(l4i, l3i, l2i).is_Some(),
-            ret.1 == PageTableErrorCode::EntryTakenBy1G <==> self.spec_resolve_mapping_1G_l3(l4i, l3i).is_Some(),
-            ret.1 == PageTableErrorCode::EntryTakenBy2M <==> self.spec_resolve_mapping_2M_l2(l4i, l3i, l2i).is_Some(),
-            ret.1 != PageTableErrorCode::EntryTakenBy1G && ret.1 != PageTableErrorCode::EntryTakenBy2M && ret.1 != PageTableErrorCode::NoError ==> self.spec_4K_entry_useable(l4i, l3i, l2i, l1i),
+            ret.1 == PageTableErrorCode::L3EntryNotExist ==> self.spec_resolve_mapping_1g_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_None() && self.spec_resolve_mapping_l4(l4i).is_Some(),
+            ret.1 == PageTableErrorCode::L2EntryNotExist ==> self.spec_resolve_mapping_2m_l2(l4i, l3i, l2i).is_None() && self.spec_resolve_mapping_l2(l4i, l3i, l2i).is_None() && self.spec_resolve_mapping_l3(l4i, l3i).is_Some(),
+            ret.1 == PageTableErrorCode::L1EntryNotExist ==> self.spec_resolve_mapping_4k_l1(l4i, l3i, l2i, l1i).is_None() && self.spec_resolve_mapping_l2(l4i, l3i, l2i).is_Some(),
+            ret.1 == PageTableErrorCode::EntryTakenBy1g <==> self.spec_resolve_mapping_1g_l3(l4i, l3i).is_Some(),
+            ret.1 == PageTableErrorCode::EntryTakenBy2m <==> self.spec_resolve_mapping_2m_l2(l4i, l3i, l2i).is_Some(),
+            ret.1 != PageTableErrorCode::EntryTakenBy1g && ret.1 != PageTableErrorCode::EntryTakenBy2m && ret.1 != PageTableErrorCode::NoError ==> self.spec_4k_entry_useable(l4i, l3i, l2i, l1i),
     {
-        match self.resolve_mapping_4K_l2(l4i,l3i,l2i){
+        match self.resolve_mapping_4k_l2(l4i,l3i,l2i){
             (None, error_code) => {
                 (None, error_code, None)
             },
