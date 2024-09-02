@@ -7,7 +7,7 @@ verus! {
         pub state: PageState,
         pub is_io_page: bool,
         pub rf_count: usize,
-        pub rev_pointer: 
+        pub rev_pointer: SLLIndex,
     
         pub mappings: Ghost<Map<(Pcid,VAddr),PageType>>,
         pub io_mappings: Ghost<Map<(IOid,VAddr),PageType>>,

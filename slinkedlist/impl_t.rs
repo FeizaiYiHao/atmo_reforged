@@ -5,7 +5,7 @@ use crate::slinkedlist::spec::*;
 use crate::define::SLLIndex;
 use core::mem::MaybeUninit;
 
-    impl<const N: usize> StaticLinkedList<N> {
+    impl<T: Copy, const N: usize> StaticLinkedList<T,N> {
 
         #[verifier(external_body)]
         pub fn new() -> (ret: Self)
@@ -37,17 +37,21 @@ use core::mem::MaybeUninit;
         }
 
         #[verifier(external_body)]
-        pub fn set_ptr(&mut self, index: SLLIndex, v: usize)
+        pub fn set_value(&mut self, index: SLLIndex, v: Option<T>)
             requires
                 old(self).array_wf(),
             ensures
                 self.array_wf(),
-                forall|i:int| #![auto] 0<=i<self.arr_seq@.len() ==>
-                    self.arr_seq@[i].next == old(self).arr_seq@[i].next && self.arr_seq@[i].prev == old(self).arr_seq@[i].prev,
-                forall|i:int| #![auto] 0<=i<self.arr_seq@.len() && i != index ==>
-                    self.arr_seq@[i].value == old(self).arr_seq@[i].value,
-                forall|i:int| #![auto] 0<=i<self.arr_seq@.len() && i == index ==>
-                    self.arr_seq@[i].value == v,
+                forall|i:int| 
+                    #![trigger self.arr_seq@[i].next, old(self).arr_seq@[i].next] 
+                    #![trigger self.arr_seq@[i].prev, old(self).arr_seq@[i].prev] 
+                    0<=i<self.arr_seq@.len() ==>
+                        self.arr_seq@[i].next == old(self).arr_seq@[i].next && self.arr_seq@[i].prev == old(self).arr_seq@[i].prev,
+                forall|i:int|
+                    #![trigger self.arr_seq@[i].value, old(self).arr_seq@[i].value] 
+                    0<=i<self.arr_seq@.len() && i != index ==>
+                        self.arr_seq@[i].value == old(self).arr_seq@[i].value,
+                self.arr_seq@[index as int].value == v,
                 self.spec_seq@ == old(self).spec_seq@,
                 self.value_list@ == old(self).value_list@,
                 self.free_list@ == old(self).free_list@,
@@ -69,12 +73,16 @@ use core::mem::MaybeUninit;
                 old(self).array_wf(),
             ensures
                 self.array_wf(),
-                forall|i:int| #![auto] 0<=i<self.arr_seq@.len() ==>
-                    self.arr_seq@[i].value == old(self).arr_seq@[i].value && self.arr_seq@[i].prev == old(self).arr_seq@[i].prev,
-                forall|i:int| #![auto] 0<=i<self.arr_seq@.len() && i != index ==>
-                    self.arr_seq@[i].next == old(self).arr_seq@[i].next,
-                forall|i:int| #![auto] 0<=i<self.arr_seq@.len() && i == index ==>
-                    self.arr_seq@[i].next == v,
+                forall|i:int|
+                    #![trigger self.arr_seq@[i].value, old(self).arr_seq@[i].value] 
+                    #![trigger self.arr_seq@[i].prev, old(self).arr_seq@[i].prev] 
+                    0<=i<self.arr_seq@.len() ==>
+                        self.arr_seq@[i].value == old(self).arr_seq@[i].value && self.arr_seq@[i].prev == old(self).arr_seq@[i].prev,
+                forall|i:int|
+                    #![trigger self.arr_seq@[i].next, old(self).arr_seq@[i].next] 
+                    0<=i<self.arr_seq@.len() && i != index ==>
+                        self.arr_seq@[i].next == old(self).arr_seq@[i].next,
+                self.arr_seq@[index as int].next == v,
                 self.spec_seq@ == old(self).spec_seq@,
                 self.value_list@ == old(self).value_list@,
                 self.free_list@ == old(self).free_list@,
@@ -94,12 +102,16 @@ use core::mem::MaybeUninit;
                 old(self).array_wf(),
             ensures
                 self.array_wf(),
-                forall|i:int| #![auto] 0<=i<self.arr_seq@.len() ==>
-                    self.arr_seq@[i].value == old(self).arr_seq@[i].value && self.arr_seq@[i].next == old(self).arr_seq@[i].next,
-                forall|i:int| #![auto] 0<=i<self.arr_seq@.len() && i != index ==>
-                    self.arr_seq@[i].prev == old(self).arr_seq@[i].prev,
-                forall|i:int| #![auto] 0<=i<self.arr_seq@.len() && i == index ==>
-                    self.arr_seq@[i].prev == v,
+                forall|i:int|
+                    #![trigger self.arr_seq@[i].value, old(self).arr_seq@[i].value] 
+                    #![trigger self.arr_seq@[i].next, old(self).arr_seq@[i].next] 
+                    0<=i<self.arr_seq@.len() ==>
+                        self.arr_seq@[i].value == old(self).arr_seq@[i].value && self.arr_seq@[i].next == old(self).arr_seq@[i].next,
+                forall|i:int|
+                    #![trigger self.arr_seq@[i].prev, old(self).arr_seq@[i].prev] 
+                    0<=i<self.arr_seq@.len() && i != index ==>
+                        self.arr_seq@[i].prev == old(self).arr_seq@[i].prev,
+                self.arr_seq@[index as int].prev == v,
                 self.spec_seq@ == old(self).spec_seq@,
                 self.value_list@ == old(self).value_list@,
                 self.free_list@ == old(self).free_list@,
@@ -113,37 +125,37 @@ use core::mem::MaybeUninit;
             self.ar[index as usize].prev = v;
         }
 
-        //TODO: prove this
-        #[verifier(external_body)]
-        pub fn put_ptr(&mut self, new_ptr: usize)
-            requires
-                old(self).array_wf(),
-            ensures
-            self.array_wf(),
-            forall|i:int| #![auto] 0<=i<self.arr_seq@.len() ==>
-                self.arr_seq@[i].next == old(self).arr_seq@[i].next && self.arr_seq@[i].prev == old(self).arr_seq@[i].prev && self.arr_seq@[i].value == old(self).arr_seq@[i].value,
-            self.spec_seq@ == old(self).spec_seq@.push(new_ptr),
-            self.value_list@ == old(self).value_list@,
-            self.free_list@ == old(self).free_list@,
-            self.value_list_head == old(self).value_list_head,
-            self.value_list_tail == old(self).value_list_tail,
-            self.value_list_len == old(self).value_list_len,
-            self.free_list_head == old(self).free_list_head,
-            self.free_list_tail == old(self).free_list_tail,
-            self.free_list_len == old(self).free_list_len,
-            old(self).free_list_wf() ==> self.free_list_wf(),
-            old(self).value_list_wf() ==> self.value_list_wf(),
-        {
-            //self.spec_seq@ = self.spec_seq@.push(new_ptr);
-        }
+        // //TODO: prove this
+        // #[verifier(external_body)]
+        // pub fn put_ptr(&mut self, new_ptr: usize)
+        //     requires
+        //         old(self).array_wf(),
+        //     ensures
+        //     self.array_wf(),
+        //     forall|i:int| #![auto] 0<=i<self.arr_seq@.len() ==>
+        //         self.arr_seq@[i].next == old(self).arr_seq@[i].next && self.arr_seq@[i].prev == old(self).arr_seq@[i].prev && self.arr_seq@[i].value == old(self).arr_seq@[i].value,
+        //     self.spec_seq@ == old(self).spec_seq@.push(new_ptr),
+        //     self.value_list@ == old(self).value_list@,
+        //     self.free_list@ == old(self).free_list@,
+        //     self.value_list_head == old(self).value_list_head,
+        //     self.value_list_tail == old(self).value_list_tail,
+        //     self.value_list_len == old(self).value_list_len,
+        //     self.free_list_head == old(self).free_list_head,
+        //     self.free_list_tail == old(self).free_list_tail,
+        //     self.free_list_len == old(self).free_list_len,
+        //     old(self).free_list_wf() ==> self.free_list_wf(),
+        //     old(self).value_list_wf() ==> self.value_list_wf(),
+        // {
+        //     //self.spec_seq@ = self.spec_seq@.push(new_ptr);
+        // }
     
         #[verifier(external_body)]
-        pub fn get_ptr(&self, index: SLLIndex) -> (ptr:usize)
+        pub fn get_value(&self, index: SLLIndex) -> (ret:Option<T>)
             requires
                 0 <= index < N,
                 self.array_wf(),
             ensures
-                ptr == self.arr_seq@[index as int].value,
+                ret == self.arr_seq@[index as int].value,
         {
             self.ar[index as usize].value
         }

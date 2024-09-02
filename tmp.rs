@@ -1,9 +1,10 @@
-assert(
-    forall|l1pi: PageMapPtr, l1i: L1Index,l1pj: PageMapPtr, l1j: L1Index| 
-        #![auto]
-        self.l1_tables@.dom().contains(l1pi) && 0 <= l1i < 511 && self.l1_tables@.dom().contains(l1pj) && 0 <= l1j < 511 && (l1pi,l1i) != (l1pj,l1j)
-        && self.l1_tables@[l1pi].value()[l1i].perm.present
-        && self.l1_tables@[l1pj].value()[l1j].perm.present
-        ==>
-        self.l1_tables@[l1pi].value()[l1i].addr != self.l1_tables@[l1pj].value()[l1j].addr
-);
+assert(self.array_wf());
+assert(self.free_list_len + self.value_list_len == N);
+assert(self.value_list_wf());
+assert(self.free_list_wf());
+assert(forall|i:SLLIndex|                
+    #![trigger self.free_list@.contains(i)]
+    #![trigger self.value_list@.contains(i)]
+    0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
+assert(self.spec_seq_wf());
+assert(self.free_list_ptr_all_null());
