@@ -225,6 +225,8 @@ use crate::define::SLLIndex;
     
         pub open spec fn wf(&self) -> bool{
             &&&
+            N > 2
+            &&&
             self.array_wf()
             &&&
             self.free_list_len + self.value_list_len == N

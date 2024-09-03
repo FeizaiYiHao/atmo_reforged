@@ -233,6 +233,84 @@ use crate::lemma::lemma_u::*;
             }
         }
 
+        pub fn pop(&mut self)
+        requires old(self).wf(),
+                old(self).len() > 0,
+                old(self).unique(),
+                N > 2,
+        ensures 
+        {
+            proof{
+                seq_push_lemma::<SLLIndex>();
+            }
+            if self.free_list_len == 0 {
+                let ret_index = self.value_list_head;
+                
+                let new_value_list_head = self.get_next(ret_index);
+                self.value_list_head = new_value_list_head;
+                self.set_prev(new_value_list_head, -1);
+                proof{
+                    self.value_list@ = self.value_list@.skip(1);
+                    self.spec_seq@ = self.spec_seq@.skip(1);
+                }
+                self.value_list_len = self.value_list_len - 1;
+
+                self.free_list_head = ret_index;
+                self.free_list_tail = ret_index;
+                self.set_prev(ret_index, -1);
+                self.set_next(ret_index, -1);
+                proof{
+                    self.free_list@ = self.free_list@.push(ret_index);
+                }
+                self.free_list_len = self.free_list_len + 1;
+
+                assert(self.wf());
+            }else if self.value_list_len == 1 {
+                let ret_index = self.value_list_head;
+
+                let old_free_list_tail = self.free_list_tail;
+                self.set_next(old_free_list_tail, ret_index);
+                self.set_prev(ret_index, old_free_list_tail);
+                self.free_list_tail = ret_index;
+                self.free_list_len = self.free_list_len + 1;
+                proof{
+                    self.free_list@ = self.free_list@.push(ret_index);
+                }
+
+                self.value_list_head = -1;
+                self.value_list_tail = -1;
+                proof{
+                    self.value_list@ = self.value_list@.skip(1);
+                    self.spec_seq@ = self.spec_seq@.skip(1);
+                }
+                self.value_list_len = self.value_list_len - 1;
+
+                assert(self.wf());
+            }else{
+                let ret_index = self.value_list_head;
+
+                let new_value_list_head = self.get_next(ret_index);
+                self.value_list_head = new_value_list_head;
+                self.set_prev(new_value_list_head, -1);
+                proof{
+                    self.value_list@ = self.value_list@.skip(1);
+                    self.spec_seq@ = self.spec_seq@.skip(1);
+                }
+                self.value_list_len = self.value_list_len - 1;
+
+                let old_free_list_tail = self.free_list_tail;
+                self.set_next(ret_index, -1);
+                self.set_next(old_free_list_tail, ret_index);
+                self.set_prev(ret_index, old_free_list_tail);
+                self.free_list_tail = ret_index;
+                self.free_list_len = self.free_list_len + 1;
+                proof{
+                    self.free_list@ = self.free_list@.push(ret_index);
+                }
+                assert(self.wf());
+            }
+        }
+
     }
 
 }
