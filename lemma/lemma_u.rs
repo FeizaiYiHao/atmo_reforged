@@ -15,4 +15,13 @@ pub proof fn page_ptr_valid_imply_MEM_valid(v:usize)
     ((v / 4096) < 2*1024*1024);
 }
 
+#[verifier(external_body)]
+pub proof fn seq_push_lemma<A>()
+    ensures
+        forall|s: Seq<A>, v: A, x: A|
+            s.contains(x) ==>  s.push(v).contains(v) && s.push(v).contains(x),
+{
+
+}
+
 }

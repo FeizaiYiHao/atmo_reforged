@@ -1,10 +1,15 @@
-assert(self.array_wf());
-assert(self.free_list_len + self.value_list_len == N);
-assert(self.value_list_wf());
-assert(self.free_list_wf());
-assert(forall|i:SLLIndex|                
-    #![trigger self.free_list@.contains(i)]
-    #![trigger self.value_list@.contains(i)]
-    0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
-assert(self.spec_seq_wf());
-assert(self.free_list_ptr_all_null());
+assert(forall|i: int|
+    #![trigger self.arr_seq@[self.value_list@[i as int] as int].next]
+    #![trigger self.next_value_node_of(i)]
+    0 <= i < self.value_list@.len() ==> self.arr_seq@[self.value_list@[i as int] as int].next == self.next_value_node_of(i));
+assert(forall|i: int|
+    #![trigger self.arr_seq@[self.value_list@[i as int] as int].prev]
+    #![trigger self.prev_value_node_of(i)]
+    0 <= i < self.value_list@.len() ==> self.arr_seq@[self.value_list@[i as int] as int].prev == self.prev_value_node_of(i));
+assert(forall|i: int| 
+    #![trigger self.value_list@[i as int]] 
+    0 <= i < self.value_list@.len() ==> 0 <= self.value_list@[i as int] < N);
+assert(self.unique());
+assert(self.wf_value_node_head());
+assert(self.wf_value_node_tail());
+assert(self.value_list_len == self.value_list@.len());

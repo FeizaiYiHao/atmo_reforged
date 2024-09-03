@@ -3,7 +3,8 @@ verus! {
 use crate::slinkedlist::define::*;
 use crate::slinkedlist::spec::*;
 use crate::define::SLLIndex;
-use vstd::seq_lib::lemma_seq_contains_after_push;
+use vstd::seq_lib::*;
+use crate::lemma::lemma_u::*;
 
     impl<T: Copy, const N: usize> StaticLinkedList<T,N> {
 
@@ -123,20 +124,30 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                     old(self)@.contains(*new_value) == false,
                     N > 2,
             ensures 
-                    // self.wf(),
-                    // self@ == old(self)@.push(new_ptr),
-                    // self.value_list@ == old(self).value_list@.push(free_node_index),
-                    // self.len() == old(self).len() + 1,
-                    // self.arr_seq@[free_node_index as int].value == new_ptr,
-                    // self.node_ref_valid(free_node_index),
-                    // self.node_ref_resolve(free_node_index) == new_ptr,
-                    // forall|index:SLLIndex| #[trigger] old(self).node_ref_valid(index) ==> self.node_ref_valid(index),
-                    // forall|index:SLLIndex| #[trigger] old(self).node_ref_valid(index) ==> index != free_node_index,
-                    // forall|index:SLLIndex| #[trigger] old(self).node_ref_valid(index) ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
-                    // self.unique(),
-                    // forall| ptr: usize| ptr != new_ptr ==> old(self)@.contains(ptr) == #[trigger] self@.contains(ptr),
-                    // self@.contains(new_ptr),
+                    self.wf(),
+                    self@ == old(self)@.push(*new_value),
+                    self.len() == old(self).len() + 1,
+                    self@ == old(self)@.push(*new_value),
+                    forall|index:SLLIndex|
+                        #![trigger old(self).node_ref_valid(index)]
+                        #![trigger self.node_ref_valid(index)]
+                        old(self).node_ref_valid(index) ==> self.node_ref_valid(index),
+                    forall|index:SLLIndex| 
+                        #![trigger old(self).node_ref_valid(index)]
+                        old(self).node_ref_valid(index) ==> index != free_node_index,
+    
+                    forall|index:SLLIndex| 
+                        #![trigger old(self).node_ref_valid(index)]
+                        #![trigger self.node_ref_resolve(index)]
+                        #![trigger old(self).node_ref_resolve(index)]
+                        old(self).node_ref_valid(index) ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                    self.node_ref_valid(free_node_index),
+                    self.node_ref_resolve(free_node_index) == *new_value,
+                    self.unique(),
         {
+            proof{
+                seq_push_lemma::<SLLIndex>();
+            }
             if self.value_list_len == 0 {
                 // value list empty
                 // assert(self.value_list_head == -1);
@@ -157,7 +168,7 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                                 
                 assert(forall|i: nat|
                     #![trigger old(self).arr_seq@[i as int]]
-                    #![trigger self.arr_seq@[i as int]]
+                    #![trigger self.arr_seq@[i as int], old(self).arr_seq@[i as int]]
                     0 <= i < N && i != ret ==>  old(self).arr_seq@[i as int].next == self.arr_seq@[i as int].next );
                     
                 self.set_next(ret, -1);
@@ -167,58 +178,59 @@ use vstd::seq_lib::lemma_seq_contains_after_push;
                 }
                 self.value_list_len = self.value_list_len + 1;
                 self.set_value(ret, Some(*new_value));
-                // assert(self.value_list_wf());
-                assert(self.wf()) by {
-                    assert(self.array_wf());
-                    assert(self.free_list_len + self.value_list_len == N);
-                    assert(self.value_list_wf());
-                    assert(self.free_list_wf()) by {
-                        assert(forall|i: nat|
-                            #![trigger self.arr_seq@[self.free_list@[i as int] as int].next]
-                            #![trigger self.next_free_node_of(i)]
-                            0 <= i < self.free_list@.len() ==>  self.arr_seq@[self.free_list@[i as int] as int].next == self.next_free_node_of(i)) by {
-                                assert(forall|i: nat|
-                                    #![trigger self.free_list@[i as int]]
-                                    0 <= i < self.free_list@.len() ==> ret != self.free_list@[i as int]
-                                    );
-                                assert(forall|i: nat|
-                                    #![trigger old(self).arr_seq@[i as int]]
-                                    #![trigger self.arr_seq@[i as int]]
-                                    0 <= i < N && i != ret ==>  old(self).arr_seq@[i as int].next == self.arr_seq@[i as int].next );
-                                assert(forall|i: nat|
-                                    #![trigger self.arr_seq@[self.free_list@[i as int] as int].next]
-                                    #![trigger self.next_free_node_of(i)]
-                                    0 <= i < self.free_list@.len() ==>  old(self).arr_seq@[old(self).free_list@[i as int + 1] as int].next == self.arr_seq@[self.free_list@[i as int] as int].next);
-                                assert(forall|i: nat|
-                                    #![trigger self.arr_seq@[self.free_list@[i as int] as int].next]
-                                    #![trigger self.next_free_node_of(i)]
-                                    0 <= i < self.free_list@.len() ==>  old(self).next_free_node_of(i + 1) == self.next_free_node_of(i));
+                assert(self.wf());
+                assert(self@ == old(self)@.push(*new_value));
+                return ret;
+            }else if self.free_list_len == 1 {
+                let ret = self.free_list_tail;
+                self.free_list_len = 0;
+                self.free_list_head = -1;
+                self.free_list_tail = -1;
+                proof{
+                    self.free_list@ = self.free_list@.skip(1);
+                }
 
-                            };
-                        assert(forall|i: nat|
-                            #![trigger self.arr_seq@[self.free_list@[i as int] as int].prev]
-                            #![trigger self.prev_free_node_of(i)]
-                            0 <= i < self.free_list@.len() ==> self.arr_seq@[self.free_list@[i as int] as int].prev == self.prev_free_node_of(i)) by {
-                                assert(forall|i: nat|
-                                    #![trigger self.arr_seq@[self.free_list@[i as int] as int].prev]
-                                    #![trigger self.prev_free_node_of(i)]
-                                    1 <= i < self.free_list@.len() ==> old(self).arr_seq@[old(self).free_list@[i as int + 1] as int].prev == self.arr_seq@[self.free_list@[i as int] as int].prev);
-                                assert(forall|i: nat|
-                                    #![trigger self.arr_seq@[self.free_list@[i as int] as int].prev]
-                                    #![trigger self.prev_free_node_of(i)]
-                                    1 <= i < self.free_list@.len() ==> old(self).prev_free_node_of(i + 1) == self.prev_free_node_of(i));
-                            };
-                    };
-                    assert(forall|i:SLLIndex|                
-                        #![trigger self.free_list@.contains(i)]
-                        #![trigger self.value_list@.contains(i)]
-                        0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i));
-                    assert(self.spec_seq_wf());
-                    assert(self.free_list_ptr_all_null());
-                };
+                let old_value_list_tail = self.value_list_tail;
+                self.set_prev(ret,old_value_list_tail);
+                self.set_next(old_value_list_tail, ret);
+                self.value_list_tail = ret;
+                proof{
+                    self.value_list@ = self.value_list@.push(ret);
+                    self.spec_seq@ = self.spec_seq@.push(*new_value);
+                }
+                self.value_list_len = self.value_list_len + 1;
+
+                self.set_value(ret, Some(*new_value));
+
+                assert(self.wf());
+                assert(self@ == old(self)@.push(*new_value));
+                return ret;
+
+            }else{
+                assert(self.free_list_len > 1 && self.value_list_len > 0);
+                let ret = self.free_list_head;
+                let old_value_list_tail = self.value_list_tail;
+
+                let new_free_list_head = self.get_next(ret);
+                self.set_prev(new_free_list_head, -1);
+                self.free_list_head = new_free_list_head;
+                self.free_list_len = self.free_list_len - 1;
+                proof{
+                    self.free_list@ = self.free_list@.skip(1);
+                }
+                self.set_next(old_value_list_tail, ret);
+                self.set_prev(ret, old_value_list_tail);
+                self.set_next(ret, -1);
+                self.value_list_tail = ret;
+                self.value_list_len = self.value_list_len + 1;
+                proof{
+                    self.value_list@ = self.value_list@.push(ret);
+                    self.spec_seq@ = self.spec_seq@.push(*new_value);
+                }
+                self.set_value(ret, Some(*new_value));
+                assert(self.wf());
+                return ret;
             }
-
-            return 0;
         }
 
     }

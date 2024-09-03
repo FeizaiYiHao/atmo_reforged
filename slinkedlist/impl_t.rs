@@ -43,14 +43,13 @@ use core::mem::MaybeUninit;
             ensures
                 self.array_wf(),
                 forall|i:int| 
-                    #![trigger self.arr_seq@[i].next, old(self).arr_seq@[i].next] 
-                    #![trigger self.arr_seq@[i].prev, old(self).arr_seq@[i].prev] 
-                    0<=i<self.arr_seq@.len() ==>
-                        self.arr_seq@[i].next == old(self).arr_seq@[i].next && self.arr_seq@[i].prev == old(self).arr_seq@[i].prev,
-                forall|i:int|
-                    #![trigger self.arr_seq@[i].value, old(self).arr_seq@[i].value] 
+                    // #![trigger self.arr_seq@[i], old(self).arr_seq@[i]]
+                    #![trigger self.arr_seq@[i]]
+                    #![trigger old(self).arr_seq@[i]]
                     0<=i<self.arr_seq@.len() && i != index ==>
-                        self.arr_seq@[i].value == old(self).arr_seq@[i].value,
+                        self.arr_seq@[i] =~= old(self).arr_seq@[i],
+                self.arr_seq@[index as int].prev == old(self).arr_seq@[index as int].prev,
+                self.arr_seq@[index as int].next == old(self).arr_seq@[index as int].next,
                 self.arr_seq@[index as int].value == v,
                 self.spec_seq@ == old(self).spec_seq@,
                 self.value_list@ == old(self).value_list@,
@@ -73,15 +72,14 @@ use core::mem::MaybeUninit;
                 old(self).array_wf(),
             ensures
                 self.array_wf(),
-                forall|i:int|
-                    #![trigger self.arr_seq@[i].value, old(self).arr_seq@[i].value] 
-                    #![trigger self.arr_seq@[i].prev, old(self).arr_seq@[i].prev] 
-                    0<=i<self.arr_seq@.len() ==>
-                        self.arr_seq@[i].value == old(self).arr_seq@[i].value && self.arr_seq@[i].prev == old(self).arr_seq@[i].prev,
-                forall|i:int|
-                    #![trigger self.arr_seq@[i].next, old(self).arr_seq@[i].next] 
+                forall|i:int| 
+                    // #![trigger self.arr_seq@[i], old(self).arr_seq@[i]]
+                    #![trigger self.arr_seq@[i]]
+                    #![trigger old(self).arr_seq@[i]]
                     0<=i<self.arr_seq@.len() && i != index ==>
-                        self.arr_seq@[i].next == old(self).arr_seq@[i].next,
+                        self.arr_seq@[i] =~= old(self).arr_seq@[i],
+                self.arr_seq@[index as int].prev == old(self).arr_seq@[index as int].prev,
+                self.arr_seq@[index as int].value == old(self).arr_seq@[index as int].value,
                 self.arr_seq@[index as int].next == v,
                 self.spec_seq@ == old(self).spec_seq@,
                 self.value_list@ == old(self).value_list@,
@@ -102,15 +100,14 @@ use core::mem::MaybeUninit;
                 old(self).array_wf(),
             ensures
                 self.array_wf(),
-                forall|i:int|
-                    #![trigger self.arr_seq@[i].value, old(self).arr_seq@[i].value] 
-                    #![trigger self.arr_seq@[i].next, old(self).arr_seq@[i].next] 
-                    0<=i<self.arr_seq@.len() ==>
-                        self.arr_seq@[i].value == old(self).arr_seq@[i].value && self.arr_seq@[i].next == old(self).arr_seq@[i].next,
-                forall|i:int|
-                    #![trigger self.arr_seq@[i].prev, old(self).arr_seq@[i].prev] 
+                forall|i:int| 
+                    // #![trigger self.arr_seq@[i], old(self).arr_seq@[i]]
+                    #![trigger self.arr_seq@[i]]
+                    #![trigger old(self).arr_seq@[i]]
                     0<=i<self.arr_seq@.len() && i != index ==>
-                        self.arr_seq@[i].prev == old(self).arr_seq@[i].prev,
+                        self.arr_seq@[i] =~= old(self).arr_seq@[i],
+                self.arr_seq@[index as int].next == old(self).arr_seq@[index as int].next,
+                self.arr_seq@[index as int].value == old(self).arr_seq@[index as int].value,
                 self.arr_seq@[index as int].prev == v,
                 self.spec_seq@ == old(self).spec_seq@,
                 self.value_list@ == old(self).value_list@,

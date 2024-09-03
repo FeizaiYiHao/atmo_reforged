@@ -56,6 +56,7 @@ use crate::define::SLLIndex;
                 0<=i<self.len() && 0<=j<self.len() && i != j ==> self.spec_seq@[i] =~= self.spec_seq@[j] == false
         }
     
+        // #[verifier(inline)]
         pub open spec fn view(&self) -> Seq<T>
         {
             self.spec_seq@
@@ -65,11 +66,11 @@ use crate::define::SLLIndex;
             self.value_list@.contains(index)
         }
     
-        pub open spec fn node_ref_resolve(&self, index: SLLIndex) -> Option<T>
+        pub open spec fn node_ref_resolve(&self, index: SLLIndex) -> T
             recommends 
                 self.node_ref_valid(index)
         {
-            self.arr_seq@[index as int].value
+            self.arr_seq@[index as int].value.get_Some_0()
         }
     
         pub open spec fn prev_free_node_of(&self, i: nat) -> int
@@ -185,7 +186,7 @@ use crate::define::SLLIndex;
                 0 <= i < self.value_list@.len() ==> self.arr_seq@[self.value_list@[i as int] as int].prev == self.prev_value_node_of(i)
             &&&
             forall|i: int| 
-                #![trigger self.value_list@.len(), self.value_list@[i as int]] 
+                #![trigger self.value_list@[i as int]] 
                 0 <= i < self.value_list@.len() ==> 0 <= self.value_list@[i as int] < N
             &&&
             self.unique()
@@ -217,7 +218,8 @@ use crate::define::SLLIndex;
             self.spec_seq@.len() == self.value_list_len
             &&&
             forall|i:int| 
-                #![trigger self.arr_seq@[self.value_list@[i as int] as int].value, self.spec_seq@[i as int]]
+                #![trigger self.spec_seq@[i as int]]
+                #![trigger self.value_list@[i as int]]
                 0 <= i < self.value_list_len ==> self.arr_seq@[self.value_list@[i as int] as int].value.is_Some() && self.arr_seq@[self.value_list@[i as int] as int].value.get_Some_0() =~= self.spec_seq@[i as int]
         }
     
@@ -231,14 +233,11 @@ use crate::define::SLLIndex;
             &&&
             self.free_list_wf()
             &&&
-            forall|i:SLLIndex|                
-                #![trigger self.free_list@.contains(i)]
-                #![trigger self.value_list@.contains(i)]
-                0<= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i)
-            &&&
             self.spec_seq_wf()
             &&&
-            self.free_list_ptr_all_null()
+            forall|i:int, j:int|
+                #![trigger self.value_list@[i], self.free_list@[j]]
+                0 <= i < self.value_list@.len() && 0 <= j < self.free_list@.len() ==> self.value_list@[i] != self.free_list@[j]
         }
     }
 }
