@@ -233,19 +233,38 @@ use crate::lemma::lemma_u::*;
             }
         }
 
-        pub fn pop(&mut self)
-        requires old(self).wf(),
-                old(self).len() > 0,
-                old(self).unique(),
-                N > 2,
-        ensures 
+        pub fn pop(&mut self) -> (ret: (T,SLLIndex))
+            requires old(self).wf(),
+                    old(self).len() > 0,
+                    old(self).unique(),
+                    N > 2,
+            ensures 
+                self.wf(),
+                self.len() == old(self).len() - 1,
+                self@ == old(self)@.skip(1),
+                ret.0 == old(self)@[0],   
+                old(self).value_list@[0] == ret.1,
+                old(self).node_ref_valid(ret.1),
+                old(self).node_ref_resolve(ret.1) == ret.0,
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    old(self).node_ref_valid(index) && index != ret.1 ==> self.node_ref_valid(index),
+                forall|index:SLLIndex| 
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && index != ret.1 ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                self.unique(),
         {
             proof{
                 seq_push_lemma::<SLLIndex>();
+                seq_skip_lemma::<SLLIndex>();
             }
             if self.free_list_len == 0 {
                 let ret_index = self.value_list_head;
-                
+                let ret = self.get_value(ret_index).unwrap();
+
                 let new_value_list_head = self.get_next(ret_index);
                 self.value_list_head = new_value_list_head;
                 self.set_prev(new_value_list_head, -1);
@@ -265,8 +284,10 @@ use crate::lemma::lemma_u::*;
                 self.free_list_len = self.free_list_len + 1;
 
                 assert(self.wf());
+                return (ret,ret_index);
             }else if self.value_list_len == 1 {
                 let ret_index = self.value_list_head;
+                let ret = self.get_value(ret_index).unwrap();
 
                 let old_free_list_tail = self.free_list_tail;
                 self.set_next(old_free_list_tail, ret_index);
@@ -286,8 +307,11 @@ use crate::lemma::lemma_u::*;
                 self.value_list_len = self.value_list_len - 1;
 
                 assert(self.wf());
+
+                return (ret,ret_index);
             }else{
                 let ret_index = self.value_list_head;
+                let ret = self.get_value(ret_index).unwrap();
 
                 let new_value_list_head = self.get_next(ret_index);
                 self.value_list_head = new_value_list_head;
@@ -308,9 +332,238 @@ use crate::lemma::lemma_u::*;
                     self.free_list@ = self.free_list@.push(ret_index);
                 }
                 assert(self.wf());
+                return (ret,ret_index);
             }
         }
 
+        pub fn remove(&mut self, remove_index: SLLIndex) -> (ret: T)
+            requires
+                old(self).wf(),
+                old(self).node_ref_valid(remove_index),
+            ensures
+                self.wf(),
+                self.len() == old(self).len() - 1,
+                ret == old(self).node_ref_resolve(remove_index), 
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_valid(index),
+                forall|index:SLLIndex| 
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                self.unique(),
+                self@ =~= old(self)@.remove_value(ret),
+        {
+            assert(self.value_list_len != 0);
+            if self.value_list_len == 1{
+                proof{
+                    seq_push_lemma::<SLLIndex>();
+                    seq_skip_lemma::<SLLIndex>(); 
+                    seq_skip_lemma::<T>(); 
+                }
+                let ret = self.get_value(remove_index).unwrap();
+                let old_free_list_tail = self.free_list_tail;
+                self.set_next(old_free_list_tail, remove_index);
+                self.set_prev(remove_index, old_free_list_tail);
+                self.free_list_tail = remove_index;
+                self.free_list_len = self.free_list_len + 1;
+                proof{
+                    self.free_list@ = self.free_list@.push(remove_index);
+                }
+
+                self.value_list_head = -1;
+                self.value_list_tail = -1;
+                proof{
+                    self.value_list@ = self.value_list@.skip(1);
+                    self.spec_seq@ = self.spec_seq@.skip(1);
+                }
+                self.value_list_len = self.value_list_len - 1;
+
+                assert(self.wf());
+                return ret;
+            }else if self.free_list_len == 0 && self.value_list_head == remove_index {
+                proof{
+                    seq_push_lemma::<SLLIndex>();
+                    seq_skip_lemma::<SLLIndex>(); 
+                    seq_skip_lemma::<T>(); 
+                }
+                let ret = self.get_value(remove_index).unwrap();
+                let new_value_list_head = self.get_next(remove_index);
+                self.value_list_head = new_value_list_head;
+                self.set_prev(new_value_list_head, -1);
+                proof{
+                    self.value_list@ = self.value_list@.skip(1);
+                    self.spec_seq@ = self.spec_seq@.skip(1);
+                }
+                self.value_list_len = self.value_list_len - 1;
+
+                self.free_list_head = remove_index;
+                self.free_list_tail = remove_index;
+                self.set_prev(remove_index, -1);
+                self.set_next(remove_index, -1);
+                proof{
+                    self.free_list@ = self.free_list@.push(remove_index);
+                }
+                self.free_list_len = self.free_list_len + 1;
+
+                assert(self.wf());
+                return ret;
+            }else if self.free_list_len == 0 && self.value_list_tail == remove_index {
+                proof{
+                    seq_push_lemma::<SLLIndex>();
+                    seq_remove_lemma::<SLLIndex>(); 
+                    seq_remove_lemma::<T>(); 
+                }
+                let ret = self.get_value(remove_index).unwrap();
+                let new_value_list_tail = self.get_prev(remove_index);
+                self.value_list_tail = new_value_list_tail;
+                self.set_next(new_value_list_tail, -1);
+                proof{
+                    self.value_list@ = self.value_list@.subrange(0,self.value_list_len as int - 1).add(self.value_list@.subrange(self.value_list_len as int, self.value_list_len as int));
+                    self.spec_seq@ = self.spec_seq@.subrange(0,self.value_list_len as int - 1).add(self.spec_seq@.subrange(self.value_list_len as int,self.value_list_len as int));
+                }
+                self.value_list_len = self.value_list_len - 1;
+
+                self.free_list_head = remove_index;
+                self.free_list_tail = remove_index;
+                self.set_prev(remove_index, -1);
+                self.set_next(remove_index, -1);
+                proof{
+                    self.free_list@ = self.free_list@.push(remove_index);
+                }
+                self.free_list_len = self.free_list_len + 1;
+
+                assert(self.wf());
+                return ret;
+            }else if self.free_list_len == 0{
+                proof{
+                    seq_push_lemma::<SLLIndex>();
+                    seq_remove_lemma::<SLLIndex>(); 
+                    seq_remove_lemma::<T>(); 
+                }
+                let ret = self.get_value(remove_index).unwrap();
+                let prev = self.get_prev(remove_index);
+                let next = self.get_next(remove_index);
+                self.set_next(prev, next);
+                self.set_prev(next, prev);
+
+                let ghost_index = Ghost(self.value_list@.index_of(remove_index));
+                assert(0 <= ghost_index@ < self.value_list@.len());
+                assert(self.value_list@[ghost_index@] == remove_index);
+
+                proof{
+                    self.value_list@ = self.value_list@.subrange(0,ghost_index@).add(self.value_list@.subrange(ghost_index@ + 1, self.value_list_len as int));
+                    self.spec_seq@ = self.spec_seq@.subrange(0,ghost_index@).add(self.spec_seq@.subrange(ghost_index@ + 1,self.value_list_len as int));
+                }
+                self.value_list_len = self.value_list_len - 1;
+
+                self.free_list_head = remove_index;
+                self.free_list_tail = remove_index;
+                self.set_prev(remove_index, -1);
+                self.set_next(remove_index, -1);
+                proof{
+                    self.free_list@ = self.free_list@.push(remove_index);
+                }
+                self.free_list_len = self.free_list_len + 1;
+
+                assert(self.wf());
+                return ret;
+            }else if self.value_list_head == remove_index {
+                proof{
+                    seq_push_lemma::<SLLIndex>();
+                    seq_skip_lemma::<SLLIndex>(); 
+                    seq_skip_lemma::<T>(); 
+                }
+                let ret = self.get_value(remove_index).unwrap();
+                let new_value_list_head = self.get_next(remove_index);
+                self.value_list_head = new_value_list_head;
+                self.set_prev(new_value_list_head, -1);
+                proof{
+                    self.value_list@ = self.value_list@.skip(1);
+                    self.spec_seq@ = self.spec_seq@.skip(1);
+                }
+                self.value_list_len = self.value_list_len - 1;
+
+                let old_free_list_tail = self.free_list_tail;
+                self.set_next(old_free_list_tail, remove_index);
+                self.set_next(remove_index, -1);
+                self.set_prev(remove_index, old_free_list_tail);
+                self.free_list_tail = remove_index;
+                self.free_list_len = self.free_list_len + 1;
+                proof{
+                    self.free_list@ = self.free_list@.push(remove_index);
+                }
+
+                assert(self.wf());
+                return ret;
+            }else if self.value_list_tail == remove_index{
+                proof{
+                    seq_push_lemma::<SLLIndex>();
+                    seq_remove_lemma::<SLLIndex>(); 
+                    seq_remove_lemma::<T>(); 
+                }
+                let ret = self.get_value(remove_index).unwrap();
+                let new_value_list_tail = self.get_prev(remove_index);
+                self.value_list_tail = new_value_list_tail;
+                self.set_next(new_value_list_tail, -1);
+                proof{
+                    self.value_list@ = self.value_list@.subrange(0,self.value_list_len as int - 1).add(self.value_list@.subrange(self.value_list_len as int, self.value_list_len as int));
+                    self.spec_seq@ = self.spec_seq@.subrange(0,self.value_list_len as int - 1).add(self.spec_seq@.subrange(self.value_list_len as int,self.value_list_len as int));
+                }
+                self.value_list_len = self.value_list_len - 1;
+
+                let old_free_list_tail = self.free_list_tail;
+                self.set_next(old_free_list_tail, remove_index);
+                self.set_next(remove_index, -1);
+                self.set_prev(remove_index, old_free_list_tail);
+                self.free_list_tail = remove_index;
+                self.free_list_len = self.free_list_len + 1;
+                proof{
+                    self.free_list@ = self.free_list@.push(remove_index);
+                }
+
+                assert(self.wf());
+                return ret;
+            }else{
+                proof{
+                    seq_push_lemma::<SLLIndex>();
+                    seq_skip_lemma::<SLLIndex>();
+                    seq_remove_lemma::<SLLIndex>();
+                    seq_remove_lemma_2::<SLLIndex>();
+                    seq_remove_lemma::<T>(); 
+                }
+                let ret = self.get_value(remove_index).unwrap();
+                let prev = self.get_prev(remove_index);
+                let next = self.get_next(remove_index);
+                self.set_next(prev, next);
+                self.set_prev(next, prev);
+
+                let ghost_index = Ghost(self.value_list@.index_of(remove_index));
+                assert(0 <= ghost_index@ < self.value_list@.len());
+                assert(self.value_list@[ghost_index@] == remove_index);
+
+                proof{
+                    self.value_list@ = self.value_list@.subrange(0,ghost_index@).add(self.value_list@.subrange(ghost_index@ + 1, self.value_list_len as int));
+                    self.spec_seq@ = self.spec_seq@.subrange(0,ghost_index@).add(self.spec_seq@.subrange(ghost_index@ + 1,self.value_list_len as int));
+                }
+                self.value_list_len = self.value_list_len - 1;
+
+                let old_free_list_tail = self.free_list_tail;
+                self.set_next(old_free_list_tail, remove_index);
+                self.set_next(remove_index, -1);
+                self.set_prev(remove_index, old_free_list_tail);
+                self.free_list_tail = remove_index;
+                self.free_list_len = self.free_list_len + 1;
+                proof{
+                    self.free_list@ = self.free_list@.push(remove_index);
+                }
+
+                assert(self.wf());
+                return ret;
+            }
+        } 
     }
 
 }
