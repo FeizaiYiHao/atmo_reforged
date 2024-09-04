@@ -1,9 +1,9 @@
 use vstd::prelude::*;
 verus! {
-use crate::slinkedlist::define::*;
+// use crate::slinkedlist::define::*;
 use crate::slinkedlist::spec::*;
 use crate::define::SLLIndex;
-use vstd::seq_lib::*;
+// use vstd::seq_lib::*;
 use crate::lemma::lemma_u::*;
 
     impl<T: Copy, const N: usize> StaticLinkedList<T,N> {

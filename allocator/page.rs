@@ -2,14 +2,16 @@ use vstd::prelude::*;
 verus! {
     use crate::define::*;
 
+    #[derive(Clone, Copy)]
     pub struct Page{
-        pub start: PagePtr,
+        pub addr: PagePtr,
         pub state: PageState,
         pub is_io_page: bool,
-        pub rf_count: usize,
         pub rev_pointer: SLLIndex,
-    
-        pub mappings: Ghost<Map<(Pcid,VAddr),PageType>>,
-        pub io_mappings: Ghost<Map<(IOid,VAddr),PageType>>,
+        pub ref_count: usize,
+
+        pub mappings: Ghost<Set<(Pcid,VAddr)>>,
+        pub io_mappings: Ghost<Set<(IOid,VAddr)>>,
     }
+
 }

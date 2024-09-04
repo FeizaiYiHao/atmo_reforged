@@ -1,15 +1,20 @@
-assert(forall|i: int|
-    #![trigger self.arr_seq@[self.value_list@[i as int] as int].next]
-    #![trigger self.next_value_node_of(i)]
-    0 <= i < self.value_list@.len() ==> self.arr_seq@[self.value_list@[i as int] as int].next == self.next_value_node_of(i));
-assert(forall|i: int|
-    #![trigger self.arr_seq@[self.value_list@[i as int] as int].prev]
-    #![trigger self.prev_value_node_of(i)]
-    0 <= i < self.value_list@.len() ==> self.arr_seq@[self.value_list@[i as int] as int].prev == self.prev_value_node_of(i));
-assert(forall|i: int| 
-    #![trigger self.value_list@[i as int]] 
-    0 <= i < self.value_list@.len() ==> 0 <= self.value_list@[i as int] < N);
-assert(self.unique());
-assert(self.wf_value_node_head());
-assert(self.wf_value_node_tail());
-assert(self.value_list_len == self.value_list@.len());
+pub open spec fn allocated_pages_1g_wf(&self) -> bool{
+    &&&
+    self.allocated_pages_1g@.finite()
+    &&&
+    forall|p:PagePtr|
+        #![trigger self.allocated_pages_1g@.contains(p), page_ptr_valid(p)]
+        self.allocated_pages_1g@.contains(p) ==> page_ptr_valid(p)
+    &&&
+    forall|i:int|
+        #![trigger self.page_array@[i].addr]
+        0<=i<NUM_PAGES && self.page_array@[i].state == PageState::Allocated1g
+        ==> 
+        self.allocated_pages_1g@.contains(self.page_array@[i].addr) 
+    &&&
+    forall|p:PagePtr| 
+        #![trigger self.page_array@[page_ptr2page_index(p) as int].state]
+        self.allocated_pages_1g@.contains(p) 
+        ==>
+        self.page_array@[page_ptr2page_index(p) as int].state == PageState::Allocated1g
+}

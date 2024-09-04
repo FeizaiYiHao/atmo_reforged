@@ -58,17 +58,22 @@ pub enum PageType {
     RWX,
 }
 
+#[allow(inconsistent_fields)]
 #[derive(Clone, Copy, Debug)]
 pub enum PageState {
     Unavailable,
     Pagetable,
-    Allocated,
+    Allocated4k,
+    Allocated2m,
+    Allocated1g,
     Free4k,
     Free2m,
     Free1g,
     Mapped4k,
     Mapped2m,
     Mapped1g,
+    Merged2m,
+    Merged1g,
     Io,
 }
 

@@ -1,6 +1,6 @@
 use vstd::prelude::*;
 verus! {
-use crate::slinkedlist::define::*;
+// use crate::slinkedlist::define::*;
 use crate::slinkedlist::spec::*;
 use crate::define::SLLIndex;
 use core::mem::MaybeUninit;

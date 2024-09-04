@@ -3,31 +3,6 @@ verus! {
 use crate::define::*;
 use crate::lemma::lemma_t::*;
 
-pub fn va_perm_bits_valid(perm:usize) -> (ret:bool)
-    ensures
-        ret == spec_va_perm_bits_valid(perm),
-{
-    perm == READ
-    ||
-    perm == READ_WRITE
-    ||
-    perm == READ_EXECUTE
-    ||
-    perm == READ_WRITE_EXECUTE
-}
-
-
-pub open spec fn spec_va_perm_bits_valid(perm:usize) -> bool{
-    perm == READ
-    ||
-    perm == READ_WRITE
-    ||
-    perm == READ_EXECUTE
-    ||
-    perm == READ_WRITE_EXECUTE
-}
-
-
 pub open spec fn spec_page_ptr2page_index(ptr: usize) -> usize
     recommends
         page_ptr_valid(ptr),
@@ -66,6 +41,16 @@ pub fn page_index2page_ptr(i: usize) -> (ret:usize)
     i * 4096usize
 }
 
+pub open spec fn page_index_2m_valid(i:usize) -> bool 
+{
+    i % 512 == 0
+}
+
+pub open spec fn page_index_1g_valid(i:usize) -> bool 
+{
+    i % 512 % 512 == 0
+}
+
 pub open spec fn MEM_valid(v: PAddr) -> bool
 {
     v & (!MEM_MASK) as usize == 0
@@ -81,6 +66,14 @@ pub open spec fn page_ptr_valid(ptr: usize) -> bool
 pub open spec fn page_index_valid(index: usize) -> bool
 {
     (0<=index<NUM_PAGES)
+}
+
+pub open spec fn spec_page_index_truncate_2m(index: usize) -> usize{
+    index / 512
+}
+
+pub open spec fn spec_page_index_truncate_1g(index: usize) -> usize{
+    index / 512 / 512
 }
 
 pub open spec fn page_ptr_2m_valid(ptr: usize) -> bool

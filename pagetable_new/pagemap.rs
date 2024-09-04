@@ -93,9 +93,6 @@ impl PageMap{
             self.wf(),
             self@ =~= old(self)@.update(index as int,value),
         {
-            // proof{
-            //     pagemap_permission_bits_lemma();
-            // }
             if value.perm.present == false {
                 self.ar.set(index,0usize);
                 proof{
@@ -119,36 +116,6 @@ impl PageMap{
                 return;
             }
         }
-    // #[verifier(external_body)]
-    // pub fn set_kernel_pml4_entry(&mut self, index:usize, value:Option<PageEntry>)
-    //     requires
-    //         old(self).wf(),
-    //         0<=index<512,
-    //         value.is_Some() ==> page_ptr_valid(value.unwrap().addr),
-    //         value.is_Some() ==> spec_va_perm_bits_valid(value.unwrap().perm),
-    //     ensures
-    //         self.wf(),
-    //         self@ =~= self@.update(index as int,value),
-    //     {
-    //         proof{
-    //             pagemap_permission_bits_lemma();
-    //         }
-    //         if value.is_none(){
-    //             self.ar.set(index,0);
-    //             proof{
-    //                 self.spec_seq@ = self.spec_seq@.update(index as int,None);
-    //             }
-    //             return;
-    //         }else{
-    //             let entry = value.unwrap();
-    //             self.ar.set(index, (entry.addr | entry.perm) | (0x1 as usize));
-    //             proof{
-    //                 self.spec_seq@ = self.spec_seq@.update(index as int,value);
-    //             }
-
-    //             return;
-    //         }
-    //     }
 
     pub fn index(&self, index:usize) -> (ret:PageEntry)
         requires
