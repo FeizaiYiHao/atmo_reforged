@@ -21,7 +21,7 @@ pub open spec fn spec_page_index2page_ptr(i:usize) -> usize
 #[verifier(when_used_as_spec(spec_page_ptr2page_index))]
 pub fn page_ptr2page_index(ptr: usize) -> (ret: usize)
     requires
-        ptr % 4096 == 0,
+        ptr % 0x1000 == 0,
     ensures
         ret == spec_page_ptr2page_index(ptr)
 {
@@ -58,9 +58,10 @@ pub open spec fn MEM_valid(v: PAddr) -> bool
 
 pub open spec fn page_ptr_valid(ptr: usize) -> bool
 {
-    ((ptr % 0x1000) == 0)
-    &&
-    ((ptr/0x1000) < NUM_PAGES)
+    &&&
+    ptr % 0x1000 == 0
+    &&&
+    ptr/0x1000 < NUM_PAGES
 }
 
 pub open spec fn page_index_valid(index: usize) -> bool
@@ -214,6 +215,33 @@ pub fn va2index(va: usize) -> (ret : (L4Index,L3Index,L2Index,L1Index))
         ret.3 == spec_v2l1index(va) && ret.3 <= 0x1ff,
 {
     (v2l4index(va),v2l3index(va),v2l2index(va),v2l1index(va))
+}
+
+#[verifier(external_body)]
+pub proof fn page_ptr_lemma()
+    ensures
+        forall|pa:PagePtr| 
+            #![trigger page_ptr_2m_valid(pa)]
+            #![trigger page_ptr_valid(pa)]
+            page_ptr_2m_valid(pa) ==> page_ptr_valid(pa),
+        forall|pa:PagePtr| 
+            #![trigger page_ptr_valid(pa)]
+            #![trigger page_ptr2page_index(pa)]
+            page_ptr_valid(pa) ==> 0 <= page_ptr2page_index(pa) < NUM_PAGES,
+        forall|pa:PagePtr| 
+            #![trigger page_ptr_valid(pa)]
+            #![trigger page_ptr2page_index(pa)]
+            page_ptr_valid(pa) ==> pa == page_index2page_ptr(page_ptr2page_index(pa)),
+        forall|i:usize| 
+            #![trigger page_index_valid(i)]
+            #![trigger page_index2page_ptr(i)]
+            page_index_valid(i) ==> i == page_ptr2page_index(page_index2page_ptr(i)),
+        forall|i:usize, j:usize|
+            #![trigger page_index2page_ptr(i), page_index2page_ptr(j)]
+            0<i<NUM_PAGES && 0<j<NUM_PAGES && i != j 
+            ==> 
+                page_index2page_ptr(i) != page_index2page_ptr(j),
+{
 }
 
 #[verifier(external_body)]

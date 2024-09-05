@@ -1,7 +1,7 @@
 use vstd::prelude::*;
 
 verus! {
-use vstd::ptr::*;
+use vstd::simple_pptr::*;
 // use crate::trap::Registers;
 
 // -------------------- Begin of Types --------------------
@@ -10,9 +10,10 @@ pub type ProcPtr = usize;
 pub type EndpointIdx = usize;
 pub type EndpointPtr = usize;
 
-pub type PagePPtr = PPtr<[u8; PAGE_SZ]>;
 pub type PagePtr = usize;
-pub type PagePerm = PointsTo<[u8; PAGE_SZ]>;
+pub type PagePerm4k = PointsTo<[u8; PAGE_SZ_4k]>;
+pub type PagePerm2m = PointsTo<[u8; PAGE_SZ_2m]>;
+pub type PagePerm1g = PointsTo<[u8; PAGE_SZ_1g]>;
 
 pub type VAddr = usize;
 pub type PAddr = usize;
@@ -109,7 +110,9 @@ pub const IPC_PAGEPAYLOAD_LEN:usize = 128;
 
 pub const KERNEL_MEM_END_L4INDEX:usize = 1; //1 for now
 pub const NUM_PAGES:usize = 2*1024*1024; //8GB
-pub const PAGE_SZ:usize = 4096;
+pub const PAGE_SZ_4k:usize = 1usize << 12;
+pub const PAGE_SZ_2m:usize = 1usize << 21;
+pub const PAGE_SZ_1g:usize = 1usize << 30;
 pub const MAX_USIZE:u64 = 31*1024*1024*1024;
 
 pub const PCID_MAX:usize = 4096;
