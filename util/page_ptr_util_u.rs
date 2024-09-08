@@ -70,11 +70,11 @@ pub open spec fn page_index_valid(index: usize) -> bool
 }
 
 pub open spec fn spec_page_index_truncate_2m(index: usize) -> usize{
-    index / 512
+    (index / 512usize * 512usize) as usize
 }
 
 pub open spec fn spec_page_index_truncate_1g(index: usize) -> usize{
-    index / 512 / 512
+    (index / 512usize / 512usize * 512usize * 512usize) as usize
 }
 
 pub open spec fn page_ptr_2m_valid(ptr: usize) -> bool
@@ -222,16 +222,53 @@ pub proof fn page_ptr_lemma()
     ensures
         forall|pa:PagePtr| 
             #![trigger page_ptr_2m_valid(pa)]
+            #![trigger page_ptr_1g_valid(pa)]
+            page_ptr_1g_valid(pa) ==> page_ptr_2m_valid(pa),
+        forall|pa:PagePtr| 
+            #![trigger page_ptr_2m_valid(pa)]
             #![trigger page_ptr_valid(pa)]
             page_ptr_2m_valid(pa) ==> page_ptr_valid(pa),
+        
+        forall|i:usize| 
+            #![trigger page_index_1g_valid(i)]
+            #![trigger page_index_2m_valid(i)]
+            page_index_1g_valid(i) ==> page_index_2m_valid(i),
+        forall|i:usize| 
+            #![trigger page_index_2m_valid(i)]
+            #![trigger page_index_valid(i)]
+            page_index_2m_valid(i) ==> page_index_valid(i),
+
+        forall|pa:PagePtr| 
+            #![trigger page_ptr_1g_valid(pa)]
+            #![trigger page_ptr2page_index(pa)]
+            page_ptr_1g_valid(pa) ==> page_index_1g_valid(page_ptr2page_index(pa)),
+        forall|pa:PagePtr| 
+            #![trigger page_ptr_2m_valid(pa)]
+            #![trigger page_ptr2page_index(pa)]
+            page_ptr_2m_valid(pa) ==> page_index_2m_valid(page_ptr2page_index(pa)),
+
+        // forall|pa:PagePtr, i:usize| 
+        //     #![trigger spec_page_index_truncate_1g((pa + i) as usize)]
+        //     page_ptr_1g_valid(pa) && 0 <= i < 0x40000 ==> spec_page_index_truncate_1g((pa + i) as usize) == spec_page_index_truncate_1g(pa),
+        // forall|pa:PagePtr, i:usize| 
+        //     #![trigger spec_page_index_truncate_1g((pa + i) as usize)]
+        //     page_ptr_1g_valid(pa) && i >= 0x40000 ==> spec_page_index_truncate_1g((pa + i) as usize) > spec_page_index_truncate_1g(pa),
+        // forall|pa:PagePtr, i:usize| 
+        //     #![trigger spec_page_index_truncate_2m((pa + i) as usize)]
+        //     page_ptr_2m_valid(pa) && 0 <= i < 0x200 ==> spec_page_index_truncate_2m((pa + i) as usize) == spec_page_index_truncate_2m(pa),
+        // forall|pa:PagePtr, i:usize| 
+        //     #![trigger spec_page_index_truncate_2m((pa + i) as usize)]
+        //     page_ptr_2m_valid(pa) && i >= 0x200 ==> spec_page_index_truncate_2m((pa + i) as usize) > spec_page_index_truncate_2m(pa),
+        
         forall|pa:PagePtr| 
             #![trigger page_ptr_valid(pa)]
             #![trigger page_ptr2page_index(pa)]
-            page_ptr_valid(pa) ==> 0 <= page_ptr2page_index(pa) < NUM_PAGES,
+            page_ptr_valid(pa) ==> page_index_valid(page_ptr2page_index(pa)),
         forall|pa:PagePtr| 
             #![trigger page_ptr_valid(pa)]
             #![trigger page_ptr2page_index(pa)]
             page_ptr_valid(pa) ==> pa == page_index2page_ptr(page_ptr2page_index(pa)),
+
         forall|i:usize| 
             #![trigger page_index_valid(i)]
             #![trigger page_index2page_ptr(i)]

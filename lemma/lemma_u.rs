@@ -29,6 +29,12 @@ pub proof fn seq_skip_lemma<A>()
     ensures
         forall|s: Seq<A>, v: A|
             s.contains(v) && s[0] != v && s.no_duplicates() ==> s.skip(1).contains(v),
+        forall|s: Seq<A>|
+            #![trigger s[0]]
+            s.len() > 0 ==> s.contains(s[0]) ,
+        forall|s: Seq<A>|
+            #![trigger s[0]]
+            s.len() > 0 ==> !s.skip(1).contains(s[0]),
         forall|s: Seq<A>, v: A,|
             s[0] == v && s.no_duplicates() ==> s.skip(1) =~= s.remove_value(v),    
 {
