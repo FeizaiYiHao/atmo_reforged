@@ -43,12 +43,18 @@ pub fn page_index2page_ptr(i: usize) -> (ret:usize)
 
 pub open spec fn page_index_2m_valid(i:usize) -> bool 
 {
+    &&&
     i % 512 == 0
+    &&&
+    0<=i<NUM_PAGES
 }
 
 pub open spec fn page_index_1g_valid(i:usize) -> bool 
 {
-    i % 512 % 512 == 0
+    &&&
+    i % (512 * 512) as usize == 0
+    &&&
+    0<=i<NUM_PAGES
 }
 
 pub open spec fn MEM_valid(v: PAddr) -> bool
@@ -218,6 +224,29 @@ pub fn va2index(va: usize) -> (ret : (L4Index,L3Index,L2Index,L1Index))
 }
 
 #[verifier(external_body)]
+pub proof fn page_ptr_page_index_truncate_lemma()
+    ensures
+        forall|pi:usize, i:usize| 
+            #![trigger page_index_1g_valid(pi), spec_page_index_truncate_1g(i)]
+            page_index_1g_valid(pi)  ==> 
+            (pi <= i < pi + 0x40000) <==> spec_page_index_truncate_1g(i) == spec_page_index_truncate_1g(pi),
+        forall|pi:usize, i:usize| 
+            #![trigger page_index_1g_valid(pi), spec_page_index_truncate_1g(i)]
+            page_index_1g_valid(pi)  && (pi <= i < pi + 0x40000) 
+            ==> page_index_1g_valid(spec_page_index_truncate_1g(i)),
+        forall|pi:usize, i:usize| 
+            #![trigger page_index_2m_valid(pi), spec_page_index_truncate_2m(i)]
+            page_index_2m_valid(pi)  ==> 
+            (pi <= i < pi + 0x200) <==> spec_page_index_truncate_2m(i) == spec_page_index_truncate_2m(pi),
+        forall|pi:usize, i:usize| 
+            #![trigger page_index_2m_valid(pi), spec_page_index_truncate_2m(i)]
+            page_index_2m_valid(pi)  && (pi <= i < pi + 0x200) 
+            ==> page_index_2m_valid(spec_page_index_truncate_2m(i)),
+{
+
+}
+
+#[verifier(external_body)]
 pub proof fn page_ptr_lemma()
     ensures
         forall|pa:PagePtr| 
@@ -247,6 +276,11 @@ pub proof fn page_ptr_lemma()
             #![trigger page_ptr2page_index(pa)]
             page_ptr_2m_valid(pa) ==> page_index_2m_valid(page_ptr2page_index(pa)),
 
+        // forall|i:usize, j:usize|
+        //     #![trigger page_index_1g_valid(i), page_index_1g_valid(j)]
+        //     page_index_1g_valid(i) && i < j < i + 0x40000
+        //     ==>
+        //     !page_index_1g_valid(j),
         // forall|pa:PagePtr, i:usize| 
         //     #![trigger spec_page_index_truncate_1g((pa + i) as usize)]
         //     page_ptr_1g_valid(pa) && 0 <= i < 0x40000 ==> spec_page_index_truncate_1g((pa + i) as usize) == spec_page_index_truncate_1g(pa),

@@ -93,7 +93,7 @@ verus! {
             &&&
             forall|i:usize| 
                 #![trigger self.page_array@[i as int]]
-                #![trigger page_index2page_ptr(i)]
+                // #![trigger page_index2page_ptr(i)]
                 0<=i<NUM_PAGES ==> self.page_array@[i as int].addr == page_index2page_ptr(i)
             &&&
             forall|i:int| 
@@ -369,20 +369,21 @@ verus! {
         }
 
         pub open spec fn hugepages_wf(&self) -> bool {
+            // true
             &&&
-            forall|i:int, j:int|
-                #![trigger self.page_array@[i].state, self.page_array@[j].state]
-                0 <= i < NUM_PAGES && (self.page_array@[i].state == PageState::Mapped1g || self.page_array@[i].state == PageState::Free1g || self.page_array@[i].state == PageState::Allocated1g)
+            forall|i:usize, j:usize|
+                #![trigger self.page_array@[i as int].state, self.page_array@[j as int].state]
+                0 <= i < NUM_PAGES && page_index_1g_valid(i) && (self.page_array@[i as int].state == PageState::Mapped1g || self.page_array@[i as int].state == PageState::Free1g || self.page_array@[i as int].state == PageState::Allocated1g)
                 && i < j < i + 0x40000
                 ==>
-                self.page_array@[j].state == PageState::Merged1g
+                self.page_array@[j as int].state == PageState::Merged1g
             &&&
-            forall|i:int, j:int|
-                #![trigger self.page_array@[i].state, self.page_array@[j].state]
-                0 <= i < NUM_PAGES && (self.page_array@[i].state == PageState::Mapped2m || self.page_array@[i].state == PageState::Free2m || self.page_array@[i].state == PageState::Allocated2m)
+            forall|i:usize, j:usize|
+                #![trigger  self.page_array@[i as int].state, self.page_array@[j as int].state]
+                0 <= i < NUM_PAGES && page_index_2m_valid(i) && (self.page_array@[i as int].state == PageState::Mapped2m || self.page_array@[i as int].state == PageState::Free2m || self.page_array@[i as int].state == PageState::Allocated2m)
                 && i < j < i + 0x200
                 ==>
-                self.page_array@[j].state == PageState::Merged2m
+                self.page_array@[j as int].state == PageState::Merged2m
         }
 
         pub open spec fn perm_wf(&self) -> bool{
@@ -478,6 +479,7 @@ verus! {
             ensures
                 self.wf(),
                 self.free_pages_4k() =~= old(self).free_pages_4k(),
+                // self.free_pages_2m() =~= old(self).free_pages_2m(),
                 self.free_pages_2m() =~= old(self).free_pages_2m().remove(ret.0),
                 self.free_pages_1g() =~= old(self).free_pages_1g(),
                 self.allocated_pages_4k() =~= old(self).allocated_pages_4k(),
@@ -514,7 +516,9 @@ verus! {
             // assert(self.mapped_pages_4k_wf()) ;
             // assert(self.mapped_pages_2m_wf());
             // assert(self.mapped_pages_1g_wf());
-            // assert(self.merged_pages_wf());
+            assert(self.merged_pages_wf()) by {
+                page_ptr_page_index_truncate_lemma();
+            };
             // assert(self.hugepages_wf());
             // assert(self.perm_wf());
             return (ret, Tracked(ret_perm));
