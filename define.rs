@@ -62,7 +62,9 @@ pub enum PageType {
 #[allow(inconsistent_fields)]
 #[derive(Clone, Copy, Debug)]
 pub enum PageState {
-    Unavailable,
+    Unavailable4k,
+    Unavailable2m,
+    Unavailable1g,
     Pagetable,
     Allocated4k,
     Allocated2m,

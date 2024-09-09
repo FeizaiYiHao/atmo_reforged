@@ -370,7 +370,7 @@ use crate::lemma::lemma_u::*;
 
         pub fn push(&mut self, new_value: &T) -> (free_node_index : SLLIndex)
             requires old(self).wf(),
-                    old(self).len() < old(self).size,
+                    old(self).len() < N,
                     old(self).unique(),
                     old(self)@.contains(*new_value) == false,
                     N > 2,
@@ -378,7 +378,6 @@ use crate::lemma::lemma_u::*;
                     self.wf(),
                     self@ == old(self)@.push(*new_value),
                     self.len() == old(self).len() + 1,
-                    self@ == old(self)@.push(*new_value),
                     forall|index:SLLIndex|
                         #![trigger old(self).node_ref_valid(index)]
                         #![trigger self.node_ref_valid(index)]
