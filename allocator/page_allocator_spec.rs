@@ -93,8 +93,8 @@ verus! {
             self.page_array.wf()
             &&&
             forall|i:usize| 
-                #![trigger self.page_array@[i as int]]
-                // #![trigger page_index2page_ptr(i)]
+                #![trigger self.page_array@[i as int].addr]
+                #![trigger page_index2page_ptr(i)]
                 0<=i<NUM_PAGES ==> self.page_array@[i as int].addr == page_index2page_ptr(i)
             &&&
             forall|i:int| 
@@ -361,41 +361,41 @@ verus! {
 
         pub open spec fn merged_pages_wf(&self) -> bool{
             &&&
-            forall|i:int|
-                #![trigger page_index_2m_valid(self.page_array@[i].addr)]
-                #![trigger spec_page_index_truncate_2m(self.page_array@[i].addr)]
-                0 <= i < NUM_PAGES && self.page_array@[i].state == PageState::Merged2m
+            forall|i:usize|
+                #![trigger page_index_2m_valid(i)]
+                #![trigger spec_page_index_truncate_2m(i)]
+                0 <= i < NUM_PAGES && self.page_array@[i as int].state == PageState::Merged2m
                 ==>
-                page_index_2m_valid(self.page_array@[i].addr) == false
+                page_index_2m_valid(i) == false
                 &&( 
-                    self.page_array@[spec_page_index_truncate_2m(self.page_array@[i].addr) as int].state == PageState::Mapped2m
+                    self.page_array@[spec_page_index_truncate_2m(i) as int].state == PageState::Mapped2m
                     ||   
-                    self.page_array@[spec_page_index_truncate_2m(self.page_array@[i].addr) as int].state == PageState::Free2m
+                    self.page_array@[spec_page_index_truncate_2m(i) as int].state == PageState::Free2m
                     ||   
-                    self.page_array@[spec_page_index_truncate_2m(self.page_array@[i].addr) as int].state == PageState::Allocated2m
+                    self.page_array@[spec_page_index_truncate_2m(i) as int].state == PageState::Allocated2m
                     ||   
-                    self.page_array@[spec_page_index_truncate_2m(self.page_array@[i].addr) as int].state == PageState::Unavailable2m
+                    self.page_array@[spec_page_index_truncate_2m(i) as int].state == PageState::Unavailable2m
                 )        
                 &&
-                self.page_array@[i].is_io_page == self.page_array@[spec_page_index_truncate_2m(self.page_array@[i].addr) as int].is_io_page    
+                self.page_array@[i as int].is_io_page == self.page_array@[spec_page_index_truncate_2m(i) as int].is_io_page    
             &&&
-                forall|i:int|
-                    #![trigger page_index_1g_valid(self.page_array@[i].addr)]
-                    #![trigger spec_page_index_truncate_1g(self.page_array@[i].addr)]
-                    0 <= i < NUM_PAGES && self.page_array@[i].state == PageState::Merged1g
+                forall|i:usize|
+                    #![trigger page_index_1g_valid(i)]
+                    #![trigger spec_page_index_truncate_1g(i)]
+                    0 <= i < NUM_PAGES && self.page_array@[i as int].state == PageState::Merged1g
                     ==>
-                    page_index_1g_valid(self.page_array@[i].addr) == false
+                    page_index_1g_valid(i) == false
                     &&( 
-                        self.page_array@[spec_page_index_truncate_1g(self.page_array@[i].addr) as int].state == PageState::Mapped1g
+                        self.page_array@[spec_page_index_truncate_1g(i) as int].state == PageState::Mapped1g
                         ||   
-                        self.page_array@[spec_page_index_truncate_1g(self.page_array@[i].addr) as int].state == PageState::Free1g
+                        self.page_array@[spec_page_index_truncate_1g(i) as int].state == PageState::Free1g
                         ||   
-                        self.page_array@[spec_page_index_truncate_1g(self.page_array@[i].addr) as int].state == PageState::Allocated1g
+                        self.page_array@[spec_page_index_truncate_1g(i) as int].state == PageState::Allocated1g
                         ||   
-                        self.page_array@[spec_page_index_truncate_1g(self.page_array@[i].addr) as int].state == PageState::Unavailable1g
+                        self.page_array@[spec_page_index_truncate_1g(i) as int].state == PageState::Unavailable1g
                     )
                     &&
-                    self.page_array@[i].is_io_page == self.page_array@[spec_page_index_truncate_1g(self.page_array@[i].addr) as int].is_io_page
+                    self.page_array@[i as int].is_io_page == self.page_array@[spec_page_index_truncate_1g(i) as int].is_io_page
                     
         }
 
@@ -403,8 +403,8 @@ verus! {
             // true
             &&&
             forall|i:usize, j:usize|
-                #![trigger self.page_array@[i as int].state, self.page_array@[j as int].state]
-                #![trigger self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
+                #![trigger page_index_1g_valid(i), self.page_array@[i as int].state, self.page_array@[j as int].state]
+                #![trigger page_index_1g_valid(i), self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
                 0 <= i < NUM_PAGES && page_index_1g_valid(i) && (self.page_array@[i as int].state == PageState::Mapped1g || self.page_array@[i as int].state == PageState::Free1g || self.page_array@[i as int].state == PageState::Allocated1g || self.page_array@[i as int].state == PageState::Unavailable1g)
                 && i < j < i + 0x40000
                 ==>
@@ -413,8 +413,8 @@ verus! {
                 self.page_array@[i as int].is_io_page == self.page_array@[j as int].is_io_page
             &&&
             forall|i:usize, j:usize|
-                #![trigger  self.page_array@[i as int].state, self.page_array@[j as int].state]
-                #![trigger self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
+                #![trigger page_index_2m_valid(i), self.page_array@[i as int].state, self.page_array@[j as int].state]
+                #![trigger page_index_2m_valid(i), self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
                 0 <= i < NUM_PAGES && page_index_2m_valid(i) && (self.page_array@[i as int].state == PageState::Mapped2m || self.page_array@[i as int].state == PageState::Free2m || self.page_array@[i as int].state == PageState::Allocated2m || self.page_array@[i as int].state == PageState::Unavailable2m)
                 && i < j < i + 0x200
                 ==>
@@ -495,14 +495,33 @@ verus! {
                     ==>
                     page_index_1g_valid(i),
         {
-            page_ptr_lemma();            
+            page_ptr_lemma();   
+            page_ptr_2m_lemma();     
+            page_ptr_1g_lemma();           
             assert(
                 forall|i:usize|
                     #![trigger self.page_array@[i as int].state]
+                    #![trigger page_index_1g_valid(i)]
                     0 <= i < NUM_PAGES && (self.page_array@[i as int].state == PageState::Mapped1g || self.page_array@[i as int].state == PageState::Free1g || self.page_array@[i as int].state == PageState::Allocated1g)
                     ==>
                     page_index_1g_valid(i)
             ) by {
+                assert(
+                    forall|i:usize|
+                        #![trigger self.page_array@[i as int].state]
+                        #![trigger page_index_valid(i)]
+                        0 <= i < NUM_PAGES && (self.page_array@[i as int].state == PageState::Mapped1g || self.page_array@[i as int].state == PageState::Free1g || self.page_array@[i as int].state == PageState::Allocated1g)
+                        ==>
+                        page_index_valid(i)
+                );
+                assert(
+                    forall|i:usize|
+                        #![trigger self.page_array@[i as int].state]
+                        #![trigger page_index_2m_valid(i)]
+                        0 <= i < NUM_PAGES && (self.page_array@[i as int].state == PageState::Mapped1g || self.page_array@[i as int].state == PageState::Free1g || self.page_array@[i as int].state == PageState::Allocated1g)
+                        ==>
+                        page_index_2m_valid(i)
+                );
             };
         }
         
@@ -514,6 +533,8 @@ verus! {
                 self.allocated_pages_4k().contains(ptr) ==> self.free_pages_4k().len() < NUM_PAGES,
         {
             page_ptr_lemma();
+            page_ptr_2m_lemma();
+            page_ptr_1g_lemma();
             seq_skip_lemma::<PagePtr>();
             self.free_pages_1g.wf_to_no_duplicates();
             self.free_pages_2m.wf_to_no_duplicates();
@@ -584,26 +605,72 @@ verus! {
                 self.free_pages_4k.wf_to_no_duplicates();
             }
             let ret = self.free_pages_2m.pop().0;
-            assert(page_ptr_valid(ret));
+            assert(page_ptr_valid(ret)) by {page_ptr_2m_lemma();};
             self.set_state(page_ptr2page_index(ret), PageState::Allocated2m);
             proof{
                 self.allocated_pages_2m@ = self.allocated_pages_2m@.insert(ret);
             }
             let tracked mut ret_perm = self.page_perms_2m.borrow_mut().tracked_remove(ret);
-            // assert(self.page_array_wf());
-            // assert(self.free_pages_4k_wf());
-            // assert(self.free_pages_2m_wf());
-            // assert(self.free_pages_1g_wf());
-            // assert(self.allocated_pages_4k_wf());
-            // assert(self.allocated_pages_2m_wf());
-            // assert(self.allocated_pages_1g_wf());
-            // assert(self.mapped_pages_4k_wf()) ;
-            // assert(self.mapped_pages_2m_wf());
-            // assert(self.mapped_pages_1g_wf());
+            assert(self.page_array_wf());
+            assert(self.free_pages_4k_wf());
+            assert(self.free_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.free_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.allocated_pages_4k_wf());
+            assert(self.allocated_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.allocated_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.mapped_pages_4k_wf()) ;
+            assert(self.mapped_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.mapped_pages_1g_wf()) by {page_ptr_1g_lemma();};
             assert(self.merged_pages_wf()) by {
                 page_ptr_page_index_truncate_lemma();
             };
-            // assert(self.hugepages_wf());
+            assert(self.hugepages_wf()) by {
+                page_index_lemma();
+                page_ptr_2m_lemma();
+                page_ptr_1g_lemma();
+                assert(            
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_2m_valid(i), page_index_valid(j)]
+                    0 <= i < NUM_PAGES && page_index_2m_valid(i) 
+                    && i < j < i + 0x200
+                    ==>
+                    page_index_valid(j));  
+                assert(
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_2m_valid(i), page_index_valid(j)]
+                    #![trigger page_index_2m_valid(i), self.page_array@[i as int].state, self.page_array@[j as int].state]
+                    #![trigger page_index_2m_valid(i), self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
+                    0 <= i < NUM_PAGES && page_index_2m_valid(i) 
+                    && i < j < i + 0x200 && j != page_ptr2page_index(ret) && i != page_ptr2page_index(ret) 
+                    ==>
+                    self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                    &&
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                );
+                assert(            
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_1g_valid(i), page_index_valid(j)]
+                    0 <= i < NUM_PAGES && page_index_1g_valid(i) 
+                    && i < j < i + 0x40000
+                    ==>
+                    page_index_valid(j));  
+                assert(
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_1g_valid(i), page_index_valid(j)]
+                    #![trigger page_index_1g_valid(i), self.page_array@[i as int], self.page_array@[j as int]]
+                    #![trigger page_index_1g_valid(i), self.page_array@[i as int], self.page_array@[j as int]]
+                    0 <= i < NUM_PAGES && page_index_1g_valid(i) 
+                    && i < j < i + 0x40000 && j != page_ptr2page_index(ret) && i != page_ptr2page_index(ret) 
+                    ==>
+                    self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                    &&
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                );           
+            };
             // assert(self.perm_wf());
             return (ret, Tracked(ret_perm));
         }
@@ -640,7 +707,7 @@ verus! {
                 self.free_pages_4k.wf_to_no_duplicates();
                 self.len_lemma(target_ptr);
             }
-            assert(page_ptr_valid(target_ptr));
+            assert(page_ptr_valid(target_ptr)) by {page_ptr_2m_lemma();};
             let rev_index = self.free_pages_2m.push(&target_ptr);
             self.set_rev_pointer(page_ptr2page_index(target_ptr), rev_index);
             self.set_state(page_ptr2page_index(target_ptr), PageState::Free2m);
@@ -649,19 +716,81 @@ verus! {
                 self.page_perms_2m.borrow_mut().tracked_insert(target_ptr, target_perm);
             }
 
-                // assert(self.page_array_wf());
-                // assert(self.free_pages_4k_wf());
-                // assert(self.free_pages_2m_wf());
-                // assert(self.free_pages_1g_wf());
-                // assert(self.allocated_pages_4k_wf());
-                // assert(self.allocated_pages_2m_wf());
-                // assert(self.allocated_pages_1g_wf());
-                // assert(self.mapped_pages_4k_wf()) ;
-                // assert(self.mapped_pages_2m_wf());
-                // assert(self.mapped_pages_1g_wf());
-                assert(self.merged_pages_wf()) by {
-                    page_ptr_page_index_truncate_lemma();
-                };
+            assert(self.page_array_wf());
+            assert(self.free_pages_4k_wf());
+            assert(self.free_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.free_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.allocated_pages_4k_wf());
+            assert(self.allocated_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.allocated_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.mapped_pages_4k_wf()) ;
+            assert(self.mapped_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.mapped_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.merged_pages_wf()) by {
+                page_ptr_page_index_truncate_lemma();
+            };
+            assert(self.hugepages_wf()) by {
+                page_index_lemma();
+                page_ptr_2m_lemma();
+                page_ptr_1g_lemma();
+                assert(
+                    forall|i:usize|
+                    #![trigger page_index_2m_valid(i)]
+                    #![trigger self.page_array@[i as int].state]
+                    #![trigger old(self).page_array@[i as int].state]
+                    #![trigger self.page_array@[i as int].is_io_page]
+                    #![trigger old(self).page_array@[i as int].is_io_page]
+                    0 <= i < NUM_PAGES && i != page_ptr2page_index(target_ptr) 
+                    ==>
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[i as int].state == old(self).page_array@[i as int].state 
+                );
+                // assert(            
+                //     forall|i:usize, j:usize|
+                //     #![trigger page_index_2m_valid(i), page_index_valid(j)]
+                //     0 <= i < NUM_PAGES && page_index_2m_valid(i) 
+                //     && i < j < i + 0x200
+                //     ==>
+                //     page_index_valid(j));  
+                assert(
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_2m_valid(i), page_index_valid(j)]
+                    #![trigger page_index_2m_valid(i), self.page_array@[i as int].state, self.page_array@[j as int].state]
+                    #![trigger page_index_2m_valid(i), self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
+                    0 <= i < NUM_PAGES && page_index_2m_valid(i) 
+                    && i < j < i + 0x200 && j != page_ptr2page_index(target_ptr) && i != page_ptr2page_index(target_ptr) 
+                    ==>
+                    self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                    &&
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                );
+                // assert(            
+                //     forall|i:usize, j:usize|
+                //     #![trigger page_index_1g_valid(i), page_index_valid(j)]
+                //     0 <= i < NUM_PAGES && page_index_1g_valid(i) 
+                //     && i < j < i + 0x40000
+                //     ==>
+                //     page_index_valid(j));              
+                assert(
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_1g_valid(i), page_index_valid(j)]
+                    #![trigger page_index_1g_valid(i), self.page_array@[i as int].state, self.page_array@[j as int].state]
+                    #![trigger page_index_1g_valid(i), self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
+                    0 <= i < NUM_PAGES && page_index_1g_valid(i) 
+                    && i < j < i + 0x40000 && j != page_ptr2page_index(target_ptr) && i != page_ptr2page_index(target_ptr) 
+                    ==>
+                    page_index_valid(j)
+                    &&
+                    self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                    &&
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                );
+            };
         }
 
         pub fn alloc_page_4k(&mut self) 
@@ -704,21 +833,80 @@ verus! {
             let tracked mut ret_perm = self.page_perms_4k.borrow_mut().tracked_remove(ret);
             assert(self.page_array_wf());
             assert(self.free_pages_4k_wf());
-            assert(self.free_pages_2m_wf());
-            assert(self.free_pages_1g_wf());
+            assert(self.free_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.free_pages_1g_wf()) by {page_ptr_1g_lemma();};
             assert(self.allocated_pages_4k_wf());
-            assert(self.allocated_pages_2m_wf());
-            assert(self.allocated_pages_1g_wf());
+            assert(self.allocated_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.allocated_pages_1g_wf()) by {page_ptr_1g_lemma();};
             assert(self.mapped_pages_4k_wf()) ;
-            assert(self.mapped_pages_2m_wf());
-            assert(self.mapped_pages_1g_wf());
+            assert(self.mapped_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.mapped_pages_1g_wf()) by {page_ptr_1g_lemma();};
             assert(self.merged_pages_wf()) by {
                 page_ptr_page_index_truncate_lemma();
             };
-            assert(self.hugepages_wf());
+            assert(self.hugepages_wf()) by {
+                page_index_lemma();
+                page_ptr_2m_lemma();
+                page_ptr_1g_lemma();
+                assert(            
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_2m_valid(i), page_index_valid(j)]
+                    0 <= i < NUM_PAGES && page_index_2m_valid(i) 
+                    && i < j < i + 0x200
+                    ==>
+                    page_index_valid(j));  
+                assert(
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_2m_valid(i), self.page_array@[i as int].state, self.page_array@[j as int].state]
+                    #![trigger page_index_2m_valid(i), self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
+                    0 <= i < NUM_PAGES && page_index_2m_valid(i) && (self.page_array@[i as int].state == PageState::Mapped1g || self.page_array@[i as int].state == PageState::Free1g || self.page_array@[i as int].state == PageState::Allocated1g || self.page_array@[i as int].state == PageState::Unavailable1g)
+                    && i < j < i + 0x200 && j != page_ptr2page_index(ret) && i != page_ptr2page_index(ret) 
+                    ==>
+                    self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                    &&
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                );
+                assert(            
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_1g_valid(i), page_index_valid(j)]
+                    0 <= i < NUM_PAGES && page_index_1g_valid(i) 
+                    && i < j < i + 0x40000
+                    ==>
+                    page_index_valid(j));        
+                assert(
+                        forall|i:usize, j:usize|
+                        #![trigger page_index_1g_valid(i), page_index_valid(j)]
+                        #![trigger page_index_1g_valid(i), self.page_array@[i as int], self.page_array@[j as int]]
+                        #![trigger page_index_1g_valid(i), self.page_array@[i as int], self.page_array@[j as int]]
+                        0 <= i < NUM_PAGES && page_index_1g_valid(i) 
+                        && i < j < i + 0x40000 && j != page_ptr2page_index(ret) && i != page_ptr2page_index(ret) 
+                        ==>
+                        self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                        &&
+                        self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                        &&
+                        self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                    );        
+                assert(
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_1g_valid(i), self.page_array@[i as int].state, self.page_array@[j as int].state]
+                    #![trigger page_index_1g_valid(i), self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
+                    0 <= i < NUM_PAGES && page_index_1g_valid(i) && (self.page_array@[i as int].state == PageState::Mapped1g || self.page_array@[i as int].state == PageState::Free1g || self.page_array@[i as int].state == PageState::Allocated1g || self.page_array@[i as int].state == PageState::Unavailable1g)
+                    && i < j < i + 0x40000 && j != page_ptr2page_index(ret) && i != page_ptr2page_index(ret) 
+                    ==>
+                    self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                    &&
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                );
+            };
             assert(self.perm_wf());
             return (ret, Tracked(ret_perm));
         }
+
         pub fn free_page_4k(&mut self, target_ptr:PagePtr, Tracked(target_perm): Tracked<PagePerm4k>) 
             requires 
                 old(self).wf(),
@@ -759,20 +947,167 @@ verus! {
                 self.allocated_pages_4k@ = self.allocated_pages_4k@.remove(target_ptr);
                 self.page_perms_4k.borrow_mut().tracked_insert(target_ptr, target_perm);
             }
+            assert(self.page_array_wf());
+            assert(self.free_pages_4k_wf());
+            assert(self.free_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.free_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.allocated_pages_4k_wf());
+            assert(self.allocated_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.allocated_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.mapped_pages_4k_wf()) ;
+            assert(self.mapped_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.mapped_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.merged_pages_wf()) by {
+                page_ptr_page_index_truncate_lemma();
+            };
+            assert(self.hugepages_wf()) by {
+                page_index_lemma();
+                page_ptr_2m_lemma();
+                page_ptr_1g_lemma();
+                assert(            
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_2m_valid(i), page_index_valid(j)]
+                    0 <= i < NUM_PAGES && page_index_2m_valid(i) 
+                    && i < j < i + 0x200
+                    ==>
+                    page_index_valid(j));  
+                assert(
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_2m_valid(i), page_index_valid(j)]
+                    #![trigger page_index_2m_valid(i), self.page_array@[i as int].state, self.page_array@[j as int].state]
+                    #![trigger page_index_2m_valid(i), self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
+                    0 <= i < NUM_PAGES && page_index_2m_valid(i) 
+                    && i < j < i + 0x200 && j != page_ptr2page_index(target_ptr) && i != page_ptr2page_index(target_ptr) 
+                    ==>
+                    self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                    &&
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                );
+                assert(            
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_1g_valid(i), page_index_valid(j)]
+                    0 <= i < NUM_PAGES && page_index_1g_valid(i) 
+                    && i < j < i + 0x40000
+                    ==>
+                    page_index_valid(j));  
+                assert(
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_1g_valid(i), page_index_valid(j)]
+                    #![trigger page_index_1g_valid(i), self.page_array@[i as int], self.page_array@[j as int]]
+                    #![trigger page_index_1g_valid(i), self.page_array@[i as int], self.page_array@[j as int]]
+                    0 <= i < NUM_PAGES && page_index_1g_valid(i) 
+                    && i < j < i + 0x40000 && j != page_ptr2page_index(target_ptr) && i != page_ptr2page_index(target_ptr) 
+                    ==>
+                    self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                    &&
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                );           
+            };
+            assert(self.perm_wf());
+        }
 
-                // assert(self.page_array_wf());
-                // assert(self.free_pages_4k_wf());
-                // assert(self.free_pages_2m_wf());
-                // assert(self.free_pages_1g_wf());
-                // assert(self.allocated_pages_4k_wf());
-                // assert(self.allocated_pages_2m_wf());
-                // assert(self.allocated_pages_1g_wf());
-                // assert(self.mapped_pages_4k_wf()) ;
-                // assert(self.mapped_pages_2m_wf());
-                // assert(self.mapped_pages_1g_wf());
-                assert(self.merged_pages_wf()) by {
-                    page_ptr_page_index_truncate_lemma();
-                };
+        pub fn alloc_and_map_4k(&mut self, pcid: Pcid, va: VAddr)
+            requires
+                old(self).wf(),
+                old(self).free_pages_4k.len() > 0
+        {
+            proof{
+                page_ptr_lemma();
+                seq_skip_lemma::<PagePtr>();
+                self.free_pages_1g.wf_to_no_duplicates();
+                self.free_pages_2m.wf_to_no_duplicates();
+                self.free_pages_4k.wf_to_no_duplicates();
+            }
+            let ret = self.free_pages_4k.pop().0;
+            assert(page_ptr_valid(ret));
+            self.set_state(page_ptr2page_index(ret), PageState::Mapped4k);
+            self.set_ref_count(page_ptr2page_index(ret), 1);
+            self.set_mapping(page_ptr2page_index(ret), Ghost(Set::<(Pcid,VAddr)>::empty().insert((pcid,va))));
+            self.set_io_mapping(page_ptr2page_index(ret), Ghost(Set::<(IOid,VAddr)>::empty()));
+            assert(self.page_array@[page_ptr2page_index(ret) as int].is_io_page == false);
+            proof{
+                self.mapped_pages_4k@ = self.mapped_pages_4k@.insert(ret);
+            }
+
+            assert(self.page_array_wf());
+            assert(self.free_pages_4k_wf());
+            assert(self.free_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.free_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.allocated_pages_4k_wf());
+            assert(self.allocated_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.allocated_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.mapped_pages_4k_wf()) ;
+            assert(self.mapped_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.mapped_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.merged_pages_wf()) by {
+                page_ptr_page_index_truncate_lemma();
+            };
+            assert(self.hugepages_wf()) by {
+                page_index_lemma();
+                page_ptr_2m_lemma();
+                page_ptr_1g_lemma();
+                assert(
+                    forall|i:usize|
+                    #![trigger page_index_2m_valid(i)]
+                    #![trigger self.page_array@[i as int].state]
+                    #![trigger old(self).page_array@[i as int].state]
+                    #![trigger self.page_array@[i as int].is_io_page]
+                    #![trigger old(self).page_array@[i as int].is_io_page]
+                    0 <= i < NUM_PAGES && i != page_ptr2page_index(ret) 
+                    ==>
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[i as int].state == old(self).page_array@[i as int].state 
+                );
+                // assert(            
+                //     forall|i:usize, j:usize|
+                //     #![trigger page_index_2m_valid(i), page_index_valid(j)]
+                //     0 <= i < NUM_PAGES && page_index_2m_valid(i) 
+                //     && i < j < i + 0x200
+                //     ==>
+                //     page_index_valid(j));  
+                assert(
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_2m_valid(i), page_index_valid(j)]
+                    #![trigger page_index_2m_valid(i), self.page_array@[i as int].state, self.page_array@[j as int].state]
+                    #![trigger page_index_2m_valid(i), self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
+                    0 <= i < NUM_PAGES && page_index_2m_valid(i) 
+                    && i < j < i + 0x200 && j != page_ptr2page_index(ret) && i != page_ptr2page_index(ret) 
+                    ==>
+                    self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                    &&
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                );
+                // assert(            
+                //     forall|i:usize, j:usize|
+                //     #![trigger page_index_1g_valid(i), page_index_valid(j)]
+                //     0 <= i < NUM_PAGES && page_index_1g_valid(i) 
+                //     && i < j < i + 0x40000
+                //     ==>
+                //     page_index_valid(j));              
+                assert(
+                    forall|i:usize, j:usize|
+                    #![trigger page_index_1g_valid(i), page_index_valid(j)]
+                    #![trigger page_index_1g_valid(i), self.page_array@[i as int].state, self.page_array@[j as int].state]
+                    #![trigger page_index_1g_valid(i), self.page_array@[i as int].is_io_page, self.page_array@[j as int].is_io_page]
+                    0 <= i < NUM_PAGES && page_index_1g_valid(i) 
+                    && i < j < i + 0x40000 && j != page_ptr2page_index(ret) && i != page_ptr2page_index(ret) 
+                    ==>
+                    page_index_valid(j)
+                    &&
+                    self.page_array@[j as int].state == old(self).page_array@[j as int].state
+                    &&
+                    self.page_array@[i as int].is_io_page == old(self).page_array@[i as int].is_io_page 
+                    &&
+                    self.page_array@[j as int].is_io_page == old(self).page_array@[j as int].is_io_page 
+                );
+            };
         }
     }
 }
