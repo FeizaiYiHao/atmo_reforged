@@ -9,6 +9,7 @@ pub type ThreadPtr = usize;
 pub type ProcPtr = usize;
 pub type EndpointIdx = usize;
 pub type EndpointPtr = usize;
+pub type ContainerPtr = usize;
 
 pub type PagePtr = usize;
 pub type PagePerm4k = PointsTo<[u8; PAGE_SZ_4k]>;
@@ -41,7 +42,6 @@ pub enum ThreadState {
     SCHEDULED,
     BLOCKED,
     RUNNING,
-    CALLING,
     TRANSIT,
 }
 
@@ -142,6 +142,10 @@ pub const PAGE_ENTRY_WRITE_MASK:u64 = 0x1u64<<PAGE_ENTRY_WRITE_SHIFT;
 pub const PAGE_ENTRY_USER_MASK:u64 = 0x1u64<<PAGE_ENTRY_USER_SHIFT;
 pub const PAGE_ENTRY_PS_MASK:u64 = 0x1u64<<PAGE_ENTRY_PS_SHIFT;
 pub const PAGE_ENTRY_EXECUTE_MASK:u64 = 0x1u64<<PAGE_ENTRY_EXECUTE_SHIFT;
+
+
+pub const CONTAINER_PROC_LIST_LEN:usize = 10;
+pub const CONTAINER_CHILD_LIST_LEN:usize = 10;
 // -------------------- End of Const --------------------
 
 // -------------------- Begin of Structs --------------------
