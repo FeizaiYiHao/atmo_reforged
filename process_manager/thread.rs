@@ -5,6 +5,7 @@ verus! {
     use crate::array::*;
 
     pub struct Thread{
+        pub owning_container: ContainerPtr,
         pub owning_proc: ProcPtr,
         pub state: ThreadState,
     
@@ -13,9 +14,11 @@ verus! {
         
         pub blocking_endpoint_ptr: Option<EndpointPtr>,
         pub endpoint_rev_ptr: Option<SLLIndex>,
+
+        pub running_cpu: Option<CpuId>,
         
-        pub endpoint_descriptors: Array<EndpointPtr,MAX_NUM_ENDPOINT_DESCRIPTORS>,
-        pub ipc_payload: IPCPayLoad,
+        pub endpoint_descriptors: Array<Option<EndpointPtr>,MAX_NUM_ENDPOINT_DESCRIPTORS>,
+        pub ipc_payload: Option<IPCPayLoad>,
         
         pub error_code: Option<ErrorCodeType>, //this will only be set when it comes out of endpoint and goes to scheduler.
         
@@ -24,7 +27,6 @@ verus! {
 
     #[derive(Clone, Copy, Debug)]
     pub struct IPCPayLoad{
-        pub calling: bool,
         pub message: Option<(VAddr,usize)>,
         pub page_payload: Option<(VAddr, usize)>,
         pub endpoint_payload: Option<EndpointIdx>,
@@ -33,14 +35,12 @@ verus! {
     impl IPCPayLoad {
         pub fn new_to_none() -> (ret:Self)
             ensures
-                ret.calling == false,
                 ret.message.is_None(),
                 ret.page_payload.is_None(),
                 ret.endpoint_payload.is_None(),
                 ret.pci_payload.is_None(),
         {
             Self{
-                calling: false,
                 message: None,
                 page_payload: None,
                 endpoint_payload: None,

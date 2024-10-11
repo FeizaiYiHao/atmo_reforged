@@ -505,6 +505,16 @@ use crate::lemma::lemma_u::*;
                     #![trigger self.node_ref_resolve(index)]
                     #![trigger old(self).node_ref_resolve(index)]
                     old(self).node_ref_valid(index) && index != ret.1 ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret.0 
+                    ==> 
+                    self.node_ref_valid(index)
+                    &&
+                    self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
                 self.unique(),
         {
             proof{
@@ -604,6 +614,16 @@ use crate::lemma::lemma_u::*;
                     #![trigger self.node_ref_resolve(index)]
                     #![trigger old(self).node_ref_resolve(index)]
                     old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
+                    ==> 
+                    self.node_ref_valid(index)
+                    &&
+                    self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
                 self.unique(),
                 self@ =~= old(self)@.remove_value(ret),
         {
@@ -653,6 +673,16 @@ use crate::lemma::lemma_u::*;
                     #![trigger self.node_ref_resolve(index)]
                     #![trigger old(self).node_ref_resolve(index)]
                     old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
+                    ==> 
+                    self.node_ref_valid(index)
+                    &&
+                    self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
                 self.unique(),
                 self@ =~= old(self)@.remove_value(ret),
         {
@@ -703,6 +733,16 @@ use crate::lemma::lemma_u::*;
                     #![trigger self.node_ref_resolve(index)]
                     #![trigger old(self).node_ref_resolve(index)]
                     old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
+                    ==> 
+                    self.node_ref_valid(index)
+                    &&
+                    self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
                 self.unique(),
                 self@ =~= old(self)@.remove_value(ret),
         {
@@ -753,6 +793,16 @@ use crate::lemma::lemma_u::*;
                     #![trigger self.node_ref_resolve(index)]
                     #![trigger old(self).node_ref_resolve(index)]
                     old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
+                    ==> 
+                    self.node_ref_valid(index)
+                    &&
+                    self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
                 self.unique(),
                 self@ =~= old(self)@.remove_value(ret),
         {
@@ -809,6 +859,16 @@ use crate::lemma::lemma_u::*;
                     #![trigger self.node_ref_resolve(index)]
                     #![trigger old(self).node_ref_resolve(index)]
                     old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
+                    ==> 
+                    self.node_ref_valid(index)
+                    &&
+                    self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
                 self.unique(),
                 self@ =~= old(self)@.remove_value(ret),
         {
@@ -860,6 +920,16 @@ use crate::lemma::lemma_u::*;
                     #![trigger self.node_ref_resolve(index)]
                     #![trigger old(self).node_ref_resolve(index)]
                     old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
+                    ==> 
+                    self.node_ref_valid(index)
+                    &&
+                    self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
                 self.unique(),
                 self@ =~= old(self)@.remove_value(ret),
         {
@@ -911,6 +981,16 @@ use crate::lemma::lemma_u::*;
                     #![trigger self.node_ref_resolve(index)]
                     #![trigger old(self).node_ref_resolve(index)]
                     old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
+                    ==> 
+                    self.node_ref_valid(index)
+                    &&
+                    self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
                 self.unique(),
                 self@ =~= old(self)@.remove_value(ret),
         {
@@ -968,6 +1048,16 @@ use crate::lemma::lemma_u::*;
                     #![trigger self.node_ref_resolve(index)]
                     #![trigger old(self).node_ref_resolve(index)]
                     old(self).node_ref_valid(index) && index != remove_index ==> self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
+                forall|index:SLLIndex|
+                    #![trigger old(self).node_ref_valid(index)]
+                    #![trigger self.node_ref_valid(index)]
+                    #![trigger old(self).node_ref_resolve(index)]
+                    #![trigger self.node_ref_resolve(index)]
+                    old(self).node_ref_valid(index) && old(self).node_ref_resolve(index) != ret
+                    ==> 
+                    self.node_ref_valid(index)
+                    &&
+                    self.node_ref_resolve(index) == old(self).node_ref_resolve(index),
                 self.unique(),
                 self@ =~= old(self)@.remove_value(ret),
         {

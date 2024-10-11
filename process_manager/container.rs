@@ -19,8 +19,6 @@ verus! {
         // pub mem_used_2m: usize,
         // pub mem_used_1g: usize,
 
-        pub owned_pages_4k: Ghost<Set<PagePtr>>,
-        
         pub owned_cpus: Array<bool,NUM_CPUS>,
         pub scheduler: StaticLinkedList<ThreadPtr,CONTAINER_CHILD_LIST_LEN>,
     }

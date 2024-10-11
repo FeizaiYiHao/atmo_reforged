@@ -7,7 +7,7 @@ pub mod array;
 pub mod slinkedlist;
 // pub mod pagetable;
 // pub mod allocator;
-pub mod process_manager;
+// pub mod process_manager;
 // pub mod pcid_alloc;
 
 pub mod lemma;
