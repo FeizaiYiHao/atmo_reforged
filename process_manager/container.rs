@@ -11,6 +11,8 @@ verus! {
         
         pub children_list: StaticLinkedList<ContainerPtr,CONTAINER_CHILD_LIST_LEN>,
 
+        pub endpoint_list: StaticLinkedList<EndpointPtr,CONTAINER_ENDPOINT_LIST_LEN>,
+
         pub mem_quota_4k: usize,
         // pub mem_quota_2m: usize,        
         // pub mem_quota_1g: usize,

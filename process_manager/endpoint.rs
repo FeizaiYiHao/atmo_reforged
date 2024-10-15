@@ -9,5 +9,8 @@ verus! {
     
         pub rf_counter: usize,
         pub owning_threads: Ghost<Set<ThreadPtr>>,
+
+        pub owning_container: ContainerPtr,
+        pub container_rev_ptr: SLLIndex,
     }
 }

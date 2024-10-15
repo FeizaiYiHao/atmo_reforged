@@ -147,6 +147,7 @@ pub const PAGE_ENTRY_EXECUTE_MASK:u64 = 0x1u64<<PAGE_ENTRY_EXECUTE_SHIFT;
 
 pub const CONTAINER_PROC_LIST_LEN:usize = 10;
 pub const CONTAINER_CHILD_LIST_LEN:usize = 10;
+pub const CONTAINER_ENDPOINT_LIST_LEN:usize = 10;
 // -------------------- End of Const --------------------
 
 // -------------------- Begin of Structs --------------------
