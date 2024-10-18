@@ -122,6 +122,33 @@ impl<const N: usize> Array<usize, N> {
     }
 }
 
+impl<T: Copy, const N: usize> Array<Option<T>, N> {
+
+    pub fn init2none(&mut self)
+        requires
+            old(self).wf(),
+            N <= usize::MAX,
+        ensures
+            forall|index:int| 0<= index < N ==> #[trigger] self@[index].is_None(),
+            self.wf(),
+    {
+        let mut i = 0;
+        for i in 0..N
+            invariant
+                N <= usize::MAX,
+                0<=i<=N,
+                self.wf(),
+                forall|j:int| #![auto] 0<=j<i ==> self@[j].is_None(),
+        {
+            let tmp:Ghost<Seq<Option<T>>> = Ghost(self@);
+            assert(forall|j:int| #![auto] 0<=j<i ==> self@[j].is_None());
+            self.set(i,None);
+            assert(self@ =~= tmp@.update(i as int,None));
+            assert(forall|j:int| #![auto] 0<=j<i ==> self@[j].is_None());
+        }
+    }
+}
+
 
     fn test<const N: usize>(ar: &mut Array<u64, N>)
     requires
