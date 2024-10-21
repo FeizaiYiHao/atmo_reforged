@@ -54,6 +54,28 @@ impl ProcessManager{
         proc
     }
 
+    pub open spec fn spec_get_proc_by_thread_ptr(&self, thread_ptr:ThreadPtr) -> &Process
+        recommends
+            self.wf(),
+            self.thread_perms@.dom().contains(thread_ptr),
+    {
+        &self.process_perms@[self.get_thread(thread_ptr).owning_proc].value()
+    }
+
+    #[verifier(when_used_as_spec(spec_get_proc_by_thread_ptr))]
+    pub fn get_proc_by_thread_ptr(&self, thread_ptr:ThreadPtr) ->(ret:&Process)
+        requires
+            self.wf(),
+            self.thread_perms@.dom().contains(thread_ptr),
+        ensures
+            ret =~= self.spec_get_proc_by_thread_ptr(thread_ptr),
+    {
+        let proc_ptr = self.get_thread(thread_ptr).owning_proc;
+        let tracked proc_perm = self.process_perms.borrow().tracked_borrow(proc_ptr);
+        let proc : &Process = PPtr::<Process>::from_usize(proc_ptr).borrow(Tracked(proc_perm));
+        proc
+    }
+
     pub open spec fn spec_get_thread(&self, thread_ptr:ThreadPtr) -> &Thread
         recommends
             self.wf(),
@@ -91,6 +113,50 @@ impl ProcessManager{
         ensures
             self.get_container(container_ptr) == ret,
     {
+        let tracked container_perm = self.container_perms.borrow().tracked_borrow(container_ptr);
+        let container : &Container = PPtr::<Container>::from_usize(container_ptr).borrow(Tracked(container_perm));
+        container
+    }
+
+    pub open spec fn spec_get_container_by_proc_ptr(&self, proc_ptr:ProcPtr) -> &Container
+        recommends
+            self.wf(),
+            self.process_perms@.dom().contains(proc_ptr),
+    {
+        &self.container_perms@[self.get_proc(proc_ptr).owning_container].value()
+    }
+
+    #[verifier(when_used_as_spec(spec_get_container_by_proc_ptr))]
+    pub fn get_container_by_proc_ptr(&self, proc_ptr:ProcPtr) -> (ret:&Container)
+        requires
+            self.wf(),
+            self.process_perms@.dom().contains(proc_ptr),
+        ensures
+            self.get_container_by_proc_ptr(proc_ptr) == ret,
+    {
+        let container_ptr = self.get_proc(proc_ptr).owning_container;
+        let tracked container_perm = self.container_perms.borrow().tracked_borrow(container_ptr);
+        let container : &Container = PPtr::<Container>::from_usize(container_ptr).borrow(Tracked(container_perm));
+        container
+    }
+
+    pub open spec fn spec_get_container_by_thread_ptr(&self, thread_ptr:ThreadPtr) -> &Container
+        recommends
+            self.wf(),
+            self.thread_perms@.dom().contains(thread_ptr),
+    {
+        &self.container_perms@[self.get_proc_by_thread_ptr(thread_ptr).owning_container].value()
+    }
+
+    #[verifier(when_used_as_spec(spec_get_container_by_thread_ptr))]
+    pub fn get_container_by_thread_ptr(&self, thread_ptr:ThreadPtr) -> (ret:&Container)
+        requires
+            self.wf(),
+            self.thread_perms@.dom().contains(thread_ptr),
+        ensures
+            self.get_container_by_thread_ptr(thread_ptr) == ret,
+    {
+        let container_ptr = self.get_proc_by_thread_ptr(thread_ptr).owning_container;
         let tracked container_perm = self.container_perms.borrow().tracked_borrow(container_ptr);
         let container : &Container = PPtr::<Container>::from_usize(container_ptr).borrow(Tracked(container_perm));
         container
@@ -533,15 +599,18 @@ impl ProcessManager{
             old(self).process_perms@.dom().contains(proc_ptr),
             old(self).page_closure().contains(page_ptr) == false,
             old(self).get_proc(proc_ptr).owned_threads.len() < MAX_NUM_THREADS_PER_PROC,
+            old(self).get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota > 0,
             old(self).get_container(old(self).get_proc(proc_ptr).owning_container).scheduler.len() < CONTAINER_SCHEDULER_LEN,
             page_perm@.is_init(),
             page_perm@.addr() == page_ptr,
         ensures
             self.wf(),
             self.page_closure() =~= old(self).page_closure().insert(page_ptr),
+            old(self).get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota - 1 == self.get_container(self.get_proc(proc_ptr).owning_container).mem_quota,
     {
         proof{seq_push_lemma::<ThreadPtr>();}
         let container_ptr = self.get_proc(proc_ptr).owning_container;
+        let old_mem_quota =  self.get_container(container_ptr).mem_quota;
         let mut proc_perm = Tracked(self.process_perms.borrow_mut().tracked_remove(proc_ptr));
         let proc_node_ref = proc_push_thread(proc_ptr,&mut proc_perm, &page_ptr);
         proof {
@@ -550,6 +619,7 @@ impl ProcessManager{
 
         let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
         let scheduler_node_ref = scheduler_push_thread(container_ptr,&mut container_perm, &page_ptr);
+        container_set_mem_quota(container_ptr,&mut container_perm, old_mem_quota - 1);
         proof {
             self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
         }
@@ -559,15 +629,15 @@ impl ProcessManager{
         proof {
             self.thread_perms.borrow_mut().tracked_insert(thread_ptr, thread_perm.get());
         }
-        assert(self.cpus_wf());
-        assert(self.container_cpu_wf());
-        assert(self.memory_disjoint());
-        assert(self.container_perms_wf());
-        assert(self.container_root_wf());
-        assert(self.container_tree_wf());
-        assert(self.containers_linkedlist_wf());
-        assert(self.processes_container_wf());
-        assert(self.processes_wf());
+        // assert(self.cpus_wf());
+        // assert(self.container_cpu_wf());
+        // assert(self.memory_disjoint());
+        // assert(self.container_perms_wf());
+        // assert(self.container_root_wf());
+        // assert(self.container_tree_wf());
+        // assert(self.containers_linkedlist_wf());
+        // assert(self.processes_container_wf());
+        // assert(self.processes_wf());
 
         assert(self.threads_process_wf()) by {
             assert(self.process_perms@[proc_ptr].value().owned_threads@ =~= old(self).process_perms@[proc_ptr].value().owned_threads@.push(page_ptr));
@@ -580,11 +650,11 @@ impl ProcessManager{
                     self.thread_perms@[child_t_ptr].value().owning_proc == proc_ptr
             );
         };
-        assert(self.threads_perms_wf());
-        assert(self.endpoint_perms_wf());
-        assert(self.threads_endpoint_descriptors_wf());
-        assert(self.endpoints_queue_wf());
-        assert(self.endpoints_container_wf());
+        // assert(self.threads_perms_wf());
+        // assert(self.endpoint_perms_wf());
+        // assert(self.threads_endpoint_descriptors_wf());
+        // assert(self.endpoints_queue_wf());
+        // assert(self.endpoints_container_wf());
         assert(self.schedulers_wf()) by {
             assert(self.container_perms@[container_ptr].value().scheduler@ =~= old(self).container_perms@[container_ptr].value().scheduler@.push(page_ptr));
             assert(

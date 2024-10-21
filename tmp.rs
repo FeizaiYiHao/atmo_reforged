@@ -1,16 +1,65 @@
-assert(self.cpus_wf());
-assert(self.container_cpu_wf());
-assert(self.memory_disjoint());
-assert(self.container_perms_wf());
-assert(self.container_root_wf());
-assert(self.container_tree_wf());
-assert(self.containers_linkedlist_wf());
-assert(self.processes_container_wf());
-assert(self.processes_wf());
-assert(self.threads_process_wf());
-assert(self.threads_perms_wf());
-assert(self.endpoint_perms_wf());
-assert(self.threads_endpoint_descriptors_wf());
-assert(self.endpoints_queue_wf());
-assert(self.endpoints_container_wf());
-assert(self.schedulers_wf());
+assert(forall|i:int|
+    #![trigger self.page_array@[i].state]
+    #![trigger self.page_array@[i].owning_container]
+    0<=i<NUM_PAGES 
+    ==>
+    (
+        self.page_array@[i].state == PageState::Mapped4k
+        ||
+        self.page_array@[i].state == PageState::Mapped2m
+        ||
+        self.page_array@[i].state == PageState::Mapped1g
+    )
+    <==> 
+    self.page_array@[i].owning_container.is_Some());
+assert(forall|i:usize|
+    #![trigger self.page_array@[i as int].state]
+    #![trigger self.page_array@[i as int].owning_container]
+    0<=i<NUM_PAGES && self.page_array@[i as int].state == PageState::Mapped4k
+    ==>
+    self.container_map_4k@.dom().contains(self.page_array@[i as int].owning_container.unwrap())
+    &&
+    self.container_map_4k@[self.page_array@[i as int].owning_container.unwrap()].contains(page_index2page_ptr(i)));
+assert(forall|i:usize|
+    #![trigger self.page_array@[i as int].state]
+    #![trigger self.page_array@[i as int].owning_container]
+    0<=i<NUM_PAGES && self.page_array@[i as int].state == PageState::Mapped2m
+    ==>
+    self.container_map_2m@.dom().contains(self.page_array@[i as int].owning_container.unwrap())
+    &&
+    self.container_map_2m@[self.page_array@[i as int].owning_container.unwrap()].contains(page_index2page_ptr(i)));
+assert(forall|i:usize|
+    #![trigger self.page_array@[i as int].state]
+    #![trigger self.page_array@[i as int].owning_container]
+    0<=i<NUM_PAGES && self.page_array@[i as int].state == PageState::Mapped1g
+    ==>
+    self.container_map_1g@.dom().contains(self.page_array@[i as int].owning_container.unwrap())
+    &&
+    self.container_map_1g@[self.page_array@[i as int].owning_container.unwrap()].contains(page_index2page_ptr(i)));
+assert(forall|c_ptr:ContainerPtr, page_ptr:PagePtr|
+    #![trigger self.container_map_4k@[c_ptr].contains(page_ptr)]
+    self.container_map_4k@.dom().contains(c_ptr) && self.container_map_4k@[c_ptr].contains(page_ptr)
+    ==>
+    page_ptr_valid(page_ptr)
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].state == PageState::Mapped4k
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].owning_container.unwrap() == c_ptr);
+assert(forall|c_ptr:ContainerPtr, page_ptr:PagePtr|
+    #![trigger self.container_map_2m@[c_ptr].contains(page_ptr)]
+    self.container_map_2m@.dom().contains(c_ptr) && self.container_map_2m@[c_ptr].contains(page_ptr)
+    ==>
+    page_ptr_2m_valid(page_ptr)
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].state == PageState::Mapped2m
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].owning_container.unwrap() == c_ptr);
+assert(forall|c_ptr:ContainerPtr, page_ptr:PagePtr|
+    #![trigger self.container_map_1g@[c_ptr].contains(page_ptr)]
+    self.container_map_1g@.dom().contains(c_ptr) && self.container_map_1g@[c_ptr].contains(page_ptr)
+    ==>
+    page_ptr_1g_valid(page_ptr)
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].state == PageState::Mapped1g
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].owning_container.unwrap() == c_ptr);

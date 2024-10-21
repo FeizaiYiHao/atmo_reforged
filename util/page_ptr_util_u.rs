@@ -3,6 +3,20 @@ verus! {
 use crate::define::*;
 use crate::lemma::lemma_t::*;
 
+pub open spec fn spec_page_index_merge_2m_vaild(i: usize, j: usize) -> bool
+    recommends
+        page_index_2m_valid(i)
+{
+    i < j < i + 0x200
+}
+
+pub open spec fn spec_page_index_merge_1g_vaild(i: usize, j: usize) -> bool
+    recommends
+        page_index_1g_valid(i)
+{
+    i < j < i + 0x40000
+}
+
 pub open spec fn spec_page_ptr2page_index(ptr: usize) -> usize
     recommends
         page_ptr_valid(ptr),
@@ -227,12 +241,14 @@ pub fn va2index(va: usize) -> (ret : (L4Index,L3Index,L2Index,L1Index))
 pub proof fn page_index_lemma()
     ensures
         forall|i:usize, j:usize| 
+            #![trigger spec_page_index_merge_2m_vaild(i, j)]
             #![trigger page_index_2m_valid(i), page_index_valid(j)]
-            page_index_2m_valid(i) && i < j < i + 0x200 ==> 
+            page_index_2m_valid(i) && spec_page_index_merge_2m_vaild(i, j)==> 
             page_index_valid(j),
         forall|i:usize, j:usize| 
-            #![trigger page_index_1g_valid(i), page_index_valid(j)]
-            page_index_1g_valid(i) && i < j < i + 0x40000 ==> 
+            #![trigger spec_page_index_merge_1g_vaild(i, j)]
+            #![trigger page_index_2m_valid(i), page_index_valid(j)]
+            page_index_1g_valid(i) && spec_page_index_merge_1g_vaild(i, j)==> 
             page_index_valid(j),
     {}
 
@@ -286,7 +302,7 @@ pub proof fn page_ptr_lemma()
             page_index_valid(i) ==> i == page_ptr2page_index(page_index2page_ptr(i)),
 
         forall|pi:usize, pj:usize|
-            #![trigger page_ptr2page_index(pi), page_ptr2page_index(pj)]
+            #![trigger page_ptr_valid(pi), page_ptr_valid(pj), page_ptr2page_index(pi), page_ptr2page_index(pj)]
             page_ptr_valid(pi) &&  page_ptr_valid(pj) && pi != pj 
             ==> 
                 page_ptr2page_index(pi) != page_ptr2page_index(pj),
