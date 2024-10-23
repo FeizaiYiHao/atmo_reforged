@@ -30,6 +30,7 @@ use crate::pagetable::pagemap::*;
 
 pub struct PageTable{
     pub cr3: PageMapPtr,
+    pub kernel_l4_end:usize,
 
     pub l4_table: Tracked<Map<PageMapPtr,PointsTo<PageMap>>>,
     pub l3_rev_map: Ghost<Map<PageMapPtr, (L4Index)>>,
@@ -42,6 +43,8 @@ pub struct PageTable{
     pub mapping_4k: Ghost<Map<VAddr,MapEntry>>,
     pub mapping_2m: Ghost<Map<VAddr,MapEntry>>,
     pub mapping_1g: Ghost<Map<VAddr,MapEntry>>,
+
+    pub kernel_entries: Ghost<Seq<PageEntry>>,
 }
 
 
@@ -209,7 +212,7 @@ impl PageTable{
             #![trigger self.l3_rev_map@.dom().contains(p)]
             #![trigger self.l3_rev_map@[p]]
             self.l3_tables@.dom().contains(p) ==>
-                0 <= self.l3_rev_map@[p] < 512 &&
+                self.kernel_l4_end <= self.l3_rev_map@[p] < 512 &&
                 self.l3_rev_map@.dom().contains(p) && self.spec_resolve_mapping_l4(self.l3_rev_map@[p]).is_Some() && self.spec_resolve_mapping_l4(self.l3_rev_map@[p]).get_Some_0().addr == p
         //L3 tables unique within
         &&&
@@ -270,7 +273,7 @@ impl PageTable{
             #![trigger self.l2_rev_map@.dom().contains(p)]
             self.l2_tables@.dom().contains(p) ==>
                 self.l2_rev_map@.dom().contains(p) && 
-                0 <= self.l2_rev_map@[p].0 < 512 && 0 <= self.l2_rev_map@[p].1 < 512 &&
+                self.kernel_l4_end <= self.l2_rev_map@[p].0 < 512 && 0 <= self.l2_rev_map@[p].1 < 512 &&
                 self.spec_resolve_mapping_l3(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1).is_Some() && self.spec_resolve_mapping_l3(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1).get_Some_0().addr == p
         // L2 mappings are unique within
         &&&
@@ -332,7 +335,7 @@ impl PageTable{
             #![trigger self.l1_rev_map@[p]]
             self.l1_tables@.dom().contains(p) ==>
                 self.l1_rev_map@.dom().contains(p) && 
-                0<=self.l1_rev_map@[p].0<512 && 0<=self.l1_rev_map@[p].1<512 && 0<=self.l1_rev_map@[p].2<512 &&
+                self.kernel_l4_end <= self.l1_rev_map@[p].0<512 && 0<=self.l1_rev_map@[p].1<512 && 0<=self.l1_rev_map@[p].2<512 &&
                 self.spec_resolve_mapping_l2(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2).is_Some() && self.spec_resolve_mapping_l2(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2).get_Some_0().addr == p
         // no l1 tables map to other levels
         &&&
@@ -462,7 +465,7 @@ impl PageTable{
     // #[verifier(inline)]
     pub open spec fn spec_resolve_mapping_l4(&self, l4i: L4Index) -> Option<PageEntry>
         recommends
-            0 <= l4i < 512,
+            self.kernel_l4_end <= l4i < 512,
     {
         if self.l4_table@[self.cr3].value()[l4i].perm.present{
             Some(self.l4_table@[self.cr3].value()[l4i])
@@ -473,7 +476,7 @@ impl PageTable{
 
     pub open spec fn spec_resolve_mapping_1g_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
     recommends
-        0<= l4i < 512,
+        self.kernel_l4_end <= l4i < 512,
         0<= l3i < 512,
     {
         if self.spec_resolve_mapping_l4(l4i).is_None() {
@@ -487,7 +490,7 @@ impl PageTable{
 
     pub open spec fn spec_resolve_mapping_l3(&self, l4i: L4Index, l3i: L3Index) -> Option<PageEntry>
         recommends
-            0<= l4i < 512,
+            self.kernel_l4_end <= l4i < 512,
             0<= l3i < 512,
     {
         if self.spec_resolve_mapping_l4(l4i).is_None() {
@@ -501,7 +504,7 @@ impl PageTable{
     
     pub open spec fn spec_resolve_mapping_2m_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
         recommends
-            0<= l4i < 512,
+            self.kernel_l4_end <= l4i < 512,
             0<= l3i < 512,
             0<= l2i < 512,
     {
@@ -515,7 +518,7 @@ impl PageTable{
     }
     pub open spec fn spec_resolve_mapping_l2(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index) -> Option<PageEntry>
     recommends
-        0<= l4i < 512,
+        self.kernel_l4_end <= l4i < 512,
         0<= l3i < 512,
         0<= l2i < 512,
     {
@@ -530,7 +533,7 @@ impl PageTable{
 
     pub open spec fn spec_resolve_mapping_4k_l1(&self, l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index) -> Option<PageEntry>
     recommends
-        0<= l4i < 512,
+        self.kernel_l4_end <= l4i < 512,
         0<= l3i < 512,
         0<= l2i < 512,
         0<= l1i < 512,
@@ -554,12 +557,12 @@ impl PageTable{
         forall|l4i: L4Index,l3i: L3Index,l2i: L2Index,l1i: L2Index| 
             #![trigger self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))]]
             #![trigger self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
-            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 ==>
+            self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 ==>
                 self.mapping_4k@.dom().contains(spec_index2va((l4i,l3i,l2i,l1i))) == self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).is_Some()
         &&&
         forall|l4i: L4Index,l3i: L3Index,l2i: L2Index,l1i: L2Index| 
             #![trigger self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))]]
-            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 && self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).is_Some()
+            self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 && self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).is_Some()
                 ==> self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].addr == self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().addr &&
                     self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].write == self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.write &&
                     self.mapping_4k@[spec_index2va((l4i,l3i,l2i,l1i))].execute_disable == self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).get_Some_0().perm.execute_disable
@@ -579,12 +582,12 @@ impl PageTable{
         forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
             #![trigger self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))]]
             #![trigger self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
-            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 ==>
+            self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 ==>
                 self.mapping_2m@.dom().contains(spec_index2va((l4i,l3i,l2i,0))) == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).is_Some()
         &&&
         forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
             #![trigger self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))]]
-            0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).is_Some()
+            self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).is_Some()
                 ==> self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].addr == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().addr &&
                     self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].write == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().perm.write &&
                     self.mapping_2m@[spec_index2va((l4i,l3i,l2i,0))].execute_disable == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).get_Some_0().perm.execute_disable
@@ -604,13 +607,13 @@ impl PageTable{
         forall|l4i: L4Index,l3i: L3Index| 
             #![trigger self.mapping_1g@[spec_index2va((l4i,l3i,0,0))]]
             #![trigger self.spec_resolve_mapping_1g_l3(l4i,l3i)]
-            0 <= l4i < 512 && 0 <= l3i < 512 ==>
+            self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 ==>
                 self.mapping_1g@.dom().contains(spec_index2va((l4i,l3i,0,0))) == self.spec_resolve_mapping_1g_l3(l4i,l3i).is_Some()
         &&&
         forall|l4i: L4Index,l3i: L3Index| 
             #![trigger self.mapping_1g@[spec_index2va((l4i,l3i,0,0))]]
             #![trigger self.spec_resolve_mapping_1g_l3(l4i,l3i)]
-            0 <= l4i < 512 && 0 <= l3i < 512 && self.spec_resolve_mapping_1g_l3(l4i,l3i).is_Some()
+            self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && self.spec_resolve_mapping_1g_l3(l4i,l3i).is_Some()
                 ==> self.mapping_1g@[spec_index2va((l4i,l3i,0,0))].addr == self.spec_resolve_mapping_1g_l3(l4i,l3i).get_Some_0().addr &&
                     self.mapping_1g@[spec_index2va((l4i,l3i,0,0))].write == self.spec_resolve_mapping_1g_l3(l4i,l3i).get_Some_0().perm.write &&
                     self.mapping_1g@[spec_index2va((l4i,l3i,0,0))].execute_disable == self.spec_resolve_mapping_1g_l3(l4i,l3i).get_Some_0().perm.execute_disable
@@ -619,6 +622,15 @@ impl PageTable{
             #![trigger self.mapping_1g@.dom().contains(va), page_ptr_1g_valid(self.mapping_1g@[va].addr)]
                 self.mapping_1g@.dom().contains(va) ==>
                 page_ptr_1g_valid(self.mapping_1g@[va].addr)
+    }
+
+    pub open spec fn kernel_entries_wf(&self) -> bool{
+        &&&
+        self.kernel_l4_end < 512
+        &&&
+        self.kernel_entries@.len() =~= self.kernel_l4_end as nat
+        &&&
+        forall|i:usize| #![trigger self.kernel_entries@[i as int]] 0 <= i < self.kernel_l4_end ==> self.kernel_entries@[i as int] == self.l4_table@[self.cr3].value()[i]
     }
 
     pub open spec fn wf(&self) -> bool
@@ -647,6 +659,8 @@ impl PageTable{
         // self.no_self_mapping()
         &&&
         self.table_pages_wf()
+        &&&
+        self.kernel_entries_wf()
     }
 
     // pub open spec fn l4_kernel_entries_reserved(&self) -> bool

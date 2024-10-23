@@ -44,7 +44,7 @@ impl PageTable{
                     // #![auto]
                     #![trigger self.l3_tables@[p].value()[i]]
                     self.l3_tables@.dom().contains(p) && 0 <= i < 512 && self.l3_tables@[p].value()[i].perm.present && self.l3_tables@[p].value()[i].perm.ps ==>
-                            0 <= self.l3_rev_map@[p] < 512
+                            self.kernel_l4_end <= self.l3_rev_map@[p] < 512
                             &&
                             self.l3_rev_map@.dom().contains(p)
                             &&
@@ -75,7 +75,7 @@ impl PageTable{
                 self.l2_tables@.dom().contains(p) && 0 <= i < 512 && self.l2_tables@[p].value()[i].perm.present && self.l2_tables@[p].value()[i].perm.ps ==>
                         self.l2_rev_map@.dom().contains(p) 
                         && 
-                        0 <= self.l2_rev_map@[p].0 < 512 && 0 <= self.l2_rev_map@[p].1 < 512 
+                        self.kernel_l4_end <= self.l2_rev_map@[p].0 < 512 && 0 <= self.l2_rev_map@[p].1 < 512 
                         &&
                         self.spec_resolve_mapping_l3(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1).is_Some() && self.spec_resolve_mapping_l3(self.l2_rev_map@[p].0,self.l2_rev_map@[p].1).get_Some_0().addr == p
                         &&
@@ -100,7 +100,7 @@ impl PageTable{
                 #![trigger self.l1_tables@[p].value()[i]]
                         self.l1_tables@.dom().contains(p) && 0 <= i < 512 && self.l1_tables@[p].value()[i].perm.present ==>
                         self.l1_rev_map@.dom().contains(p) && 
-                        0<=self.l1_rev_map@[p].0<512 && 0<=self.l1_rev_map@[p].1<512 && 0<=self.l1_rev_map@[p].2<512 &&
+                        self.kernel_l4_end <= self.l1_rev_map@[p].0<512 && 0<=self.l1_rev_map@[p].1<512 && 0<=self.l1_rev_map@[p].2<512 &&
                         self.spec_resolve_mapping_l2(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2).is_Some() && self.spec_resolve_mapping_l2(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2).get_Some_0().addr == p
                         &&
                         self.spec_resolve_mapping_l2(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2).is_Some() && self.spec_resolve_mapping_l2(self.l1_rev_map@[p].0,self.l1_rev_map@[p].1,self.l1_rev_map@[p].2).get_Some_0().addr == p 
@@ -125,21 +125,21 @@ impl PageTable{
         ensures
             forall|l4i: L4Index, l4j: L4Index| 
                 #![trigger self.spec_resolve_mapping_l4(l4i), self.spec_resolve_mapping_l4(l4j)]
-                0 <= l4i < 512 && 0 <= l4j < 512 && l4i != l4j && self.spec_resolve_mapping_l4(l4i).is_Some() && self.spec_resolve_mapping_l4(l4j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && 0 <= l4j < 512 && l4i != l4j && self.spec_resolve_mapping_l4(l4i).is_Some() && self.spec_resolve_mapping_l4(l4j).is_Some() ==>
                     self.spec_resolve_mapping_l4(l4i).get_Some_0().addr != self.spec_resolve_mapping_l4(l4j).get_Some_0().addr,
             forall|l4i: L4Index, l3i: L3Index, l4j: L4Index, l3j: L3Index| 
                 #![trigger self.spec_resolve_mapping_l3(l4i,l3i), self.spec_resolve_mapping_l3(l4j,l3j)]
-                0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && (l4i,l3i) != (l4j,l3j) && self.spec_resolve_mapping_l3(l4i,l3i).is_Some() && self.spec_resolve_mapping_l3(l4j,l3j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && (l4i,l3i) != (l4j,l3j) && self.spec_resolve_mapping_l3(l4i,l3i).is_Some() && self.spec_resolve_mapping_l3(l4j,l3j).is_Some() ==>
                     self.spec_resolve_mapping_l3(l4i,l3i).get_Some_0().addr != self.spec_resolve_mapping_l3(l4j,l3j).get_Some_0().addr,
             forall|l4i: L4Index, l3i: L3Index, l2i: L3Index, l4j: L4Index, l3j: L3Index, l2j: L2Index| 
             #![trigger self.spec_resolve_mapping_l2(l4i,l3i,l2i), self.spec_resolve_mapping_l2(l4j,l3j,l2j)]
-                0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && 0 <= l2j < 512 && (l4i,l3i,l2i) != (l4j,l3j,l2j) && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && self.spec_resolve_mapping_l2(l4j,l3j,l2j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && 0 <= l2j < 512 && (l4i,l3i,l2i) != (l4j,l3j,l2j) && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && self.spec_resolve_mapping_l2(l4j,l3j,l2j).is_Some() ==>
                     self.spec_resolve_mapping_l2(l4i,l3i,l2i).get_Some_0().addr != self.spec_resolve_mapping_l2(l4j,l3j,l2j).get_Some_0().addr
     {
         assert(
             forall|l4i: L4Index, l4j: L4Index| 
                 #![trigger self.spec_resolve_mapping_l4(l4i), self.spec_resolve_mapping_l4(l4j)]
-                0 <= l4i < 512 && 0 <= l4j < 512 && l4i != l4j && self.spec_resolve_mapping_l4(l4i).is_Some() && self.spec_resolve_mapping_l4(l4j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && 0 <= l4j < 512 && l4i != l4j && self.spec_resolve_mapping_l4(l4i).is_Some() && self.spec_resolve_mapping_l4(l4j).is_Some() ==>
                     self.spec_resolve_mapping_l4(l4i).get_Some_0().addr != self.spec_resolve_mapping_l4(l4j).get_Some_0().addr
         );
 
@@ -156,7 +156,7 @@ impl PageTable{
         assert(
             forall|l4i: L4Index, l3i: L3Index, l4j: L4Index, l3j: L3Index| 
                 #![auto]
-                0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && (l4i,l3i) != (l4j,l3j) && self.spec_resolve_mapping_l3(l4i,l3i).is_Some() && self.spec_resolve_mapping_l3(l4j,l3j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && (l4i,l3i) != (l4j,l3j) && self.spec_resolve_mapping_l3(l4i,l3i).is_Some() && self.spec_resolve_mapping_l3(l4j,l3j).is_Some() ==>
                     self.spec_resolve_mapping_l3(l4i,l3i).get_Some_0().addr != self.spec_resolve_mapping_l3(l4j,l3j).get_Some_0().addr
         );
         assert(
@@ -172,7 +172,7 @@ impl PageTable{
         assert(
             forall|l4i: L4Index, l3i: L3Index, l2i: L3Index, l4j: L4Index, l3j: L3Index, l2j: L2Index| 
                 #![auto]
-                0 <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && 0 <= l2j < 512 && (l4i,l3i,l2i) != (l4j,l3j,l2j) && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && self.spec_resolve_mapping_l2(l4j,l3j,l2j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && 0 <= l2j < 512 && (l4i,l3i,l2i) != (l4j,l3j,l2j) && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && self.spec_resolve_mapping_l2(l4j,l3j,l2j).is_Some() ==>
                     self.spec_resolve_mapping_l2(l4i,l3i,l2i).get_Some_0().addr != self.spec_resolve_mapping_l2(l4j,l3j,l2j).get_Some_0().addr
         );
 

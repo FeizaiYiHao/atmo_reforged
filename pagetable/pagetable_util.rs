@@ -19,7 +19,7 @@ impl PageTable{
     pub open spec fn spec_4k_entry_useable(&self, l4i:L4Index, l3i:L3Index, l2i:L2Index, l1i:L2Index) -> bool
         recommends    
             self.wf(),
-            0 <= l4i < 512,
+            self.kernel_l4_end <= l4i < 512,
             0 <= l3i < 512,
             0 <= l2i < 512,
             0 <= l1i < 512,
@@ -35,7 +35,7 @@ impl PageTable{
     pub fn resolve_mapping_l4(&self, l4i:L4Index) -> (ret: Option<PageEntry>)
         requires    
             self.wf(),
-            0 <= l4i < 512,
+            self.kernel_l4_end <= l4i < 512,
         ensures
             ret =~= self.spec_resolve_mapping_l4(l4i),
     {
@@ -53,7 +53,7 @@ impl PageTable{
     pub fn resolve_mapping_4k_l3(&self, l4i:L4Index, l3i:L3Index) -> (ret: (Option<PageEntry>, PageTableErrorCode))
         requires    
             self.wf(),
-            0 <= l4i < 512,
+            self.kernel_l4_end <= l4i < 512,
             0 <= l3i < 512,
         ensures
             ret.0 =~= self.spec_resolve_mapping_l3(l4i, l3i),
@@ -88,7 +88,7 @@ impl PageTable{
     pub fn resolve_mapping_4k_l2(&self, l4i:L4Index, l3i:L3Index, l2i:L2Index) -> (ret: (Option<PageEntry>, PageTableErrorCode))
         requires    
             self.wf(),
-            0 <= l4i < 512,
+            self.kernel_l4_end <= l4i < 512,
             0 <= l3i < 512,
             0 <= l2i < 512,
         ensures
@@ -124,7 +124,7 @@ impl PageTable{
     pub fn resolve_mapping_4k_l1(&self, l4i:L4Index, l3i:L3Index, l2i:L2Index, l1i:L2Index) -> (ret: (Option<PageEntry>, PageTableErrorCode, Option<MapEntry>))
         requires    
             self.wf(),
-            0 <= l4i < 512,
+            self.kernel_l4_end <= l4i < 512,
             0 <= l3i < 512,
             0 <= l2i < 512,
             0 <= l1i < 512,
