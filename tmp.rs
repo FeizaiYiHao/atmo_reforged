@@ -1,65 +1,36 @@
-assert(forall|i:int|
-    #![trigger self.page_array@[i].state]
-    #![trigger self.page_array@[i].owning_container]
-    0<=i<NUM_PAGES 
-    ==>
-    (
-        self.page_array@[i].state == PageState::Mapped4k
-        ||
-        self.page_array@[i].state == PageState::Mapped2m
-        ||
-        self.page_array@[i].state == PageState::Mapped1g
-    )
-    <==> 
-    self.page_array@[i].owning_container.is_Some());
-assert(forall|i:usize|
-    #![trigger self.page_array@[i as int].state]
-    #![trigger self.page_array@[i as int].owning_container]
-    0<=i<NUM_PAGES && self.page_array@[i as int].state == PageState::Mapped4k
-    ==>
-    self.container_map_4k@.dom().contains(self.page_array@[i as int].owning_container.unwrap())
-    &&
-    self.container_map_4k@[self.page_array@[i as int].owning_container.unwrap()].contains(page_index2page_ptr(i)));
-assert(forall|i:usize|
-    #![trigger self.page_array@[i as int].state]
-    #![trigger self.page_array@[i as int].owning_container]
-    0<=i<NUM_PAGES && self.page_array@[i as int].state == PageState::Mapped2m
-    ==>
-    self.container_map_2m@.dom().contains(self.page_array@[i as int].owning_container.unwrap())
-    &&
-    self.container_map_2m@[self.page_array@[i as int].owning_container.unwrap()].contains(page_index2page_ptr(i)));
-assert(forall|i:usize|
-    #![trigger self.page_array@[i as int].state]
-    #![trigger self.page_array@[i as int].owning_container]
-    0<=i<NUM_PAGES && self.page_array@[i as int].state == PageState::Mapped1g
-    ==>
-    self.container_map_1g@.dom().contains(self.page_array@[i as int].owning_container.unwrap())
-    &&
-    self.container_map_1g@[self.page_array@[i as int].owning_container.unwrap()].contains(page_index2page_ptr(i)));
-assert(forall|c_ptr:ContainerPtr, page_ptr:PagePtr|
-    #![trigger self.container_map_4k@[c_ptr].contains(page_ptr)]
-    self.container_map_4k@.dom().contains(c_ptr) && self.container_map_4k@[c_ptr].contains(page_ptr)
-    ==>
-    page_ptr_valid(page_ptr)
-    &&
-    self.page_array@[page_ptr2page_index(page_ptr) as int].state == PageState::Mapped4k
-    &&
-    self.page_array@[page_ptr2page_index(page_ptr) as int].owning_container.unwrap() == c_ptr);
-assert(forall|c_ptr:ContainerPtr, page_ptr:PagePtr|
-    #![trigger self.container_map_2m@[c_ptr].contains(page_ptr)]
-    self.container_map_2m@.dom().contains(c_ptr) && self.container_map_2m@[c_ptr].contains(page_ptr)
-    ==>
-    page_ptr_2m_valid(page_ptr)
-    &&
-    self.page_array@[page_ptr2page_index(page_ptr) as int].state == PageState::Mapped2m
-    &&
-    self.page_array@[page_ptr2page_index(page_ptr) as int].owning_container.unwrap() == c_ptr);
-assert(forall|c_ptr:ContainerPtr, page_ptr:PagePtr|
-    #![trigger self.container_map_1g@[c_ptr].contains(page_ptr)]
-    self.container_map_1g@.dom().contains(c_ptr) && self.container_map_1g@[c_ptr].contains(page_ptr)
-    ==>
-    page_ptr_1g_valid(page_ptr)
-    &&
-    self.page_array@[page_ptr2page_index(page_ptr) as int].state == PageState::Mapped1g
-    &&
-    self.page_array@[page_ptr2page_index(page_ptr) as int].owning_container.unwrap() == c_ptr);
+pub open spec fn iommu_tables_wf(&self) -> bool{
+    &&&
+    self.free_ioids.wf()
+    &&&
+    self.free_ioids@.no_duplicates()
+    &&&
+    forall|i:int| #![trigger self.free_ioids@[i]] 0<=i<self.free_ioids.len()  ==> self.free_ioids@[i]<IOID_MAX
+    &&&
+    self.iommu_tables.wf()
+    &&&
+    forall|ioid:IOid| 
+        #![trigger self.iommu_tables[ioid as int]] 
+        #![trigger self.free_ioids@.contains(ioid)] 
+        0 <= ioid < IOID_MAX ==>
+        self.iommu_tables[ioid as int].is_None() <==> !self.free_ioids@.contains(ioid)
+    &&&
+    forall|ioid:IOid| 
+        #![trigger self.iommu_tables[ioid as int].unwrap()]
+        0 <= ioid < IOID_MAX && self.iommu_tables[ioid as int].is_Some() 
+        ==> 
+        self.iommu_tables[ioid as int].unwrap().wf()
+        &&
+        self.iommu_tables[ioid as int].unwrap().page_closure().subset_of(self.iommu_table_pages@)        
+        &&
+        self.iommu_tables[ioid as int].unwrap().kernel_l4_end == 0
+    &&&
+    forall|ioid_i:IOid, ioid_j:IOid| 
+        #![trigger self.iommu_tables[ioid_i as int].unwrap().page_closure(), self.iommu_tables[ioid_j as int].unwrap().page_closure()]
+        0 <= ioid_i < IOID_MAX && self.iommu_tables[ioid_i as int].is_Some() 
+        &&
+        0 <= ioid_j < IOID_MAX && self.iommu_tables[ioid_j as int].is_Some() 
+        &&
+        ioid_i != ioid_j
+        ==>
+        self.iommu_tables[ioid_i as int].unwrap().page_closure().disjoint(self.iommu_tables[ioid_j as int].unwrap().page_closure())
+}
