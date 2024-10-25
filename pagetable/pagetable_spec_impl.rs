@@ -33,6 +33,8 @@ use crate::lemma::lemma_u::*;
 
 pub struct PageTable{
     pub cr3: PageMapPtr,
+    pub pcid: Option<Pcid>,
+    pub ioid: Option<IOid>,
     pub kernel_l4_end:usize,
 
     pub l4_table: Tracked<Map<PageMapPtr,PointsTo<PageMap>>>,
@@ -48,6 +50,10 @@ pub struct PageTable{
     pub mapping_1g: Ghost<Map<VAddr,MapEntry>>,
 
     pub kernel_entries: Ghost<Seq<PageEntry>>,
+
+    pub tlb_mapping_4k: Ghost<Seq<Map<VAddr,MapEntry>>>,
+    pub tlb_mapping_2m: Ghost<Seq<Map<VAddr,MapEntry>>>,
+    pub tlb_mapping_1g: Ghost<Seq<Map<VAddr,MapEntry>>>,
 }
 
 
@@ -143,6 +149,31 @@ impl PageTable{
     pub closed spec fn is_1g_pa_mapped(&self, pa:PAddr) -> bool
     {
         exists|va:VAddr| #![auto] self.mapping_1g().dom().contains(va) && self.mapping_1g()[va].addr == pa
+    }
+
+    pub closed spec fn pcid_ioid_wf(&self) -> bool{
+        self.pcid.is_Some() != self.ioid.is_Some()
+    }
+
+    pub closed spec fn tlb_wf(&self) -> bool{
+        &&&
+        self.tlb_mapping_4k@.len() == NUM_CPUS
+        &&&
+        self.tlb_mapping_2m@.len() == NUM_CPUS
+        &&&
+        self.tlb_mapping_1g@.len() == NUM_CPUS
+    }
+
+    pub closed spec fn tlb_submap_of_mapping(&self) -> bool{
+        forall|cpu_id:CpuId| 
+            #![auto] 
+            0 <= cpu_id < NUM_CPUS
+            ==>
+            self.tlb_mapping_4k@[cpu_id as int].submap_of(self.mapping_4k@)
+            &&
+            self.tlb_mapping_2m@[cpu_id as int].submap_of(self.mapping_2m@)
+            &&
+            self.tlb_mapping_1g@[cpu_id as int].submap_of(self.mapping_1g@)
     }
 
     pub closed spec fn wf_l4(&self) -> bool{
@@ -664,6 +695,12 @@ impl PageTable{
         self.table_pages_wf()
         &&&
         self.kernel_entries_wf()
+        &&&
+        self.pcid_ioid_wf()
+        &&&
+        self.tlb_wf()
+        &&&
+        self.tlb_submap_of_mapping()
     }
 
     // pub closed spec fn l4_kernel_entries_reserved(&self) -> bool

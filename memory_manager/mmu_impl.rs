@@ -288,7 +288,7 @@ impl MMUManager{
         ret
     }
 
-    pub fn mmu_get_va_entry_by_pcid(&self, pcid: Pcid, va:VAddr) -> (ret:Option<PageEntry>)
+    pub fn get_va_entry_by_pcid(&self, pcid: Pcid, va:VAddr) -> (ret:Option<PageEntry>)
         requires
             self.wf(),
             0<=pcid<PCID_MAX,
@@ -302,7 +302,7 @@ impl MMUManager{
         self.page_tables.get(pcid).get_va_entry(va)
     }
 
-    pub fn mmu_get_va_entry_by_ioid(&self, ioid: IOid, va:VAddr) -> (ret:Option<PageEntry>)
+    pub fn get_va_entry_by_ioid(&self, ioid: IOid, va:VAddr) -> (ret:Option<PageEntry>)
         requires
             self.wf(),
             0<=ioid<IOID_MAX,
@@ -314,7 +314,7 @@ impl MMUManager{
         self.iommu_tables.get(ioid).dummy.get_va_entry(va)
     }
 
-    pub fn mmu_get_pci_dev_by_ioid(&self, ioid:IOid, bus:u8,dev:u8,fun:u8) -> (ret:bool)
+    pub fn get_pci_dev_by_ioid(&self, ioid:IOid, bus:u8,dev:u8,fun:u8) -> (ret:bool)
         requires
             self.wf(),
             self.get_free_ioids_as_set().contains(ioid) == false,
@@ -326,7 +326,7 @@ impl MMUManager{
         return self.pci_bitmap.get(ioid, bus,dev,fun);
     }
 
-    pub fn mmu_send_pci_dev_by_ioid(&mut self, ioid:IOid, bus:u8,dev:u8,fun:u8)
+    pub fn send_pci_dev_by_ioid(&mut self, ioid:IOid, bus:u8,dev:u8,fun:u8)
         requires
             old(self).wf(),
             old(self).get_free_ioids_as_set().contains(ioid) == false,
@@ -347,7 +347,7 @@ impl MMUManager{
 
     }
 
-    pub fn mmu_register_pci_dev(&mut self, ioid:IOid, bus:u8,dev:u8,fun:u8)
+    pub fn register_pci_dev(&mut self, ioid:IOid, bus:u8,dev:u8,fun:u8)
         requires
             old(self).wf(),
             old(self).get_free_ioids_as_set().contains(ioid) == false,

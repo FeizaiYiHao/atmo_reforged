@@ -2,15 +2,14 @@ use vstd::prelude::*;
 verus! {
 // use vstd::ptr::PointsTo;
 
-use crate::pagetable::*;
 use crate::array_vec::ArrayVec;
 use crate::define::*;
 use crate::array::Array;
-use crate::mmu::*;
-use crate::mmu::mmu_spec::pagetable_spec_impl::PageTable;
+use crate::memory_manager::*;
+use crate::pagetable::pagetable_spec_impl::PageTable;
 use crate::pagetable::entry::*;
 
-pub struct MMUManager{
+pub struct MemoryManager{
     pub kernel_entries: Array<usize,KERNEL_MEM_END_L4INDEX>,
     pub kernel_entries_ghost: Ghost<Seq<PageEntry>>,
 
@@ -20,8 +19,8 @@ pub struct MMUManager{
 
 
     pub free_ioids: ArrayVec<IOid,IOID_MAX>, //actual owners are procs
-    pub iommu_tables:  Array<Option<PageTable>,IOID_MAX>,
-    pub iommu_table_pages: Ghost<Set<PagePtr>>,
+    pub iomemory_manager_tables:  Array<Option<PageTable>,IOID_MAX>,
+    pub iomemory_manager_table_pages: Ghost<Set<PagePtr>>,
 
     pub root_table:RootTable,
     pub root_table_cache: Ghost<Seq<Seq<Seq<Option<(IOid,usize)>>>>>,
@@ -31,7 +30,7 @@ pub struct MMUManager{
     pub pci_bitmap: PCIBitMap,
 }
 
-impl MMUManager{
+impl MemoryManager{
 
     pub open spec fn pagetables_wf(&self) -> bool{
         &&&
@@ -55,6 +54,8 @@ impl MMUManager{
             ==> 
             self.page_tables[pcid as int].unwrap().wf()
             &&
+            self.page_tables[pcid as int].unwrap().pcid =~= Some(pcid)
+            &&
             self.page_tables[pcid as int].unwrap().page_closure().subset_of(self.page_table_pages@)            
             &&
             self.page_tables[pcid as int].unwrap().kernel_entries@ =~= self.kernel_entries_ghost@     
@@ -72,7 +73,7 @@ impl MMUManager{
             self.page_tables[pcid_i as int].unwrap().page_closure().disjoint(self.page_tables[pcid_j as int].unwrap().page_closure())
     }
 
-    pub open spec fn iommutables_wf(&self) -> bool{
+    pub open spec fn iomemory_managertables_wf(&self) -> bool{
         &&&
         self.free_ioids.wf()
         &&&
@@ -80,38 +81,40 @@ impl MMUManager{
         &&&
         forall|i:int| #![trigger self.free_ioids@[i]] 0<=i<self.free_ioids.len()  ==> self.free_ioids@[i]<IOID_MAX
         &&&
-        self.iommu_tables.wf()
+        self.iomemory_manager_tables.wf()
         &&&
         forall|ioid:IOid| 
-            #![trigger self.iommu_tables[ioid as int]] 
+            #![trigger self.iomemory_manager_tables[ioid as int]] 
             #![trigger self.free_ioids@.contains(ioid)] 
             0 <= ioid < IOID_MAX ==>
-            self.iommu_tables[ioid as int].is_None() <==> !self.free_ioids@.contains(ioid)
+            self.iomemory_manager_tables[ioid as int].is_None() <==> !self.free_ioids@.contains(ioid)
         &&&
         forall|ioid:IOid| 
-            #![trigger self.iommu_tables[ioid as int].unwrap()]
-            0 <= ioid < IOID_MAX && self.iommu_tables[ioid as int].is_Some() 
+            #![trigger self.iomemory_manager_tables[ioid as int].unwrap()]
+            0 <= ioid < IOID_MAX && self.iomemory_manager_tables[ioid as int].is_Some() 
             ==> 
-            self.iommu_tables[ioid as int].unwrap().wf()
+            self.iomemory_manager_tables[ioid as int].unwrap().wf()
             &&
-            self.iommu_tables[ioid as int].unwrap().page_closure().subset_of(self.iommu_table_pages@)        
+            self.iomemory_manager_tables[ioid as int].unwrap().ioid =~= Some(ioid)
             &&
-            self.iommu_tables[ioid as int].unwrap().kernel_l4_end == 0
+            self.iomemory_manager_tables[ioid as int].unwrap().page_closure().subset_of(self.iomemory_manager_table_pages@)        
+            &&
+            self.iomemory_manager_tables[ioid as int].unwrap().kernel_l4_end == 0
         &&&
         forall|ioid_i:IOid, ioid_j:IOid| 
-            #![trigger self.iommu_tables[ioid_i as int].unwrap().page_closure(), self.iommu_tables[ioid_j as int].unwrap().page_closure()]
-            0 <= ioid_i < IOID_MAX && self.iommu_tables[ioid_i as int].is_Some() 
+            #![trigger self.iomemory_manager_tables[ioid_i as int].unwrap().page_closure(), self.iomemory_manager_tables[ioid_j as int].unwrap().page_closure()]
+            0 <= ioid_i < IOID_MAX && self.iomemory_manager_tables[ioid_i as int].is_Some() 
             &&
-            0 <= ioid_j < IOID_MAX && self.iommu_tables[ioid_j as int].is_Some() 
+            0 <= ioid_j < IOID_MAX && self.iomemory_manager_tables[ioid_j as int].is_Some() 
             &&
             ioid_i != ioid_j
             ==>
-            self.iommu_tables[ioid_i as int].unwrap().page_closure().disjoint(self.iommu_tables[ioid_j as int].unwrap().page_closure())
+            self.iomemory_manager_tables[ioid_i as int].unwrap().page_closure().disjoint(self.iomemory_manager_tables[ioid_j as int].unwrap().page_closure())
     }
 
-    pub open spec fn pagetable_iommutable_disjoint(&self) -> bool
+    pub open spec fn pagetable_iomemory_managertable_disjoint(&self) -> bool
     {
-        self.page_table_pages@.disjoint(self.iommu_table_pages@)
+        self.page_table_pages@.disjoint(self.iomemory_manager_table_pages@)
     }
 
     pub open spec fn kernel_entries_wf(&self) -> bool
@@ -141,7 +144,7 @@ impl MMUManager{
             &&
             self.get_free_ioids_as_set().contains(self.root_table.resolve(bus,dev,fun).get_Some_0().0) == false
             &&
-            self.root_table.resolve(bus,dev,fun).get_Some_0().1 == self.get_iommutable_by_ioid(self.root_table.resolve(bus,dev,fun).get_Some_0().0).unwrap().cr3
+            self.root_table.resolve(bus,dev,fun).get_Some_0().1 == self. get_iommu_table_by_ioid(self.root_table.resolve(bus,dev,fun).get_Some_0().0).unwrap().cr3
         &&&
         forall|bus:u8,dev:u8,fun:u8|#![auto] 0<=bus<256 && 0<=dev<32 && 0<=fun<8 && self.root_table.resolve(bus,dev,fun).is_Some() 
             ==>
@@ -204,7 +207,7 @@ impl MMUManager{
 
     pub open spec fn page_closure(&self) -> Set<PagePtr>
     {
-        self.iommu_table_pages@ + self.page_table_pages@
+        self.iomemory_manager_table_pages@ + self.page_table_pages@
     }
 
     pub open spec fn get_pagetable_by_pcid(&self, pcid: Pcid) -> Option<PageTable>
@@ -240,27 +243,27 @@ impl MMUManager{
         self.free_ioids@.to_set()
     }
 
-    pub open spec fn get_iommutable_by_ioid(&self, ioid: IOid) -> Option<PageTable>
+    pub open spec fn get_iommu_table_by_ioid(&self, ioid: IOid) -> Option<PageTable>
         recommends 
             0<=ioid<IOID_MAX,
     {
-        self.iommu_tables[ioid as int]
+        self.iomemory_manager_tables[ioid as int]
     }
 
-    pub open spec fn get_iommutable_mapping_by_ioid(&self, ioid: IOid) -> Map<VAddr,MapEntry>
+    pub open spec fn get_iommu_table_mapping_by_ioid(&self, ioid: IOid) -> Map<VAddr,MapEntry>
         recommends 
             0<=ioid<IOID_MAX,
-            self.get_iommutable_by_ioid(ioid).is_Some(),
+            self. get_iommu_table_by_ioid(ioid).is_Some(),
     {
-        self.iommu_tables[ioid as int].unwrap().mapping_4k()
+        self.iomemory_manager_tables[ioid as int].unwrap().mapping_4k()
     }
 
-    pub open spec fn get_iommutable_page_closure_by_ioid(&self, ioid: IOid) -> Set<PagePtr>
+    pub open spec fn get_iomemory_managertable_page_closure_by_ioid(&self, ioid: IOid) -> Set<PagePtr>
         recommends 
             0<=ioid<IOID_MAX,
-            self.get_iommutable_by_ioid(ioid).is_Some(),
+            self. get_iommu_table_by_ioid(ioid).is_Some(),
     {
-        self.iommu_tables[ioid as int].unwrap().page_closure()
+        self.iomemory_manager_tables[ioid as int].unwrap().page_closure()
     }
 
     pub fn get_cr3_by_pcid(&self, pcid:Pcid) -> (ret:usize)
@@ -278,11 +281,11 @@ impl MMUManager{
             self.wf(),
             0<=ioid<IOID_MAX,
             self.get_free_ioids_as_set().contains(ioid) == false,
-            self.get_iommutable_by_ioid(ioid).is_Some(),
+            self. get_iommu_table_by_ioid(ioid).is_Some(),
         ensures
-            self.get_iommutable_by_ioid(ioid).unwrap().cr3 == ret,
+            self. get_iommu_table_by_ioid(ioid).unwrap().cr3 == ret,
     {
-        return self.iommu_tables.get(ioid).as_ref().unwrap().cr3;
+        return self.iomemory_manager_tables.get(ioid).as_ref().unwrap().cr3;
     }
 
     pub fn get_pci_binding(&self, bus:u8,dev:u8,fun:u8) -> (ret:Option<(IOid,usize)>)
@@ -301,9 +304,9 @@ impl MMUManager{
         &&&
         self.pagetables_wf()
         &&&
-        self.iommutables_wf()
+        self.iomemory_managertables_wf()
         &&&
-        self.pagetable_iommutable_disjoint()
+        self.pagetable_iomemory_managertable_disjoint()
         &&&
         self.root_table_wf()
         &&&

@@ -7,10 +7,11 @@ pub mod array_set;
 pub mod array_vec;
 pub mod slinkedlist;
 pub mod pagetable;
-// pub mod allocator;
-// pub mod process_manager;
-// pub mod pcid_alloc;
-pub mod mmu;
+pub mod allocator;
+pub mod process_manager;
+pub mod memory_manager;
+
+pub mod kernel;
 
 pub mod lemma;
 pub mod util;

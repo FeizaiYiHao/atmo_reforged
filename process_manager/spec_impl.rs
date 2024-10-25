@@ -528,6 +528,23 @@ impl ProcessManager{
             self.thread_perms@[t_ptr].value().owning_container == c_ptr
     }
 
+    pub open spec fn pcid_ioid_wf(&self) -> bool{
+        &&&
+        forall|p_ptr_i:ProcPtr, p_ptr_j:ProcPtr| 
+            #![trigger self.process_perms@[p_ptr_i].value().pcid, self.process_perms@[p_ptr_j].value().pcid]
+            self.process_perms@.dom().contains(p_ptr_i) && self.process_perms@.dom().contains(p_ptr_j) && p_ptr_i != p_ptr_j
+            ==>
+            self.process_perms@[p_ptr_i].value().pcid != self.process_perms@[p_ptr_j].value().pcid
+        &&&
+        forall|p_ptr_i:ProcPtr, p_ptr_j:ProcPtr| 
+            #![trigger self.process_perms@[p_ptr_i].value().ioid, self.process_perms@[p_ptr_j].value().ioid]
+            self.process_perms@.dom().contains(p_ptr_i) && self.process_perms@.dom().contains(p_ptr_j) && p_ptr_i != p_ptr_j
+            &&
+            self.process_perms@[p_ptr_i].value().ioid.is_Some() && self.process_perms@[p_ptr_j].value().ioid.is_Some() 
+            ==>
+            self.process_perms@[p_ptr_i].value().ioid.unwrap() != self.process_perms@[p_ptr_j].value().ioid.unwrap()
+    }
+
     pub open spec fn wf(&self) -> bool{
         &&&
         self.cpus_wf()
@@ -561,6 +578,8 @@ impl ProcessManager{
         self.endpoints_container_wf()
         &&&
         self.schedulers_wf()
+        &&&
+        self.pcid_ioid_wf()
     }
 }
 
