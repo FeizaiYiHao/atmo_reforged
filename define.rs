@@ -34,11 +34,6 @@ pub type L1Index = usize;
 pub type SLLIndex = i32;
 
 #[derive(Clone, Copy, Debug)]
-pub enum ErrorCodeType {
-    NoErrorCode,
-}
-
-#[derive(Clone, Copy, Debug)]
 pub enum ThreadState {
     SCHEDULED,
     BLOCKED,
@@ -100,6 +95,12 @@ pub enum PageTableErrorCode {
     EntryTakenBy1g,
 }
 
+#[derive(Clone, Copy, Debug)]
+#[allow(inconsistent_fields)]
+pub enum ErrorCodeType{
+    Success{ value:usize },
+    CpuIdle,
+}
 // -------------------- End of Types --------------------
 
 // -------------------- Begin of Const --------------------
@@ -154,29 +155,26 @@ pub const CONTAINER_SCHEDULER_LEN:usize = 10;
 #[derive(Clone, Copy, Debug)]
 pub struct SyscallReturnStruct{
     pub error_code: ErrorCodeType,
-    pub pcid: Pcid,
-    pub cr3: usize,
-    pub thread_ptr:ThreadPtr,
+    pub pcid: Option<Pcid>,
+    pub cr3: Option<usize>,
 }
 
 impl SyscallReturnStruct{
 
-    pub fn new(error_code:ErrorCodeType,pcid:Pcid,cr3:usize,thread_ptr:ThreadPtr )->(ret:Self)
+    pub fn NoSwitchNew(error_code:ErrorCodeType )->(ret:Self)
         ensures
             ret.error_code == error_code,
-            ret.pcid == pcid,
-            ret.cr3 == cr3,
-            ret.thread_ptr == thread_ptr,
+            ret.pcid.is_None(),
+            ret.cr3.is_None(),
     {
         return Self{
             error_code:error_code,
-            pcid:pcid,
-            cr3:cr3,
-            thread_ptr:thread_ptr,
+            pcid:None,
+            cr3:None,
         };
     }
 }
 
-// -------------------- End of Structs --------------------
+// -------------------- End of Structs -------------------
 
 }

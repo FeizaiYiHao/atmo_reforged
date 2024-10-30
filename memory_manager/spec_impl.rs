@@ -43,34 +43,34 @@ impl MemoryManager{
         self.page_tables.wf()
         &&&
         forall|pcid:Pcid| 
-            #![trigger self.page_tables[pcid as int]] 
-            #![trigger self.free_pcids@.contains(pcid)] 
+            #![trigger self.get_pagetable_by_pcid(pcid)] 
+            #![trigger self.get_free_pcids_as_set().contains(pcid)] 
             0 <= pcid < PCID_MAX ==>
-            self.page_tables[pcid as int].is_None() <==> !self.free_pcids@.contains(pcid)
+            self.get_pagetable_by_pcid(pcid).is_None() <==> self.get_free_pcids_as_set().contains(pcid)
         &&&
         forall|pcid:Pcid| 
-            #![trigger self.page_tables[pcid as int].unwrap()]
-            0 <= pcid < PCID_MAX && self.page_tables[pcid as int].is_Some() 
+            #![trigger self.get_pagetable_by_pcid(pcid).unwrap()]
+            0 <= pcid < PCID_MAX && self.get_pagetable_by_pcid(pcid).is_Some() 
             ==> 
-            self.page_tables[pcid as int].unwrap().wf()
+            self.get_pagetable_by_pcid(pcid).unwrap().wf()
             &&
-            self.page_tables[pcid as int].unwrap().pcid =~= Some(pcid)
+            self.get_pagetable_by_pcid(pcid).unwrap().pcid =~= Some(pcid)
             &&
-            self.page_tables[pcid as int].unwrap().page_closure().subset_of(self.page_table_pages@)            
+            self.get_pagetable_by_pcid(pcid).unwrap().page_closure().subset_of(self.page_table_pages@)            
             &&
-            self.page_tables[pcid as int].unwrap().kernel_entries@ =~= self.kernel_entries_ghost@     
+            self.get_pagetable_by_pcid(pcid).unwrap().kernel_entries@ =~= self.kernel_entries_ghost@     
             &&
-            self.page_tables[pcid as int].unwrap().kernel_l4_end == KERNEL_MEM_END_L4INDEX
+            self.get_pagetable_by_pcid(pcid).unwrap().kernel_l4_end == KERNEL_MEM_END_L4INDEX
         &&&
         forall|pcid_i:Pcid, pcid_j:Pcid| 
-            #![trigger self.page_tables[pcid_i as int].unwrap().page_closure(), self.page_tables[pcid_j as int].unwrap().page_closure()]
-            0 <= pcid_i < PCID_MAX && self.page_tables[pcid_i as int].is_Some() 
+            #![trigger self.get_pagetable_by_pcid(pcid_i).unwrap().page_closure(), self.get_pagetable_by_pcid(pcid_j).unwrap().page_closure()]
+            0 <= pcid_i < PCID_MAX && self.get_pagetable_by_pcid(pcid_i).is_Some() 
             &&
-            0 <= pcid_j < PCID_MAX && self.page_tables[pcid_j as int].is_Some() 
+            0 <= pcid_j < PCID_MAX && self.get_pagetable_by_pcid(pcid_j).is_Some() 
             &&
             pcid_i != pcid_j
             ==>
-            self.page_tables[pcid_i as int].unwrap().page_closure().disjoint(self.page_tables[pcid_j as int].unwrap().page_closure())
+            self.get_pagetable_by_pcid(pcid_i).unwrap().page_closure().disjoint(self.get_pagetable_by_pcid(pcid_j).unwrap().page_closure())
     }
 
     pub open spec fn iomemory_managertables_wf(&self) -> bool{
@@ -84,32 +84,32 @@ impl MemoryManager{
         self.iomemory_manager_tables.wf()
         &&&
         forall|ioid:IOid| 
-            #![trigger self.iomemory_manager_tables[ioid as int]] 
-            #![trigger self.free_ioids@.contains(ioid)] 
+            #![trigger self.get_iommu_table_by_ioid(ioid)] 
+            #![trigger self.get_free_ioids_as_set().contains(ioid)] 
             0 <= ioid < IOID_MAX ==>
-            self.iomemory_manager_tables[ioid as int].is_None() <==> !self.free_ioids@.contains(ioid)
+            self.get_iommu_table_by_ioid(ioid).is_None() <==> self.get_free_ioids_as_set().contains(ioid)
         &&&
         forall|ioid:IOid| 
-            #![trigger self.iomemory_manager_tables[ioid as int].unwrap()]
-            0 <= ioid < IOID_MAX && self.iomemory_manager_tables[ioid as int].is_Some() 
+            #![trigger self.get_iommu_table_by_ioid(ioid).unwrap()]
+            0 <= ioid < IOID_MAX && self.get_iommu_table_by_ioid(ioid).is_Some() 
             ==> 
-            self.iomemory_manager_tables[ioid as int].unwrap().wf()
+            self.get_iommu_table_by_ioid(ioid).unwrap().wf()
             &&
-            self.iomemory_manager_tables[ioid as int].unwrap().ioid =~= Some(ioid)
+            self.get_iommu_table_by_ioid(ioid).unwrap().ioid =~= Some(ioid)
             &&
-            self.iomemory_manager_tables[ioid as int].unwrap().page_closure().subset_of(self.iomemory_manager_table_pages@)        
+            self.get_iommu_table_by_ioid(ioid).unwrap().page_closure().subset_of(self.iomemory_manager_table_pages@)        
             &&
-            self.iomemory_manager_tables[ioid as int].unwrap().kernel_l4_end == 0
+            self.get_iommu_table_by_ioid(ioid).unwrap().kernel_l4_end == 0
         &&&
         forall|ioid_i:IOid, ioid_j:IOid| 
-            #![trigger self.iomemory_manager_tables[ioid_i as int].unwrap().page_closure(), self.iomemory_manager_tables[ioid_j as int].unwrap().page_closure()]
-            0 <= ioid_i < IOID_MAX && self.iomemory_manager_tables[ioid_i as int].is_Some() 
+            #![trigger self.get_iommu_table_by_ioid(ioid_i).unwrap().page_closure(), self.get_iommu_table_by_ioid(ioid_j).unwrap().page_closure()]
+            0 <= ioid_i < IOID_MAX && self.get_iommu_table_by_ioid(ioid_i).is_Some() 
             &&
-            0 <= ioid_j < IOID_MAX && self.iomemory_manager_tables[ioid_j as int].is_Some() 
+            0 <= ioid_j < IOID_MAX && self.get_iommu_table_by_ioid(ioid_j).is_Some() 
             &&
             ioid_i != ioid_j
             ==>
-            self.iomemory_manager_tables[ioid_i as int].unwrap().page_closure().disjoint(self.iomemory_manager_tables[ioid_j as int].unwrap().page_closure())
+            self.get_iommu_table_by_ioid(ioid_i).unwrap().page_closure().disjoint(self.get_iommu_table_by_ioid(ioid_j).unwrap().page_closure())
     }
 
     pub open spec fn pagetable_iomemory_managertable_disjoint(&self) -> bool

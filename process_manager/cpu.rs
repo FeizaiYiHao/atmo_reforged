@@ -5,6 +5,7 @@ verus! {
     #[derive(Clone, Copy)]
     pub struct Cpu{
         pub owning_container: ContainerPtr,
+        pub active: bool,
         pub current_thread: Option<ThreadPtr>,
     }
 }

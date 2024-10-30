@@ -33,6 +33,7 @@ use crate::lemma::lemma_u::*;
         pub fn len(&self) -> (l: usize)
             ensures
                 l == self.value_list_len,
+                self.wf() ==> l == self.len(),
         {
             self.value_list_len
         }

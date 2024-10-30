@@ -80,7 +80,12 @@ verus! {
         {
             self.page_array@[page_ptr2page_index(p) as int].io_mappings@
         }
-
+        pub closed spec fn get_container_owned_pages(&self, c_ptr:ContainerPtr) -> Set<PagePtr>
+            recommends
+                self.container_map_4k@.dom().contains(c_ptr)
+        {
+            self.container_map_4k@[c_ptr]
+        }
 
         pub open spec fn page_array_wf(&self) -> bool{
             &&&
@@ -905,11 +910,19 @@ verus! {
                 self.mapped_pages_4k() =~= old(self).mapped_pages_4k(),
                 self.mapped_pages_2m() =~= old(self).mapped_pages_2m(),
                 self.mapped_pages_1g() =~= old(self).mapped_pages_1g(),
+                self.container_map_4k@.dom() =~= old(self).container_map_4k@.dom(),
                 forall|p:PagePtr| 
                     self.page_is_mapped(p) ==> 
                     self.page_mappings(p) =~= old(self).page_mappings(p)
                     &&
-                    self.page_io_mappings(p) =~= old(self).page_io_mappings(p)
+                    self.page_io_mappings(p) =~= old(self).page_io_mappings(p),
+                ret.1@.is_init(),
+                ret.1@.addr() == ret.0,
+                old(self).allocated_pages_4k().contains(ret.0) == false,
+                forall|c:ContainerPtr| 
+                    #![trigger self.get_container_owned_pages(c)]
+                    self.container_map_4k@.dom().contains(c) ==> 
+                    self.get_container_owned_pages(c) =~= old(self).get_container_owned_pages(c),
         {
             proof{
                 page_ptr_lemma();

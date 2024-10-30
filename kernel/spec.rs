@@ -5,6 +5,7 @@ use crate::memory_manager::spec_impl::*;
 use crate::process_manager::spec_impl::*;
 use crate::util::page_ptr_util_u::*;
 use crate::define::*;
+
 pub struct Kernel{
     pub page_alloc: PageAllocator,
     pub mem_man: MemoryManager,
@@ -30,6 +31,8 @@ impl Kernel{
         self.page_alloc.allocated_pages_2m() =~= Set::empty()
         &&&
         self.page_alloc.allocated_pages_1g() =~= Set::empty()
+        &&&
+        self.page_alloc.container_map_4k@.dom() =~= self.proc_man.container_dom()
     }
 
     pub open spec fn mapping_wf(&self) -> bool{
@@ -40,11 +43,13 @@ impl Kernel{
             &&
             self.mem_man.get_pagetable_mapping_by_pcid(pcid).dom().contains(va)
             ==>
+            self.page_alloc.page_is_mapped(self.mem_man.get_pagetable_mapping_by_pcid(pcid)[va].addr)
+            &&
             self.page_alloc.page_mappings(self.mem_man.get_pagetable_mapping_by_pcid(pcid)[va].addr).contains((pcid,va))
         &&&
         forall|page_ptr:PagePtr, pcid:Pcid, va:VAddr|
             #![auto]
-            page_ptr_valid(page_ptr) && self.page_alloc.page_mappings(page_ptr).contains((pcid,va))
+            self.page_alloc.page_is_mapped(page_ptr) && self.page_alloc.page_mappings(page_ptr).contains((pcid,va))
             ==>
             0 <= pcid < PCID_MAX && va_4k_valid(va) && self.mem_man.get_free_pcids_as_set().contains(pcid) == false
             &&
@@ -55,12 +60,14 @@ impl Kernel{
             0 <= ioid < IOID_MAX && va_4k_valid(va) && self.mem_man.get_free_ioids_as_set().contains(ioid) == false
             &&
             self.mem_man.get_iommu_table_mapping_by_ioid(ioid).dom().contains(va)
-            ==>
+            ==>            
+            self.page_alloc.page_is_mapped(self.mem_man.get_iommu_table_mapping_by_ioid(ioid)[va].addr)
+            &&
             self.page_alloc.page_io_mappings(self.mem_man.get_iommu_table_mapping_by_ioid(ioid)[va].addr).contains((ioid,va))
         &&&
         forall|page_ptr:PagePtr, ioid:IOid, va:VAddr|
             #![auto]
-            page_ptr_valid(page_ptr) && self.page_alloc.page_io_mappings(page_ptr).contains((ioid,va))
+            self.page_alloc.page_is_mapped(page_ptr) && self.page_alloc.page_io_mappings(page_ptr).contains((ioid,va))
             ==>
             0 <= ioid < IOID_MAX && va_4k_valid(va) && self.mem_man.get_free_ioids_as_set().contains(ioid) == false
             &&
@@ -72,13 +79,28 @@ impl Kernel{
         forall|proc_ptr:ProcPtr|
         #![trigger self.proc_man.get_proc(proc_ptr).pcid]
         #![trigger self.proc_man.get_proc(proc_ptr).ioid]
-        self.proc_man.process_perms@.dom().contains(proc_ptr) 
+        self.proc_man.proc_dom().contains(proc_ptr) 
         ==>
         self.mem_man.get_free_pcids_as_set().contains(self.proc_man.get_proc(proc_ptr).pcid) == false
         &&
             self.proc_man.get_proc(proc_ptr).ioid.is_Some() 
             ==> 
             self.mem_man.get_free_ioids_as_set().contains(self.proc_man.get_proc(proc_ptr).ioid.unwrap()) == false
+    }
+
+    pub open spec fn wf(&self) -> bool{
+        &&&
+        self.mem_man.wf()
+        &&&
+        self.page_alloc.wf()
+        &&&
+        self.proc_man.wf()
+        &&&
+        self.memory_wf()
+        &&&
+        self.mapping_wf()
+        &&&
+        self.pcid_ioid_wf()
     }
 }
 
