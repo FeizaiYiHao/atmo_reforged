@@ -13,7 +13,7 @@ pub fn scheduler_push_thread(container_ptr:ContainerPtr, container_perm: &mut Tr
         old(container_perm)@.addr() == container_ptr,
         old(container_perm)@.value().scheduler.wf(),
         old(container_perm)@.value().scheduler.unique(),
-        old(container_perm)@.value().scheduler.len() < CONTAINER_SCHEDULER_LEN,
+        old(container_perm)@.value().scheduler.len() < MAX_CONTAINER_SCHEDULER_LEN,
         old(container_perm)@.value().scheduler@.contains(*thread_ptr) == false,
     ensures
         container_perm@.is_init(),

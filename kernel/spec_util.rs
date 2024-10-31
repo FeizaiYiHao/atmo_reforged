@@ -6,6 +6,7 @@ use crate::process_manager::process::Process;
 use crate::process_manager::thread::Thread;
 use crate::process_manager::container::Container;
 use crate::process_manager::endpoint::Endpoint;
+use crate::process_manager::cpu::*;
 use crate::pagetable::entry::MapEntry;
 
 impl Kernel{
@@ -53,6 +54,15 @@ impl Kernel{
         self.proc_man.get_container(c_ptr)
     }
 
+    pub open spec fn get_container_quota(&self, c_ptr:ContainerPtr) -> usize
+        recommends
+            self.wf(),
+            self.container_dom().contains(c_ptr)
+    {
+        self.proc_man.get_container(c_ptr).mem_quota
+    }
+
+
     pub open spec fn get_endpoint(&self, e_ptr:EndpointPtr) -> &Endpoint
         recommends
             self.wf(),
@@ -75,6 +85,81 @@ impl Kernel{
             self.container_dom().contains(c_ptr),
     {
         self.page_alloc.get_container_owned_pages(c_ptr)
+    }
+
+    pub open spec fn get_is_cpu_running(&self, cpu_i:CpuId) -> bool
+        recommends
+            self.wf(),
+            0 <= cpu_i < NUM_CPUS,
+    {
+        self.proc_man.get_is_cpu_running(cpu_i)
+    }
+
+    pub open spec fn get_is_process_thread_list_full(&self, p_ptr:ProcPtr) -> bool
+        recommends
+            self.wf(),
+            self.proc_dom().contains(p_ptr),
+    {
+        self.get_proc(p_ptr).owned_threads.len() >= MAX_NUM_THREADS_PER_PROC
+    }
+
+    pub open spec fn get_proc_ptr_by_cpu_id(&self, cpu_id:CpuId) -> (ret: Option<ProcPtr>)
+        recommends
+            self.wf(),
+            0 <= cpu_id < NUM_CPUS,
+    {
+        if self.get_is_cpu_running(cpu_id){
+            Some(self.get_thread(self.proc_man.cpu_list@[cpu_id as int].current_thread.unwrap()).owning_proc)
+        }else{
+            None
+        }
+    }
+
+    pub open spec fn get_thread_ptr_by_cpu_id(&self, cpu_id:CpuId) -> (ret: Option<ThreadPtr>)
+        recommends
+            self.wf(),
+            0 <= cpu_id < NUM_CPUS,
+    {
+        self.proc_man.get_thread_ptr_by_cpu_id(cpu_id)
+    }
+
+    pub open spec fn get_owning_proc_by_thread_ptr(&self, t_ptr:ThreadPtr) -> ProcPtr
+        recommends
+            self.wf(),
+            self.thread_dom().contains(t_ptr),
+    {
+        self.get_thread(t_ptr).owning_proc
+    }
+
+    pub open spec fn get_cpu(&self, cpu_id:CpuId) -> &Cpu
+        recommends
+            self.wf(),
+            0 <= cpu_id < NUM_CPUS,
+    {
+        self.proc_man.get_cpu(cpu_id)
+    }
+
+    pub open spec fn get_proc_owning_container(&self, p_ptr:ProcPtr) -> ContainerPtr
+        recommends
+            self.wf(),
+            self.proc_dom().contains(p_ptr),
+    {
+        self.get_proc(p_ptr).owning_container
+    }
+
+    pub open spec fn get_is_scheduler_full(&self, c_ptr:ContainerPtr) -> bool
+        recommends
+            self.wf(),
+            self.container_dom().contains(c_ptr),
+    {
+        self.get_container(c_ptr).scheduler.len() >= MAX_CONTAINER_SCHEDULER_LEN
+    }
+
+    pub open spec fn get_num_of_free_pages(&self) -> usize
+        recommends
+            self.wf(),
+    {
+        self.page_alloc.free_pages_4k.len()
     }
 }
 }

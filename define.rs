@@ -100,6 +100,7 @@ pub enum PageTableErrorCode {
 pub enum ErrorCodeType{
     Success{ value:usize },
     CpuIdle,
+    Error,
 }
 // -------------------- End of Types --------------------
 
@@ -148,7 +149,7 @@ pub const PAGE_ENTRY_EXECUTE_MASK:u64 = 0x1u64<<PAGE_ENTRY_EXECUTE_SHIFT;
 pub const CONTAINER_PROC_LIST_LEN:usize = 10;
 pub const CONTAINER_CHILD_LIST_LEN:usize = 10;
 pub const CONTAINER_ENDPOINT_LIST_LEN:usize = 10;
-pub const CONTAINER_SCHEDULER_LEN:usize = 10;
+pub const MAX_CONTAINER_SCHEDULER_LEN:usize = 10;
 // -------------------- End of Const --------------------
 
 // -------------------- Begin of Structs --------------------
@@ -160,6 +161,24 @@ pub struct SyscallReturnStruct{
 }
 
 impl SyscallReturnStruct{
+
+    pub open spec fn spec_is_error(&self) -> bool{
+        match self.error_code {
+            ErrorCodeType::Error => true,
+            _ => false,
+        }
+    }
+
+    #[verifier(when_used_as_spec(spec_is_error))]
+    pub fn is_error(&self) -> (ret: bool)
+        ensures
+            ret == self.is_error()
+    {
+        match self.error_code {
+            ErrorCodeType::Error => true,
+            _ => false,
+        }
+    }
 
     pub fn NoSwitchNew(error_code:ErrorCodeType )->(ret:Self)
         ensures

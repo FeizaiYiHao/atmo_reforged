@@ -68,7 +68,7 @@ impl ProcessManager{
             self.wf(),
             self.proc_dom().contains(proc_ptr),
         ensures
-            ret =~= self.spec_get_proc(proc_ptr),
+            ret =~= self.get_proc(proc_ptr),
             ret.owned_threads.wf(),
     {
         let tracked proc_perm = self.process_perms.borrow().tracked_borrow(proc_ptr);
@@ -119,6 +119,45 @@ impl ProcessManager{
         thread
     }
 
+    pub closed spec fn spec_get_cpu(&self, cpu_id:CpuId) -> &Cpu
+        recommends
+            self.wf(),
+            0 <= cpu_id < NUM_CPUS,
+    {
+        &self.cpu_list@[cpu_id as int]
+    }
+
+    #[verifier(when_used_as_spec(spec_get_cpu))]
+    pub fn get_cpu(&self, cpu_id:CpuId) -> (ret: &Cpu)
+        requires
+            self.wf(),
+            0 <= cpu_id < NUM_CPUS,
+        ensures
+            ret == self.get_cpu(cpu_id),
+    {
+        self.cpu_list.get(cpu_id)
+    }
+
+    pub closed spec fn spec_get_is_cpu_running(&self, cpu_i:CpuId) -> bool
+        recommends
+            self.wf(),
+            0 <= cpu_i < NUM_CPUS,
+    {
+        self.cpu_list@[cpu_i as int].current_thread.is_Some()
+    }
+
+    #[verifier(when_used_as_spec(spec_get_is_cpu_running))]
+    pub fn get_is_cpu_running(&self, cpu_i:CpuId) -> (ret :bool)
+        requires
+            self.wf(),
+            0 <= cpu_i < NUM_CPUS,
+        ensures
+            ret == self.get_is_cpu_running(cpu_i),
+    {
+        self.cpu_list.get(cpu_i).current_thread.is_some()
+    }
+
+
     pub closed spec fn spec_get_container(&self, container_ptr:ContainerPtr) -> &Container
         recommends
             self.wf(),
@@ -155,6 +194,8 @@ impl ProcessManager{
             self.proc_dom().contains(proc_ptr),
         ensures
             self.get_container_by_proc_ptr(proc_ptr) == ret,
+            self.container_dom().contains(self.get_proc(proc_ptr).owning_container),
+            self.get_container(self.get_proc(proc_ptr).owning_container) == ret,
             ret.scheduler.wf(),
     {
         let container_ptr = self.get_proc(proc_ptr).owning_container;
@@ -206,20 +247,73 @@ impl ProcessManager{
         endpoint
     }
 
+    pub closed spec fn spec_get_thread_ptr_by_cpu_id(&self, cpu_id:CpuId) -> (ret: Option<ThreadPtr>)
+        recommends
+            self.wf(),
+            0 <= cpu_id < NUM_CPUS,
+    {
+        self.cpu_list@[cpu_id as int].current_thread
+    }
+
+    #[verifier(when_used_as_spec(spec_get_thread_ptr_by_cpu_id))]
+    pub fn get_thread_ptr_by_cpu_id(&self, cpu_id:CpuId) -> (ret: Option<ThreadPtr>)
+        requires
+            self.wf(),
+            0 <= cpu_id < NUM_CPUS,
+        ensures
+            ret == self.get_thread_ptr_by_cpu_id(cpu_id),
+            self.get_is_cpu_running(cpu_id) == ret.is_Some(),
+            ret.is_Some() ==> 
+                self.get_cpu(cpu_id).current_thread.is_Some()
+                &&
+                self.thread_dom().contains(ret.unwrap()),
+            self.get_thread_ptr_by_cpu_id(cpu_id) == ret,
+            self.get_cpu(cpu_id).current_thread == ret,
+    {
+        self.cpu_list.get(cpu_id).current_thread
+    }
+
+    pub closed spec fn spec_get_owning_proc_by_thread_ptr(&self, t_ptr:ThreadPtr) -> (ret: ProcPtr)
+        recommends
+            self.wf(),
+            self.thread_dom().contains(t_ptr),
+    {
+        self.get_thread(t_ptr).owning_proc
+    }
+
+    #[verifier(when_used_as_spec(spec_get_owning_proc_by_thread_ptr))]
+    pub fn get_owning_proc_by_thread_ptr(&self, t_ptr:ThreadPtr) -> (ret: ProcPtr)
+        requires
+            self.wf(),
+            self.thread_dom().contains(t_ptr),
+        ensures
+            ret == self.get_owning_proc_by_thread_ptr(t_ptr),
+            self.proc_dom().contains(ret),
+            self.get_thread(t_ptr).owning_proc == ret,
+    {
+        self.get_thread(t_ptr).owning_proc
+    }
+
     pub fn get_proc_ptr_by_cpu_id(&self, cpu_id:CpuId) -> (ret: Option<ProcPtr>)
         requires
             self.wf(),
             0 <= cpu_id < NUM_CPUS,
         ensures
+            self.get_is_cpu_running(cpu_id) <==> ret.is_Some(),
             ret.is_Some()
                 ==> 
+                self.get_is_cpu_running(cpu_id)
+                &&
                 self.cpu_list@[cpu_id as int].current_thread.is_Some()
                 &&
                 self.get_thread(self.cpu_list@[cpu_id as int].current_thread.unwrap()).owning_proc == ret.unwrap()
                 &&
                 self.proc_dom().contains(ret.unwrap()),
             ret.is_None()
-                ==> self.cpu_list@[cpu_id as int].current_thread.is_None()
+                ==> 
+                self.get_is_cpu_running(cpu_id) == false
+                &&
+                self.cpu_list@[cpu_id as int].current_thread.is_None()
              
     {
         let thread_ptr_op = self.cpu_list.get(cpu_id).current_thread;
@@ -265,10 +359,11 @@ impl ProcessManager{
     pub closed spec fn cpus_wf(&self) -> bool{
         &&&
         self.cpu_list.wf()
-        &&&
-        forall|cpu_i:CpuId| 
-            #![trigger self.cpu_list@[cpu_i as int]]
-            self.cpu_list@[cpu_i as int].active == false ==> self.cpu_list@[cpu_i as int].current_thread.is_None()
+        // &&&
+        // forall|cpu_i:CpuId| 
+        //     #![trigger self.cpu_list@[cpu_i as int].active]
+        //     #![trigger self.cpu_list@[cpu_i as int].current_thread]
+        //     self.cpu_list@[cpu_i as int].active == false ==> self.cpu_list@[cpu_i as int].current_thread.is_None()
     }
     pub closed spec fn container_cpu_wf(&self) -> bool{
         &&&
@@ -288,11 +383,14 @@ impl ProcessManager{
         &&&
         forall|cpu_i:CpuId|
         #![trigger self.cpu_list@[cpu_i as int].owning_container]
+        #![trigger self.cpu_list@[cpu_i as int].active]
         0 <= cpu_i < NUM_CPUS 
         ==> 
         self.container_perms@.dom().contains(self.cpu_list@[cpu_i as int].owning_container)
         &&
         self.container_perms@[self.cpu_list@[cpu_i as int].owning_container].value().owned_cpus@.contains(cpu_i)
+        &&
+        self.cpu_list@[cpu_i as int].active == false ==> self.cpu_list@[cpu_i as int].current_thread.is_None()
     }
 
     pub closed spec fn threads_cpu_wf(&self) -> bool {
@@ -707,7 +805,7 @@ impl ProcessManager{
             old(self).page_closure().contains(page_ptr) == false,
             old(self).get_proc(target_proc_ptr).owned_threads.len() < MAX_NUM_THREADS_PER_PROC,
             old(self).get_container_by_proc_ptr(target_proc_ptr).mem_quota > 0,
-            old(self).get_container_by_proc_ptr(target_proc_ptr).scheduler.len() < CONTAINER_SCHEDULER_LEN,
+            old(self).get_container_by_proc_ptr(target_proc_ptr).scheduler.len() < MAX_CONTAINER_SCHEDULER_LEN,
             page_perm@.is_init(),
             page_perm@.addr() == page_ptr,
         ensures
@@ -835,7 +933,7 @@ impl ProcessManager{
             old(self).page_closure().contains(page_ptr) == false,
             old(self).get_proc(proc_ptr).owned_threads.len() < MAX_NUM_THREADS_PER_PROC,
             old(self).get_container_by_proc_ptr(proc_ptr).mem_quota > 0,
-            old(self).get_container_by_proc_ptr(proc_ptr).scheduler.len() < CONTAINER_SCHEDULER_LEN,
+            old(self).get_container_by_proc_ptr(proc_ptr).scheduler.len() < MAX_CONTAINER_SCHEDULER_LEN,
             old(self).get_thread(thread_ptr).owning_proc == proc_ptr,
             0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
             old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).is_Some(),

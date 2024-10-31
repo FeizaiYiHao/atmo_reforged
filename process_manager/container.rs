@@ -22,6 +22,6 @@ verus! {
         // pub mem_used_1g: usize,
 
         pub owned_cpus: ArraySet<NUM_CPUS>,
-        pub scheduler: StaticLinkedList<ThreadPtr,CONTAINER_SCHEDULER_LEN>,
+        pub scheduler: StaticLinkedList<ThreadPtr,MAX_CONTAINER_SCHEDULER_LEN>,
     }
 }
