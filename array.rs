@@ -31,7 +31,7 @@ impl<A, const N: usize> Array<A, N> {
             0 <= i < N,
             self.seq@.len() == N,
         ensures
-            *out == self.seq@.index(i as int),
+            *out == self.seq@[i as int],
             self.seq@.len() == N,
     {
         &self.ar[i]

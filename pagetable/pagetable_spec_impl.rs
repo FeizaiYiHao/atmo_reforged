@@ -741,7 +741,26 @@ impl PageTable{
 
 // proof
 impl PageTable{
- 
+
+    pub proof fn no_mapping_infer_no_reslove(&self)
+        requires
+            self.wf(),
+        ensures
+            self.mapping_2m().dom() =~= Set::empty()
+            ==>
+            forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
+                #![trigger self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 ==>
+                    self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i).is_Some() == false,
+            self.mapping_1g().dom() =~= Set::empty()
+            ==>
+            forall|l4i: L4Index,l3i: L3Index| 
+                #![trigger self.spec_resolve_mapping_1g_l3(l4i,l3i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 ==>
+                    self.spec_resolve_mapping_1g_l3(l4i,l3i).is_Some() == false,
+    {
+    }
+    
     pub proof fn ps_entries_exist_in_mapped_pages(&self)
         requires
             self.wf(),
@@ -918,6 +937,153 @@ impl PageTable{
     // {
 
     // }
+
+    pub fn get_entry_l4(&self, target_l4i: L4Index) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            self.kernel_l4_end <= target_l4i < 512,
+        ensures
+            self.spec_resolve_mapping_l4(target_l4i) == ret,
+            forall|l3i: L3Index, l2i: L2Index, l1i: L1Index| 
+                #![trigger spec_index2va((target_l4i, l3i, l2i, l1i))]
+                #![trigger self.spec_resolve_mapping_4k_l1(target_l4i, l3i, l2i, l1i)]
+                0<=l3i<512 && 0<=l2i<512 && 0<=l1i<512 && ret.is_None()
+                ==> 
+                self.spec_resolve_mapping_4k_l1(target_l4i, l3i, l2i, l1i).is_None()
+                &&
+                self.mapping_4k().dom().contains(spec_index2va((target_l4i, l3i, l2i, l1i))) == false,
+    {
+        let tracked l4_perm = self.l4_table.borrow().tracked_borrow(self.cr3);
+        let l4_tbl : &PageMap = PPtr::<PageMap>::from_usize(self.cr3).borrow(Tracked(l4_perm));
+        let l4_entry = l4_tbl.get(target_l4i);
+        if l4_entry.perm.present{
+            Some(l4_entry)
+        }else{
+            None
+        }
+    }
+
+    pub fn get_entry_l3(&self, target_l4i: L4Index, target_l3i: L3Index, l4_entry: &PageEntry) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            self.kernel_l4_end <= target_l4i < 512,
+            0 <= target_l3i < 512,
+            self.spec_resolve_mapping_l4(target_l4i) =~= Some(*l4_entry),
+        ensures
+            self.spec_resolve_mapping_l3(target_l4i, target_l3i) =~= ret,            
+            forall|l2i: L2Index, l1i: L1Index| 
+                #![trigger spec_index2va((target_l4i, target_l3i, l2i, l1i))]
+                #![trigger self.spec_resolve_mapping_4k_l1(target_l4i, target_l3i, l2i, l1i)]
+                0<=l2i<512 && 0<=l1i<512 && ret.is_None()
+                ==> 
+                self.spec_resolve_mapping_4k_l1(target_l4i, target_l3i, l2i, l1i).is_None()
+                &&
+                self.mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, l2i, l1i))) == false,
+    {
+        let tracked l3_perm = self.l3_tables.borrow().tracked_borrow(l4_entry.addr);
+        let l3_tbl : &PageMap = PPtr::<PageMap>::from_usize(l4_entry.addr).borrow(Tracked(l3_perm));
+        let l3_entry = l3_tbl.get(target_l3i);
+        if l3_entry.perm.present && !l3_entry.perm.ps{
+            Some(l3_entry)
+        }else{
+            None
+        }
+    }
+
+    pub fn get_entry_1g_l3(&self, target_l4i: L4Index, target_l3i: L3Index, l4_entry: &PageEntry) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            self.kernel_l4_end <= target_l4i < 512,
+            0 <= target_l3i < 512,
+            self.spec_resolve_mapping_l4(target_l4i) =~= Some(*l4_entry),
+        ensures
+            self.spec_resolve_mapping_1g_l3(target_l4i, target_l3i) =~= ret,
+    {
+        let tracked l3_perm = self.l3_tables.borrow().tracked_borrow(l4_entry.addr);
+        let l3_tbl : &PageMap = PPtr::<PageMap>::from_usize(l4_entry.addr).borrow(Tracked(l3_perm));
+        let l3_entry = l3_tbl.get(target_l3i);
+        if l3_entry.perm.present && l3_entry.perm.ps{
+            Some(l3_entry)
+        }else{
+            None
+        }
+    }
+
+    pub fn get_entry_l2(&self, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, l3_entry: &PageEntry) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            self.kernel_l4_end <= target_l4i < 512,
+            0 <= target_l3i < 512,
+            0 <= target_l2i < 512,
+            self.spec_resolve_mapping_l3(target_l4i,target_l3i) =~= Some(*l3_entry),
+        ensures
+            self.spec_resolve_mapping_l2(target_l4i, target_l3i, target_l2i) =~= ret,
+            forall|l1i: L1Index| 
+                #![trigger spec_index2va((target_l4i, target_l3i, target_l2i, l1i))]
+                #![trigger self.spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, l1i)]
+                0<=l1i<512 && ret.is_None()
+                ==> 
+                self.spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, l1i).is_None()
+                &&
+                self.mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, target_l2i, l1i))) == false,
+    {
+        proof{va_lemma();}
+        let tracked l2_perm = self.l2_tables.borrow().tracked_borrow(l3_entry.addr);
+        let l2_tbl : &PageMap = PPtr::<PageMap>::from_usize(l3_entry.addr).borrow(Tracked(l2_perm));
+        let l2_entry = l2_tbl.get(target_l2i);
+        if l2_entry.perm.present && !l2_entry.perm.ps{
+            Some(l2_entry)
+        }else{
+            None
+        }
+    }
+
+    pub fn get_entry_2m_l2(&self, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, l3_entry: &PageEntry) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            self.kernel_l4_end <= target_l4i < 512,
+            0 <= target_l3i < 512,
+            0 <= target_l2i < 512,
+            self.spec_resolve_mapping_l3(target_l4i,target_l3i) =~= Some(*l3_entry),
+        ensures
+            self.spec_resolve_mapping_2m_l2(target_l4i, target_l3i, target_l2i) =~= ret,
+    {
+        let tracked l2_perm = self.l2_tables.borrow().tracked_borrow(l3_entry.addr);
+        let l2_tbl : &PageMap = PPtr::<PageMap>::from_usize(l3_entry.addr).borrow(Tracked(l2_perm));
+        let l2_entry = l2_tbl.get(target_l2i);
+        if l2_entry.perm.present && l2_entry.perm.ps{
+            Some(l2_entry)
+        }else{
+            None
+        }
+    }
+
+    pub fn get_entry_l1(&self, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, target_l1i: L2Index, l2_entry: &PageEntry) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            self.kernel_l4_end <= target_l4i < 512,
+            0 <= target_l3i < 512,
+            0 <= target_l2i < 512,
+            0 <= target_l1i < 512,
+            self.spec_resolve_mapping_l2(target_l4i,target_l3i,target_l2i) =~= Some(*l2_entry),
+        ensures
+            self.spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, target_l1i) =~= ret,
+            self.mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))) =~= ret.is_Some(),
+            ret.is_Some() ==> 
+                self.mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i)))
+                &&
+                self.mapping_4k()[spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))] == page_entry_to_map_entry(&ret.unwrap()),
+    {
+        proof{va_lemma();}
+        let tracked l1_perm = self.l1_tables.borrow().tracked_borrow(l2_entry.addr);
+        let l1_tbl : &PageMap = PPtr::<PageMap>::from_usize(l2_entry.addr).borrow(Tracked(l1_perm));
+        let l1_entry = l1_tbl.get(target_l1i);
+        if l1_entry.perm.present{
+            Some(l1_entry)
+        }else{
+            None
+        }
+    }
 
     pub fn create_entry_l4(&mut self, target_l4i: L4Index, page_map_ptr: PageMapPtr, Tracked(page_map_perm): Tracked<PointsTo<PageMap>>)
         requires

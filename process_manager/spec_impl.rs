@@ -238,7 +238,7 @@ impl ProcessManager{
     pub fn get_endpoint(&self, endpoint_ptr:EndpointPtr) -> (ret:&Endpoint)
         requires
             self.wf(),
-            self.endpoint_perms@.dom().contains(endpoint_ptr),
+            self.endpoint_dom().contains(endpoint_ptr),
         ensures
             ret == self.get_endpoint(endpoint_ptr)
     {
@@ -322,6 +322,28 @@ impl ProcessManager{
         }else{
             return None;
         }
+    }
+
+    pub closed spec fn spec_get_endpoint_ptr_by_endpoint_idx(&self, thread_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> Option<EndpointPtr>
+        recommends
+            self.wf(),
+            self.thread_dom().contains(thread_ptr),
+            0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
+    {
+        self.get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int]
+    }
+
+    #[verifier(when_used_as_spec(spec_get_endpoint_ptr_by_endpoint_idx))]
+    pub fn get_endpoint_ptr_by_endpoint_idx(&self, thread_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> (ret: Option<EndpointPtr>)
+        requires
+            self.wf(),
+            self.thread_dom().contains(thread_ptr),
+            0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
+        ensures
+            ret == self.get_endpoint_ptr_by_endpoint_idx(thread_ptr,endpoint_index),
+            ret.is_Some() ==> self.endpoint_dom().contains(ret.unwrap()),
+    {
+        *self.get_thread(thread_ptr).endpoint_descriptors.get(endpoint_index)
     }
 
     pub closed spec fn spec_get_endpoint_by_endpoint_idx(&self, thread_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> Option<&Endpoint>
@@ -936,8 +958,8 @@ impl ProcessManager{
             old(self).get_container_by_proc_ptr(proc_ptr).scheduler.len() < MAX_CONTAINER_SCHEDULER_LEN,
             old(self).get_thread(thread_ptr).owning_proc == proc_ptr,
             0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
-            old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).is_Some(),
-            old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).unwrap().rf_counter_is_full() == false,
+            old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).is_Some() || old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).is_Some(),
+            old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).unwrap().rf_counter_is_full() == false || old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).rf_counter_is_full() == false,
             page_perm@.is_init(),
             page_perm@.addr() == page_ptr,
         ensures
@@ -950,11 +972,11 @@ impl ProcessManager{
             old(self).get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota - 1 == self.get_container(self.get_proc(proc_ptr).owning_container).mem_quota,
             old(self).get_proc(proc_ptr).pcid =~= self.get_proc(proc_ptr).pcid,
             old(self).get_proc(proc_ptr).ioid =~= self.get_proc(proc_ptr).ioid,
-            forall|proc_ptr:ProcPtr|
-                #![trigger self.get_proc(proc_ptr)]
-                self.proc_dom().contains(proc_ptr) && proc_ptr != proc_ptr
+            forall|p_ptr:ProcPtr|
+                #![trigger self.get_proc(p_ptr)]
+                self.proc_dom().contains(p_ptr) && p_ptr != proc_ptr
                 ==> 
-                self.get_proc(proc_ptr) =~= old(self).get_proc(proc_ptr),
+                self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
             forall|container_ptr:ContainerPtr|
                 #![trigger self.get_container(container_ptr).owned_procs]
                 self.container_dom().contains(container_ptr) && container_ptr != self.get_proc(proc_ptr).owning_container

@@ -8,6 +8,7 @@ use crate::array::Array;
 use crate::memory_manager::*;
 use crate::pagetable::pagetable_spec_impl::PageTable;
 use crate::pagetable::entry::*;
+use crate::util::page_ptr_util_u::*;
 
 pub struct MemoryManager{
     pub kernel_entries: Array<usize,KERNEL_MEM_END_L4INDEX>,
@@ -61,6 +62,11 @@ impl MemoryManager{
             self.get_pagetable_by_pcid(pcid).unwrap().kernel_entries@ =~= self.kernel_entries_ghost@     
             &&
             self.get_pagetable_by_pcid(pcid).unwrap().kernel_l4_end == KERNEL_MEM_END_L4INDEX
+            // for now, we disable hugepages
+            &&
+            self.get_pagetable_by_pcid(pcid).unwrap().mapping_2m().dom() == Set::<VAddr>::empty()
+            &&
+            self.get_pagetable_by_pcid(pcid).unwrap().mapping_1g().dom() == Set::<VAddr>::empty()
         &&&
         forall|pcid_i:Pcid, pcid_j:Pcid| 
             #![trigger self.get_pagetable_by_pcid(pcid_i).unwrap().page_closure(), self.get_pagetable_by_pcid(pcid_j).unwrap().page_closure()]
@@ -99,7 +105,11 @@ impl MemoryManager{
             &&
             self.get_iommu_table_by_ioid(ioid).unwrap().page_closure().subset_of(self.iomemory_manager_table_pages@)        
             &&
-            self.get_iommu_table_by_ioid(ioid).unwrap().kernel_l4_end == 0
+            self.get_iommu_table_by_ioid(ioid).unwrap().kernel_l4_end == 0            
+            &&
+            self.get_iommu_table_by_ioid(ioid).unwrap().mapping_2m().dom() == Set::<VAddr>::empty()
+            &&
+            self.get_iommu_table_by_ioid(ioid).unwrap().mapping_1g().dom() == Set::<VAddr>::empty()
         &&&
         forall|ioid_i:IOid, ioid_j:IOid| 
             #![trigger self.get_iommu_table_by_ioid(ioid_i).unwrap().page_closure(), self.get_iommu_table_by_ioid(ioid_j).unwrap().page_closure()]
@@ -214,7 +224,7 @@ impl MemoryManager{
         recommends 
             0<=pcid<PCID_MAX,
     {
-        self.page_tables[pcid as int]
+        self.page_tables@[pcid as int]
     }
 
     pub open spec fn get_pagetable_mapping_by_pcid(&self, pcid: Pcid) -> Map<VAddr,MapEntry>
@@ -222,7 +232,7 @@ impl MemoryManager{
             0<=pcid<PCID_MAX,
             self.get_pagetable_by_pcid(pcid).is_Some(),
     {
-        self.page_tables[pcid as int].unwrap().mapping_4k()
+        self.page_tables@[pcid as int].unwrap().mapping_4k()
     }
     
     pub open spec fn get_pagetable_page_closure_by_pcid(&self, pcid: Pcid) -> Set<PagePtr>
@@ -313,6 +323,138 @@ impl MemoryManager{
         self.root_table_cache_wf()
         &&&
         self.kernel_entries_wf()
+    }
+
+    pub fn get_pagetable_l4_entry(&self, pcid:Pcid, l4i: L4Index) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            0 <= pcid < PCID_MAX,
+            KERNEL_MEM_END_L4INDEX <= l4i < 512,
+            self.get_free_pcids_as_set().contains(pcid) == false,
+        ensures
+            ret =~= self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l4(l4i),
+            forall|l3i: L3Index, l2i: L2Index, l1i: L1Index| 
+                #![trigger spec_index2va((l4i, l3i, l2i, l1i))]
+                #![trigger self.page_tables@[pcid as int].unwrap().spec_resolve_mapping_4k_l1(l4i, l3i, l2i, l1i)]
+                0<=l3i<512 && 0<=l2i<512 && 0<=l1i<512 && ret.is_None()
+                ==> 
+                self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_4k_l1(l4i, l3i, l2i, l1i).is_None()
+                &&
+                self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k().dom().contains(spec_index2va((l4i, l3i, l2i, l1i))) == false,
+    {
+        proof{va_lemma();}
+        let ret = self.page_tables.get(pcid).as_ref().unwrap().get_entry_l4(l4i);
+        assert(
+            self.page_tables@[pcid as int].unwrap().spec_resolve_mapping_l4(l4i) == ret
+        );
+        assert(
+            forall|l3i: L3Index, l2i: L2Index, l1i: L1Index| 
+            #![trigger spec_index2va((l4i, l3i, l2i, l1i))]
+            #![trigger self.page_tables@[pcid as int].unwrap().spec_resolve_mapping_4k_l1(l4i, l3i, l2i, l1i)]
+            0<=l3i<512 && 0<=l2i<512 && 0<=l1i<512 && ret.is_None()
+            ==> 
+            self.page_tables@[pcid as int].unwrap().spec_resolve_mapping_4k_l1(l4i, l3i, l2i, l1i).is_None()
+            &&
+            self.page_tables@[pcid as int].unwrap().mapping_4k().dom().contains(spec_index2va((l4i, l3i, l2i, l1i))) == false
+        );
+        return ret;
+    }
+
+    pub fn get_pagetable_l3_entry(&self, pcid:Pcid, target_l4i: L4Index, target_l3i: L3Index, l4_entry: &PageEntry) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            KERNEL_MEM_END_L4INDEX <= target_l4i < 512,
+            0 <= target_l3i < 512,
+            self.get_free_pcids_as_set().contains(pcid) == false,
+            self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l4(target_l4i) =~= Some(*l4_entry),
+        ensures
+            self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l3(target_l4i, target_l3i) =~= ret,
+            forall|l2i: L2Index, l1i: L1Index| 
+                #![trigger spec_index2va((target_l4i, target_l3i, l2i, l1i))]
+                #![trigger self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_4k_l1(target_l4i, target_l3i, l2i, l1i)]
+                0<=l2i<512 && 0<=l1i<512 && ret.is_None()
+                ==> 
+                self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_4k_l1(target_l4i, target_l3i, l2i, l1i).is_None()
+                &&
+                self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, l2i, l1i))) == false,
+    {
+        self.page_tables.get(pcid).as_ref().unwrap().get_entry_l3(target_l4i, target_l3i, l4_entry)
+    }
+
+    pub fn get_pagetable_l2_entry(&self, pcid:Pcid, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, l3_entry: &PageEntry) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            self.get_free_pcids_as_set().contains(pcid) == false,
+            KERNEL_MEM_END_L4INDEX <= target_l4i < 512,
+            0 <= target_l3i < 512,
+            0 <= target_l2i < 512,
+            self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l3(target_l4i,target_l3i) =~= Some(*l3_entry),
+        ensures
+            self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l2(target_l4i, target_l3i, target_l2i) =~= ret,
+            forall|l1i: L1Index| 
+                #![trigger spec_index2va((target_l4i, target_l3i, target_l2i, l1i))]
+                #![trigger self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, l1i)]
+                0<=l1i<512 && ret.is_None()
+                ==> 
+                self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, l1i).is_None()
+                &&
+                self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, target_l2i, l1i))) == false,
+    {
+        self.page_tables.get(pcid).as_ref().unwrap().get_entry_l2(target_l4i, target_l3i, target_l2i, l3_entry)
+    }
+
+    pub fn get_pagetable_l1_entry(&self, pcid:Pcid, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, target_l1i: L2Index, l2_entry: &PageEntry) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            self.get_free_pcids_as_set().contains(pcid) == false,
+            KERNEL_MEM_END_L4INDEX <= target_l4i < 512,
+            0 <= target_l3i < 512,
+            0 <= target_l2i < 512,
+            0 <= target_l1i < 512,
+            self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l2(target_l4i,target_l3i,target_l2i) =~= Some(*l2_entry),
+        ensures
+            self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, target_l1i) =~= ret,
+            self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))) =~= ret.is_Some(),
+            ret.is_Some() ==> 
+                self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i)))
+                &&
+                self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k()[spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))] == page_entry_to_map_entry(&ret.unwrap()),
+    {
+        self.page_tables.get(pcid).as_ref().unwrap().get_entry_l1(target_l4i, target_l3i, target_l2i, target_l1i, l2_entry)
+    }
+
+    pub fn reslove_pagetable_mapping(&self, pcid:Pcid, va:VAddr) -> (ret: Option<PageEntry>)
+        requires
+            self.wf(),
+            self.get_free_pcids_as_set().contains(pcid) == false,
+            va_4k_valid(va),
+        ensures
+            self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k().dom().contains(va) == ret.is_Some(),
+    {
+        proof{va_lemma();}
+        proof{self.get_pagetable_by_pcid(pcid).unwrap().no_mapping_infer_no_reslove();}
+        let (l4i, l3i, l2i, l1i) = va2index(va);
+        assert(spec_index2va((l4i, l3i, l2i, l1i)) == va);
+        let l4_entry_op = self.get_pagetable_l4_entry(pcid, l4i);
+        if l4_entry_op.is_none(){
+            return None;
+        }
+        let l4_entry = l4_entry_op.unwrap();
+        let l3_entry_op = self.get_pagetable_l3_entry(pcid, l4i, l3i, &l4_entry);
+        if l3_entry_op.is_none(){
+            return None;
+        }
+        let l3_entry = l3_entry_op.unwrap();
+        let l2_entry_op = self.get_pagetable_l2_entry(pcid, l4i, l3i, l2i, &l3_entry);
+        if l2_entry_op.is_none(){
+            return None;
+        }
+        let l2_entry = l2_entry_op.unwrap();        
+        let l1_entry_op = self.get_pagetable_l1_entry(pcid, l4i, l3i, l2i, l1i, &l2_entry);
+        if l1_entry_op.is_none(){
+            return None;
+        }
+        l1_entry_op
     }
 }
 }

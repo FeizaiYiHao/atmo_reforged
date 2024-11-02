@@ -233,6 +233,7 @@ pub fn va2index(va: usize) -> (ret : (L4Index,L3Index,L2Index,L1Index))
         ret.1 == spec_v2l3index(va) && ret.1 <= 0x1ff,
         ret.2 == spec_v2l2index(va) && ret.2 <= 0x1ff,
         ret.3 == spec_v2l1index(va) && ret.3 <= 0x1ff,
+        ret == spec_va2index(va),
 {
     (v2l4index(va),v2l3index(va),v2l2index(va),v2l1index(va))
 }
@@ -467,7 +468,14 @@ pub proof fn va_lemma()
             forall|l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index|
                 #![trigger va_4k_valid(spec_index2va((l4i,l3i,l2i,l1i)))]
                 0<=l4i<512 && 0<=l3i<512 && 0<=l2i<512 && 0<=l1i<512 ==>
-                    va_4k_valid(spec_index2va((l4i,l3i,l2i,l1i)))
+                    va_4k_valid(spec_index2va((l4i,l3i,l2i,l1i))),
+        forall|va:VAddr, l4i: L4Index, l3i: L3Index, l2i: L2Index, l1i: L1Index| 
+            #![trigger spec_index2va((l4i,l3i,l2i,l1i)), spec_va2index(va)]
+            va_4k_valid(va) && spec_va2index(va) == (l4i,l3i,l2i,l1i) 
+            <==> 
+            KERNEL_MEM_END_L4INDEX<=l4i<512 && 0<=l3i<512 && 0<=l2i<512 && 0<=l1i<512
+            &&
+            spec_index2va((l4i,l3i,l2i,l1i)) == va,
 {
     // assert(forall|va:VAddr| #![auto] (va & (!0x0000_fffc_0000_0000u64) as usize == 0) && (va as u64 >> 39u64 & 0x1ffu64) >= 1u64 as u64 ==>
     //     0 <= ((va >> 39 & 0x1ff) as usize) < 512
