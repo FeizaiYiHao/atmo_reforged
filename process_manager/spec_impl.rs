@@ -70,6 +70,7 @@ impl ProcessManager{
         ensures
             ret =~= self.get_proc(proc_ptr),
             ret.owned_threads.wf(),
+            self.container_dom().contains(ret.owning_container)
     {
         let tracked proc_perm = self.process_perms.borrow().tracked_borrow(proc_ptr);
         let proc : &Process = PPtr::<Process>::from_usize(proc_ptr).borrow(Tracked(proc_perm));
@@ -793,6 +794,20 @@ impl ProcessManager{
 
 //proofs
 impl ProcessManager{
+    pub proof fn wf_imply_proc_to_unique_pcid(&self) 
+        requires
+            self.wf(),
+        ensures
+            forall|p_ptr_i:ProcPtr, p_ptr_j:ProcPtr|
+                #![trigger self.get_proc(p_ptr_i).pcid, self.get_proc(p_ptr_j).pcid]
+                self.proc_dom().contains(p_ptr_i) && self.proc_dom().contains(p_ptr_j) 
+                &&
+                p_ptr_i != p_ptr_j
+                ==>
+                self.get_proc(p_ptr_i).pcid != self.get_proc(p_ptr_j).pcid
+    {
+    }
+
     pub proof fn wf_imply_container_proc_disjoint(&self)
         requires
             self.wf(),

@@ -1,7 +1,14 @@
-pub open spec fn get_endpoint(&self, endpoint_ptr:EndpointPtr) -> &Endpoint
-recommends
-    self.wf(),
-    self.endpoint_dom().contains(endpoint_ptr)
-{
-self.proc_man.get_endpoint(endpoint_ptr)
-}
+self.get_pagetable_by_pcid(pcid).is_Some(),
+self.get_pagetable_by_pcid(pcid).unwrap().wf(),
+self.get_pagetable_by_pcid(pcid).unwrap().pcid == old(self).get_pagetable_by_pcid(pcid).unwrap().pcid, 
+self.get_pagetable_by_pcid(pcid).unwrap().kernel_l4_end == old(self).get_pagetable_by_pcid(pcid).unwrap().kernel_l4_end,  
+self.get_pagetable_by_pcid(pcid).unwrap().page_closure() =~= old(self).get_pagetable_by_pcid(pcid).unwrap().page_closure().insert(page_map_ptr),
+self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k() =~= old(self).get_pagetable_by_pcid(pcid).unwrap().mapping_4k(),
+self.get_pagetable_by_pcid(pcid).unwrap().mapping_2m() =~= old(self).get_pagetable_by_pcid(pcid).unwrap().mapping_2m(),
+self.get_pagetable_by_pcid(pcid).unwrap().mapping_1g() =~= old(self).get_pagetable_by_pcid(pcid).unwrap().mapping_1g(),
+self.get_pagetable_by_pcid(pcid).unwrap().mapped_4k_pages() =~= old(self).get_pagetable_by_pcid(pcid).unwrap().mapped_4k_pages(),
+self.get_pagetable_by_pcid(pcid).unwrap().mapped_2m_pages() =~= old(self).get_pagetable_by_pcid(pcid).unwrap().mapped_2m_pages(),
+self.get_pagetable_by_pcid(pcid).unwrap().mapped_1g_pages() =~= old(self).get_pagetable_by_pcid(pcid).unwrap().mapped_1g_pages(),
+self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l4(target_l4i).is_Some(),
+self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l4(target_l4i).get_Some_0().addr == page_map_ptr,
+self.get_pagetable_by_pcid(pcid).unwrap().kernel_entries =~= old(self).get_pagetable_by_pcid(pcid).unwrap().kernel_entries,

@@ -741,6 +741,28 @@ impl PageTable{
 
 // proof
 impl PageTable{
+    pub proof fn no_mapping_infer_not_mapped(&self, page_map_ptr:PageMapPtr)
+        requires
+            self.wf(),
+            forall|va:VAddr|
+            #![trigger self.mapping_4k().dom().contains(va)]
+            #![trigger self.mapping_4k()[va]]
+            self.mapping_4k().dom().contains(va)
+            ==>
+            self.mapping_4k()[va].addr != page_map_ptr,
+            forall|va:VAddr|
+            #![auto]
+            self.mapping_2m().dom().contains(va)
+            ==>
+            self.mapping_2m()[va].addr != page_map_ptr,
+            forall|va:VAddr|
+            #![auto]
+            self.mapping_1g().dom().contains(va)
+            ==>
+            self.mapping_1g()[va].addr != page_map_ptr,
+        ensures
+            self.page_not_mapped(page_map_ptr),
+    {}
 
     pub proof fn no_mapping_infer_no_reslove(&self)
         requires
@@ -1102,6 +1124,7 @@ impl PageTable{
         ensures
             self.wf(),
             self.kernel_l4_end == old(self).kernel_l4_end,  
+            self.pcid == old(self).pcid,  
             self.page_closure() =~= old(self).page_closure().insert(page_map_ptr),
             self.mapping_4k() =~= old(self).mapping_4k(),
             self.mapping_2m() =~= old(self).mapping_2m(),

@@ -572,6 +572,29 @@ verus! {
 
     // proof
     impl PageAllocator{
+        pub proof fn free_pages_are_not_mapped(&self)
+            requires
+                self.wf(),
+            ensures
+                forall|page_ptr:PagePtr|
+                    #![trigger self.free_pages_4k().contains(page_ptr)]
+                    #![trigger self.page_is_mapped(page_ptr)]
+                    self.free_pages_4k().contains(page_ptr)
+                    ==>
+                    self.page_is_mapped(page_ptr) == false,
+        {
+            assert(
+                forall|page_ptr:PagePtr|
+                    #![trigger self.free_pages_4k().contains(page_ptr)]
+                    #![trigger self.page_is_mapped(page_ptr)]
+                    self.free_pages_4k().contains(page_ptr)
+                    ==>
+                    page_ptr_valid(page_ptr)
+                    &&
+                    self.page_array@[page_ptr2page_index(page_ptr) as int].state == PageState::Free4k
+                    &&
+                    self.page_is_mapped(page_ptr) == false);
+        }
         // pub proof fn page_ptr_page_index_lemma(&self)
         //     requires
         //         self.wf(),

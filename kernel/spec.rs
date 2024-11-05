@@ -39,7 +39,7 @@ impl Kernel{
         &&&
         forall|pcid:Pcid, va:VAddr|
             #![auto]
-            0 <= pcid < PCID_MAX && va_4k_valid(va) && self.mem_man.get_free_pcids_as_set().contains(pcid) == false
+            self.mem_man.pcid_active(pcid)
             &&
             self.mem_man.get_pagetable_mapping_by_pcid(pcid).dom().contains(va)
             ==>
@@ -78,14 +78,17 @@ impl Kernel{
         &&&
         forall|proc_ptr:ProcPtr|
         #![trigger self.proc_man.get_proc(proc_ptr).pcid]
-        #![trigger self.proc_man.get_proc(proc_ptr).ioid]
         self.proc_man.proc_dom().contains(proc_ptr) 
         ==>
-        self.mem_man.get_free_pcids_as_set().contains(self.proc_man.get_proc(proc_ptr).pcid) == false
+        self.mem_man.pcid_active(self.proc_man.get_proc(proc_ptr).pcid)
+        &&&
+        forall|proc_ptr:ProcPtr|
+        #![trigger self.proc_man.get_proc(proc_ptr).ioid]
+        self.proc_man.proc_dom().contains(proc_ptr) 
         &&
-            self.proc_man.get_proc(proc_ptr).ioid.is_Some() 
-            ==> 
-            self.mem_man.get_free_ioids_as_set().contains(self.proc_man.get_proc(proc_ptr).ioid.unwrap()) == false
+        self.proc_man.get_proc(proc_ptr).ioid.is_Some() 
+        ==> 
+        self.mem_man.ioid_active(self.proc_man.get_proc(proc_ptr).ioid.unwrap())
     }
 
     pub open spec fn wf(&self) -> bool{

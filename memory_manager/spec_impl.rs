@@ -9,6 +9,8 @@ use crate::memory_manager::*;
 use crate::pagetable::pagetable_spec_impl::PageTable;
 use crate::pagetable::entry::*;
 use crate::util::page_ptr_util_u::*;
+use vstd::simple_pptr::PointsTo;
+use crate::pagetable::pagemap::PageMap;
 
 pub struct MemoryManager{
     pub kernel_entries: Array<usize,KERNEL_MEM_END_L4INDEX>,
@@ -18,10 +20,9 @@ pub struct MemoryManager{
     pub page_tables: Array<Option<PageTable>,PCID_MAX>,
     pub page_table_pages: Ghost<Set<PagePtr>>,
 
-
     pub free_ioids: ArrayVec<IOid,IOID_MAX>, //actual owners are procs
-    pub iomemory_manager_tables:  Array<Option<PageTable>,IOID_MAX>,
-    pub iomemory_manager_table_pages: Ghost<Set<PagePtr>>,
+    pub iommu_tables:  Array<Option<PageTable>,IOID_MAX>,
+    pub iommu_table_pages: Ghost<Set<PagePtr>>,
 
     pub root_table:RootTable,
     pub root_table_cache: Ghost<Seq<Seq<Seq<Option<(IOid,usize)>>>>>,
@@ -32,6 +33,19 @@ pub struct MemoryManager{
 }
 
 impl MemoryManager{
+    pub open spec fn pcid_active(&self, pcid:Pcid) -> bool{
+        &&&
+        0 <= pcid < PCID_MAX
+        &&&
+        self.get_free_pcids_as_set().contains(pcid) == false
+    }
+
+    pub open spec fn ioid_active(&self, ioid:IOid) -> bool{
+        &&&
+        0 <= ioid < IOID_MAX
+        &&&
+        self.get_free_ioids_as_set().contains(ioid) == false
+    }
 
     pub open spec fn pagetables_wf(&self) -> bool{
         &&&
@@ -44,42 +58,43 @@ impl MemoryManager{
         self.page_tables.wf()
         &&&
         forall|pcid:Pcid| 
-            #![trigger self.get_pagetable_by_pcid(pcid)] 
+            #![trigger self.page_tables@[pcid as int]] 
             #![trigger self.get_free_pcids_as_set().contains(pcid)] 
             0 <= pcid < PCID_MAX ==>
-            self.get_pagetable_by_pcid(pcid).is_None() <==> self.get_free_pcids_as_set().contains(pcid)
+            self.page_tables@[pcid as int].is_None() <==> self.get_free_pcids_as_set().contains(pcid)
         &&&
         forall|pcid:Pcid| 
-            #![trigger self.get_pagetable_by_pcid(pcid).unwrap()]
-            0 <= pcid < PCID_MAX && self.get_pagetable_by_pcid(pcid).is_Some() 
+            #![trigger self.page_tables@[pcid as int].unwrap()]
+            #![trigger self.pcid_active(pcid)]
+            self.pcid_active(pcid)
             ==> 
-            self.get_pagetable_by_pcid(pcid).unwrap().wf()
+            self.page_tables@[pcid as int].unwrap().wf()
             &&
-            self.get_pagetable_by_pcid(pcid).unwrap().pcid =~= Some(pcid)
+            self.page_tables@[pcid as int].unwrap().pcid =~= Some(pcid)
             &&
-            self.get_pagetable_by_pcid(pcid).unwrap().page_closure().subset_of(self.page_table_pages@)            
+            self.page_tables@[pcid as int].unwrap().page_closure().subset_of(self.page_table_pages@)            
             &&
-            self.get_pagetable_by_pcid(pcid).unwrap().kernel_entries@ =~= self.kernel_entries_ghost@     
+            self.page_tables@[pcid as int].unwrap().kernel_entries@ =~= self.kernel_entries_ghost@     
             &&
-            self.get_pagetable_by_pcid(pcid).unwrap().kernel_l4_end == KERNEL_MEM_END_L4INDEX
+            self.page_tables@[pcid as int].unwrap().kernel_l4_end == KERNEL_MEM_END_L4INDEX
             // for now, we disable hugepages
             &&
-            self.get_pagetable_by_pcid(pcid).unwrap().mapping_2m().dom() == Set::<VAddr>::empty()
+            self.page_tables@[pcid as int].unwrap().mapping_2m().dom() == Set::<VAddr>::empty()
             &&
-            self.get_pagetable_by_pcid(pcid).unwrap().mapping_1g().dom() == Set::<VAddr>::empty()
+            self.page_tables@[pcid as int].unwrap().mapping_1g().dom() == Set::<VAddr>::empty()
         &&&
         forall|pcid_i:Pcid, pcid_j:Pcid| 
-            #![trigger self.get_pagetable_by_pcid(pcid_i).unwrap().page_closure(), self.get_pagetable_by_pcid(pcid_j).unwrap().page_closure()]
-            0 <= pcid_i < PCID_MAX && self.get_pagetable_by_pcid(pcid_i).is_Some() 
+            #![trigger self.page_tables@[pcid_i as int].unwrap().page_closure(), self.page_tables@[pcid_j as int].unwrap().page_closure()]
+            0 <= pcid_i < PCID_MAX && self.page_tables@[pcid_i as int].is_Some() 
             &&
-            0 <= pcid_j < PCID_MAX && self.get_pagetable_by_pcid(pcid_j).is_Some() 
+            0 <= pcid_j < PCID_MAX && self.page_tables@[pcid_j as int].is_Some() 
             &&
             pcid_i != pcid_j
             ==>
-            self.get_pagetable_by_pcid(pcid_i).unwrap().page_closure().disjoint(self.get_pagetable_by_pcid(pcid_j).unwrap().page_closure())
+            self.page_tables@[pcid_i as int].unwrap().page_closure().disjoint(self.page_tables@[pcid_j as int].unwrap().page_closure())
     }
 
-    pub open spec fn iomemory_managertables_wf(&self) -> bool{
+    pub open spec fn iommutables_wf(&self) -> bool{
         &&&
         self.free_ioids.wf()
         &&&
@@ -87,44 +102,44 @@ impl MemoryManager{
         &&&
         forall|i:int| #![trigger self.free_ioids@[i]] 0<=i<self.free_ioids.len()  ==> self.free_ioids@[i]<IOID_MAX
         &&&
-        self.iomemory_manager_tables.wf()
+        self.iommu_tables.wf()
         &&&
         forall|ioid:IOid| 
-            #![trigger self.get_iommu_table_by_ioid(ioid)] 
+            #![trigger self.iommu_tables[ioid as int]] 
             #![trigger self.get_free_ioids_as_set().contains(ioid)] 
             0 <= ioid < IOID_MAX ==>
-            self.get_iommu_table_by_ioid(ioid).is_None() <==> self.get_free_ioids_as_set().contains(ioid)
+            self.iommu_tables[ioid as int].is_None() <==> self.get_free_ioids_as_set().contains(ioid)
         &&&
         forall|ioid:IOid| 
-            #![trigger self.get_iommu_table_by_ioid(ioid).unwrap()]
-            0 <= ioid < IOID_MAX && self.get_iommu_table_by_ioid(ioid).is_Some() 
+            #![trigger self.iommu_tables[ioid as int].unwrap()]
+            0 <= ioid < IOID_MAX && self.iommu_tables[ioid as int].is_Some() 
             ==> 
-            self.get_iommu_table_by_ioid(ioid).unwrap().wf()
+            self.iommu_tables[ioid as int].unwrap().wf()
             &&
-            self.get_iommu_table_by_ioid(ioid).unwrap().ioid =~= Some(ioid)
+            self.iommu_tables[ioid as int].unwrap().ioid =~= Some(ioid)
             &&
-            self.get_iommu_table_by_ioid(ioid).unwrap().page_closure().subset_of(self.iomemory_manager_table_pages@)        
+            self.iommu_tables[ioid as int].unwrap().page_closure().subset_of(self.iommu_table_pages@)        
             &&
-            self.get_iommu_table_by_ioid(ioid).unwrap().kernel_l4_end == 0            
+            self.iommu_tables[ioid as int].unwrap().kernel_l4_end == 0            
             &&
-            self.get_iommu_table_by_ioid(ioid).unwrap().mapping_2m().dom() == Set::<VAddr>::empty()
+            self.iommu_tables[ioid as int].unwrap().mapping_2m().dom() == Set::<VAddr>::empty()
             &&
-            self.get_iommu_table_by_ioid(ioid).unwrap().mapping_1g().dom() == Set::<VAddr>::empty()
+            self.iommu_tables[ioid as int].unwrap().mapping_1g().dom() == Set::<VAddr>::empty()
         &&&
         forall|ioid_i:IOid, ioid_j:IOid| 
-            #![trigger self.get_iommu_table_by_ioid(ioid_i).unwrap().page_closure(), self.get_iommu_table_by_ioid(ioid_j).unwrap().page_closure()]
-            0 <= ioid_i < IOID_MAX && self.get_iommu_table_by_ioid(ioid_i).is_Some() 
+            #![trigger self.iommu_tables[ioid_i as int].unwrap().page_closure(), self.iommu_tables[ioid_j as int].unwrap().page_closure()]
+            0 <= ioid_i < IOID_MAX && self.iommu_tables[ioid_i as int].is_Some() 
             &&
-            0 <= ioid_j < IOID_MAX && self.get_iommu_table_by_ioid(ioid_j).is_Some() 
+            0 <= ioid_j < IOID_MAX && self.iommu_tables[ioid_j as int].is_Some() 
             &&
             ioid_i != ioid_j
             ==>
-            self.get_iommu_table_by_ioid(ioid_i).unwrap().page_closure().disjoint(self.get_iommu_table_by_ioid(ioid_j).unwrap().page_closure())
+            self.iommu_tables[ioid_i as int].unwrap().page_closure().disjoint(self.iommu_tables[ioid_j as int].unwrap().page_closure())
     }
 
-    pub open spec fn pagetable_iomemory_managertable_disjoint(&self) -> bool
+    pub open spec fn pagetable_iommu_table_disjoint(&self) -> bool
     {
-        self.page_table_pages@.disjoint(self.iomemory_manager_table_pages@)
+        self.page_table_pages@.disjoint(self.iommu_table_pages@)
     }
 
     pub open spec fn kernel_entries_wf(&self) -> bool
@@ -217,7 +232,7 @@ impl MemoryManager{
 
     pub open spec fn page_closure(&self) -> Set<PagePtr>
     {
-        self.iomemory_manager_table_pages@ + self.page_table_pages@
+        self.iommu_table_pages@ + self.page_table_pages@
     }
 
     pub open spec fn get_pagetable_by_pcid(&self, pcid: Pcid) -> Option<PageTable>
@@ -257,7 +272,7 @@ impl MemoryManager{
         recommends 
             0<=ioid<IOID_MAX,
     {
-        self.iomemory_manager_tables[ioid as int]
+        self.iommu_tables[ioid as int]
     }
 
     pub open spec fn get_iommu_table_mapping_by_ioid(&self, ioid: IOid) -> Map<VAddr,MapEntry>
@@ -265,7 +280,7 @@ impl MemoryManager{
             0<=ioid<IOID_MAX,
             self. get_iommu_table_by_ioid(ioid).is_Some(),
     {
-        self.iomemory_manager_tables[ioid as int].unwrap().mapping_4k()
+        self.iommu_tables[ioid as int].unwrap().mapping_4k()
     }
 
     pub open spec fn get_iomemory_managertable_page_closure_by_ioid(&self, ioid: IOid) -> Set<PagePtr>
@@ -273,7 +288,7 @@ impl MemoryManager{
             0<=ioid<IOID_MAX,
             self. get_iommu_table_by_ioid(ioid).is_Some(),
     {
-        self.iomemory_manager_tables[ioid as int].unwrap().page_closure()
+        self.iommu_tables[ioid as int].unwrap().page_closure()
     }
 
     pub fn get_cr3_by_pcid(&self, pcid:Pcid) -> (ret:usize)
@@ -295,7 +310,7 @@ impl MemoryManager{
         ensures
             self. get_iommu_table_by_ioid(ioid).unwrap().cr3 == ret,
     {
-        return self.iomemory_manager_tables.get(ioid).as_ref().unwrap().cr3;
+        return self.iommu_tables.get(ioid).as_ref().unwrap().cr3;
     }
 
     pub fn get_pci_binding(&self, bus:u8,dev:u8,fun:u8) -> (ret:Option<(IOid,usize)>)
@@ -314,9 +329,9 @@ impl MemoryManager{
         &&&
         self.pagetables_wf()
         &&&
-        self.iomemory_managertables_wf()
+        self.iommutables_wf()
         &&&
-        self.pagetable_iomemory_managertable_disjoint()
+        self.pagetable_iommu_table_disjoint()
         &&&
         self.root_table_wf()
         &&&
@@ -328,9 +343,8 @@ impl MemoryManager{
     pub fn get_pagetable_l4_entry(&self, pcid:Pcid, l4i: L4Index) -> (ret: Option<PageEntry>)
         requires
             self.wf(),
-            0 <= pcid < PCID_MAX,
             KERNEL_MEM_END_L4INDEX <= l4i < 512,
-            self.get_free_pcids_as_set().contains(pcid) == false,
+            self.pcid_active(pcid),
         ensures
             ret =~= self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l4(l4i),
             forall|l3i: L3Index, l2i: L2Index, l1i: L1Index| 
@@ -360,12 +374,113 @@ impl MemoryManager{
         return ret;
     }
 
+    pub fn create_pagetable_l4_entry(&mut self, target_pcid:Pcid, target_l4i: L4Index, page_map_ptr: PageMapPtr, Tracked(page_map_perm): Tracked<PointsTo<PageMap>>)
+        requires
+            old(self).wf(),
+            old(self).pcid_active(target_pcid),
+            KERNEL_MEM_END_L4INDEX <= target_l4i < 512,
+            old(self).get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l4(target_l4i).is_None(),
+            page_ptr_valid(page_map_ptr),
+            old(self).page_closure().contains(page_map_ptr) == false,
+            page_map_perm.addr() == page_map_ptr,
+            page_map_perm.is_init(),
+            page_map_perm.value().wf(),
+            forall|i:usize|
+                #![trigger page_map_perm.value()[i].is_empty()]
+                0<=i<512 ==> page_map_perm.value()[i].is_empty(),
+            forall|pcid:Pcid, va:VAddr|
+                #![trigger old(self).get_pagetable_mapping_by_pcid(pcid).dom().contains(va)]
+                #![trigger old(self).get_pagetable_mapping_by_pcid(pcid)[va]]
+                old(self).pcid_active(pcid)
+                &&
+                old(self).get_pagetable_mapping_by_pcid(pcid).dom().contains(va)
+                ==>
+                old(self).get_pagetable_mapping_by_pcid(pcid)[va].addr != page_map_ptr,
+        ensures
+            self.kernel_entries =~= old(self).kernel_entries,
+            self.kernel_entries_ghost =~= old(self).kernel_entries_ghost,
+            self.free_pcids =~= old(self).free_pcids,
+            // self.page_tables =~= old(self).page_tables,
+            // self.page_table_pages =~= old(self).page_table_pages,
+            self.free_ioids =~= old(self).free_ioids,
+            self.iommu_tables =~= old(self).iommu_tables,
+            self.iommu_table_pages =~= old(self).iommu_table_pages,
+            self.root_table =~= old(self).root_table,
+            self.root_table_cache =~= old(self).root_table_cache,
+            self.pci_bitmap =~= old(self).pci_bitmap,
+            self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                self.pcid_active(p) && p != target_pcid
+                ==>
+                old(self).get_pagetable_mapping_by_pcid(p) == self.get_pagetable_mapping_by_pcid(p)
+                &&
+                old(self).get_pagetable_by_pcid(p) == self.get_pagetable_by_pcid(p),
+            self.get_pagetable_by_pcid(target_pcid).is_Some(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().wf(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().pcid == old(self).get_pagetable_by_pcid(target_pcid).unwrap().pcid, 
+            self.get_pagetable_by_pcid(target_pcid).unwrap().kernel_l4_end == old(self).get_pagetable_by_pcid(target_pcid).unwrap().kernel_l4_end,  
+            self.get_pagetable_by_pcid(target_pcid).unwrap().page_closure() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().page_closure().insert(page_map_ptr),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_4k() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapping_4k(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_2m() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapping_2m(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l4(target_l4i).is_Some(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l4(target_l4i).get_Some_0().addr == page_map_ptr,
+            self.get_pagetable_by_pcid(target_pcid).unwrap().kernel_entries =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().kernel_entries,
+    {
+        assert(
+            old(self).get_pagetable_mapping_by_pcid(target_pcid) =~= old(self).page_tables@[target_pcid as int].unwrap().mapping_4k()
+        );
+        assert(
+            forall|va:VAddr|
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_4k().dom().contains(va)]
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_4k()[va]]
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_4k().dom().contains(va)
+            ==>
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_4k()[va].addr != page_map_ptr);
+        assert(
+            forall|va:VAddr|
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_2m().dom().contains(va)]
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_2m()[va]]
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_2m().dom().contains(va)
+            ==>
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_2m()[va].addr != page_map_ptr);
+        assert(
+            forall|va:VAddr|
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_1g().dom().contains(va)]
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_1g()[va]]
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_1g().dom().contains(va)
+            ==>
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_1g()[va].addr != page_map_ptr);
+            
+        assert(self.get_pagetable_by_pcid(target_pcid).is_Some());
+        assert(self.get_pagetable_by_pcid(target_pcid).unwrap().wf());
+        proof{
+            self.get_pagetable_by_pcid(target_pcid).unwrap().no_mapping_infer_not_mapped(page_map_ptr);
+        }
+        self.page_tables.pagetable_array_create_pagetable_l4_entry_t(target_pcid, target_l4i, page_map_ptr, Tracked(page_map_perm));
+        proof{
+        self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr);
+        }
+        assert(self.wf()) by {
+            assert(self.pagetables_wf());
+            assert(self.iommutables_wf());
+            assert(self.pagetable_iommu_table_disjoint());
+            assert(self.root_table_wf());
+            assert(self.root_table_cache_wf());
+            assert(self.kernel_entries_wf());
+        };
+    }
+
     pub fn get_pagetable_l3_entry(&self, pcid:Pcid, target_l4i: L4Index, target_l3i: L3Index, l4_entry: &PageEntry) -> (ret: Option<PageEntry>)
         requires
             self.wf(),
             KERNEL_MEM_END_L4INDEX <= target_l4i < 512,
             0 <= target_l3i < 512,
-            self.get_free_pcids_as_set().contains(pcid) == false,
+            self.pcid_active(pcid),
             self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l4(target_l4i) =~= Some(*l4_entry),
         ensures
             self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l3(target_l4i, target_l3i) =~= ret,
@@ -384,7 +499,7 @@ impl MemoryManager{
     pub fn get_pagetable_l2_entry(&self, pcid:Pcid, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, l3_entry: &PageEntry) -> (ret: Option<PageEntry>)
         requires
             self.wf(),
-            self.get_free_pcids_as_set().contains(pcid) == false,
+            self.pcid_active(pcid),
             KERNEL_MEM_END_L4INDEX <= target_l4i < 512,
             0 <= target_l3i < 512,
             0 <= target_l2i < 512,
@@ -406,7 +521,7 @@ impl MemoryManager{
     pub fn get_pagetable_l1_entry(&self, pcid:Pcid, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, target_l1i: L2Index, l2_entry: &PageEntry) -> (ret: Option<PageEntry>)
         requires
             self.wf(),
-            self.get_free_pcids_as_set().contains(pcid) == false,
+            self.pcid_active(pcid),
             KERNEL_MEM_END_L4INDEX <= target_l4i < 512,
             0 <= target_l3i < 512,
             0 <= target_l2i < 512,
@@ -426,13 +541,18 @@ impl MemoryManager{
     pub fn reslove_pagetable_mapping(&self, pcid:Pcid, va:VAddr) -> (ret: Option<PageEntry>)
         requires
             self.wf(),
-            self.get_free_pcids_as_set().contains(pcid) == false,
+            self.pcid_active(pcid),
             va_4k_valid(va),
         ensures
             self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k().dom().contains(va) == ret.is_Some(),
+            ret.is_Some() 
+                ==>
+                self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k().dom().contains(va) 
+                &&
+                self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k()[va] == page_entry_to_map_entry(&ret.unwrap()),
     {
         proof{va_lemma();}
-        proof{self.get_pagetable_by_pcid(pcid).unwrap().no_mapping_infer_no_reslove();}
+        // proof{self.get_pagetable_by_pcid(pcid).unwrap().no_mapping_infer_no_reslove();}
         let (l4i, l3i, l2i, l1i) = va2index(va);
         assert(spec_index2va((l4i, l3i, l2i, l1i)) == va);
         let l4_entry_op = self.get_pagetable_l4_entry(pcid, l4i);
@@ -458,3 +578,4 @@ impl MemoryManager{
     }
 }
 }
+
