@@ -27,10 +27,40 @@ pub fn create_entry(&mut self, proc_ptr:ProcPtr, va:VAddr) -> (ret: (usize, Page
             #![auto]
             self.proc_dom().contains(p_ptr)
             ==>
-            self.get_address_space(p_ptr) =~= old(self).get_address_space(p_ptr),
+            self.get_address_space(p_ptr) =~= old(self).get_address_space(p_ptr)
+            &&
+            self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
+        forall|t_ptr:ThreadPtr|
+            #![auto]
+            self.thread_dom().contains(t_ptr)
+            ==>
+            self.get_thread(t_ptr) =~= old(self).get_thread(t_ptr),
+        forall|c_ptr:ContainerPtr|
+            #![auto]
+            self.container_dom().contains(c_ptr) && c_ptr != self.get_proc(proc_ptr).owning_container
+            ==>
+            self.get_container(c_ptr) =~= old(self).get_container(c_ptr),
+        forall|e_ptr:EndpointPtr|
+            #![auto]
+            self.endpoint_dom().contains(e_ptr)
+            ==>
+            self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).owned_procs =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).owned_procs,
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).parent =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).parent,
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).parent_rev_ptr =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).parent_rev_ptr,
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).children =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).children,
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).owned_endpoints =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).owned_endpoints,
+        // self.get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota,
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).mem_used =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).mem_used,
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).owned_cpus =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).owned_cpus,
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).scheduler =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).scheduler,
+        self.get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota as int =~= old(self).get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota - ret.0,
+        self.mem_man.get_pagetable_by_pcid(self.get_proc(proc_ptr).pcid).unwrap().spec_resolve_mapping_l2(spec_va2index(va).0, spec_va2index(va).1, spec_va2index(va).2).is_Some(),
+        self.mem_man.get_pagetable_by_pcid(self.get_proc(proc_ptr).pcid).unwrap().spec_resolve_mapping_l2(spec_va2index(va).0, spec_va2index(va).1, spec_va2index(va).2).unwrap().addr == ret.1,
     {
         let mut ret = 0;
         let container_ptr = self.proc_man.get_proc(proc_ptr).owning_container;
+        let old_quota = self.proc_man.get_container(container_ptr).mem_quota;
         let target_pcid = self.proc_man.get_proc(proc_ptr).pcid;
         proof{va_lemma();}
         let (l4i, l3i, l2i, l1i) = va2index(va);
@@ -119,6 +149,25 @@ pub fn create_entry(&mut self, proc_ptr:ProcPtr, va:VAddr) -> (ret: (usize, Page
             ret = ret + 1;
             l2_entry_op = self.mem_man.get_pagetable_l2_entry(target_pcid, l4i, l3i, l2i, &l3_entry);
         }
+        self.proc_man.set_container_mem_quota(container_ptr, old_quota - ret);
+
+        assert(self.wf()) by {
+            assert(self.mem_man.wf());
+            assert(self.page_alloc.wf());
+            assert(self.proc_man.wf());
+            assert(self.memory_wf()) by {
+                assert(self.mem_man.page_closure().disjoint(self.proc_man.page_closure()));
+                assert(self.mem_man.page_closure() + self.proc_man.page_closure() == self.page_alloc.allocated_pages_4k());
+                assert(self.page_alloc.mapped_pages_2m() =~= Set::empty());
+                assert(self.page_alloc.mapped_pages_1g() =~= Set::empty());
+                assert(self.page_alloc.allocated_pages_2m() =~= Set::empty());
+                assert(self.page_alloc.allocated_pages_1g() =~= Set::empty());
+                assert(self.page_alloc.container_map_4k@.dom() =~= self.proc_man.container_dom());
+            };
+            assert(self.mapping_wf());
+            assert(self.pcid_ioid_wf());
+        };
+
         (ret, l2_entry_op.unwrap().addr)
     }
 }

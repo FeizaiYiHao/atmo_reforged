@@ -171,7 +171,7 @@ impl ProcessManager{
     pub fn get_container(&self, container_ptr:ContainerPtr) -> (ret:&Container)
         requires
             self.wf(),
-            self.container_perms@.dom().contains(container_ptr),
+            self.container_dom().contains(container_ptr),
         ensures
             self.get_container(container_ptr) == ret,
     {
@@ -835,6 +835,55 @@ impl ProcessManager{
 
 //exec
 impl ProcessManager{
+    pub fn set_container_mem_quota(&mut self, container_ptr:ContainerPtr, new_quota:usize)
+        requires
+            old(self).wf(),
+            old(self).container_dom().contains(container_ptr),
+        ensures
+            self.wf(),
+            self.proc_dom() =~= old(self).proc_dom(),
+            self.thread_dom() =~= old(self).thread_dom(),
+            self.container_dom() =~= old(self).container_dom(),
+            self.endpoint_dom() =~= old(self).endpoint_dom(), 
+            self.page_closure() =~= old(self).page_closure(),
+            forall|p_ptr:ProcPtr|
+                #![auto]
+                self.proc_dom().contains(p_ptr)
+                ==>
+                self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
+            forall|t_ptr:ThreadPtr|
+                #![auto]
+                self.thread_dom().contains(t_ptr)
+                ==>
+                self.get_thread(t_ptr) =~= old(self).get_thread(t_ptr),
+            forall|c_ptr:ContainerPtr|
+                #![auto]
+                self.container_dom().contains(c_ptr) && c_ptr != container_ptr
+                ==>
+                self.get_container(c_ptr) =~= old(self).get_container(c_ptr),
+            forall|e_ptr:EndpointPtr|
+                #![auto]
+                self.endpoint_dom().contains(e_ptr)
+                ==>
+                self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
+            self.get_container(container_ptr).owned_procs =~= self.get_container(container_ptr).owned_procs,
+            self.get_container(container_ptr).parent =~= self.get_container(container_ptr).parent,
+            self.get_container(container_ptr).parent_rev_ptr =~= self.get_container(container_ptr).parent_rev_ptr,
+            self.get_container(container_ptr).children =~= self.get_container(container_ptr).children,
+            self.get_container(container_ptr).owned_endpoints =~= self.get_container(container_ptr).owned_endpoints,
+            // self.get_container(container_ptr).mem_quota =~= self.get_container(container_ptr).mem_quota,
+            self.get_container(container_ptr).mem_used =~= self.get_container(container_ptr).mem_used,
+            self.get_container(container_ptr).owned_cpus =~= self.get_container(container_ptr).owned_cpus,
+            self.get_container(container_ptr).scheduler =~= self.get_container(container_ptr).scheduler,
+            self.get_container(container_ptr).mem_quota =~= new_quota,
+    {
+        let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
+        container_set_mem_quota(container_ptr,&mut container_perm, new_quota);
+        proof {
+            self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
+        }
+    }
+
     pub fn new_thread(&mut self, target_proc_ptr:ProcPtr, pt_regs:Registers, page_ptr: PagePtr, page_perm: Tracked<PagePerm4k>) -> (ret:ThreadPtr)
         requires
             old(self).wf(),
