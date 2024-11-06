@@ -1001,6 +1001,7 @@ impl PageTable{
                 self.spec_resolve_mapping_4k_l1(target_l4i, target_l3i, l2i, l1i).is_None()
                 &&
                 self.mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, l2i, l1i))) == false,
+            ret.is_Some() ==> self.spec_resolve_mapping_1g_l3(target_l4i, target_l3i).is_None()
     {
         let tracked l3_perm = self.l3_tables.borrow().tracked_borrow(l4_entry.addr);
         let l3_tbl : &PageMap = PPtr::<PageMap>::from_usize(l4_entry.addr).borrow(Tracked(l3_perm));
@@ -1232,6 +1233,7 @@ impl PageTable{
             self.mapped_4k_pages() =~= old(self).mapped_4k_pages(),
             self.mapped_2m_pages() =~= old(self).mapped_2m_pages(),
             self.mapped_1g_pages() =~= old(self).mapped_1g_pages(),
+            self.spec_resolve_mapping_l4(target_l4i) == old(self).spec_resolve_mapping_l4(target_l4i),
             self.spec_resolve_mapping_l3(target_l4i,target_l3i).is_Some(),
             self.spec_resolve_mapping_l3(target_l4i,target_l3i).get_Some_0().addr == page_map_ptr,
             self.spec_resolve_mapping_1g_l3(target_l4i,target_l3i).is_None(),

@@ -39,6 +39,9 @@ impl Kernel{
         &&&
         forall|pcid:Pcid, va:VAddr|
             #![auto]
+            #![trigger self.mem_man.get_pagetable_mapping_by_pcid(pcid).dom().contains(va)]
+            #![trigger self.page_alloc.page_is_mapped(self.mem_man.get_pagetable_mapping_by_pcid(pcid)[va].addr)]
+            #![trigger self.page_alloc.page_mappings(self.mem_man.get_pagetable_mapping_by_pcid(pcid)[va].addr).contains((pcid,va))]
             self.mem_man.pcid_active(pcid)
             &&
             self.mem_man.get_pagetable_mapping_by_pcid(pcid).dom().contains(va)
@@ -48,16 +51,20 @@ impl Kernel{
             self.page_alloc.page_mappings(self.mem_man.get_pagetable_mapping_by_pcid(pcid)[va].addr).contains((pcid,va))
         &&&
         forall|page_ptr:PagePtr, pcid:Pcid, va:VAddr|
-            #![auto]
+            #![trigger self.page_alloc.page_mappings(page_ptr).contains((pcid,va))]
             self.page_alloc.page_is_mapped(page_ptr) && self.page_alloc.page_mappings(page_ptr).contains((pcid,va))
             ==>
-            0 <= pcid < PCID_MAX && va_4k_valid(va) && self.mem_man.get_free_pcids_as_set().contains(pcid) == false
+            va_4k_valid(va) && self.mem_man.pcid_active(pcid)
             &&
             self.mem_man.get_pagetable_mapping_by_pcid(pcid).dom().contains(va)
+            &&
+            self.mem_man.get_pagetable_mapping_by_pcid(pcid)[va].addr == page_ptr
         &&&
         forall|ioid:IOid, va:VAddr|
-            #![auto]
-            0 <= ioid < IOID_MAX && va_4k_valid(va) && self.mem_man.get_free_ioids_as_set().contains(ioid) == false
+            #![trigger self.mem_man.get_iommu_table_mapping_by_ioid(ioid).dom().contains(va)]
+            #![trigger self.page_alloc.page_is_mapped(self.mem_man.get_iommu_table_mapping_by_ioid(ioid)[va].addr)]
+            #![trigger self.page_alloc.page_io_mappings(self.mem_man.get_iommu_table_mapping_by_ioid(ioid)[va].addr).contains((ioid,va))]
+            self.mem_man.ioid_active(ioid)
             &&
             self.mem_man.get_iommu_table_mapping_by_ioid(ioid).dom().contains(va)
             ==>            
@@ -66,10 +73,10 @@ impl Kernel{
             self.page_alloc.page_io_mappings(self.mem_man.get_iommu_table_mapping_by_ioid(ioid)[va].addr).contains((ioid,va))
         &&&
         forall|page_ptr:PagePtr, ioid:IOid, va:VAddr|
-            #![auto]
+            #![trigger self.page_alloc.page_io_mappings(page_ptr).contains((ioid,va))]
             self.page_alloc.page_is_mapped(page_ptr) && self.page_alloc.page_io_mappings(page_ptr).contains((ioid,va))
             ==>
-            0 <= ioid < IOID_MAX && va_4k_valid(va) && self.mem_man.get_free_ioids_as_set().contains(ioid) == false
+            va_4k_valid(va) && self.mem_man.ioid_active(ioid)
             &&
             self.mem_man.get_iommu_table_mapping_by_ioid(ioid).dom().contains(va)
     }
@@ -105,6 +112,7 @@ impl Kernel{
         &&&
         self.pcid_ioid_wf()
     }
+
 }
 
 }

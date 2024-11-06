@@ -31,4 +31,21 @@ ensures
 {
 }
 
+#[verifier(external_body)]
+pub fn page_perm_to_page_map(page_ptr: PagePtr, Tracked(page_perm): Tracked<PagePerm4k>) -> (ret: (PageMapPtr, Tracked<PointsTo<PageMap>>))
+requires
+    page_perm.is_init(),
+    page_perm.addr() == page_ptr,
+ensures
+    ret.0 == page_ptr,
+    ret.1@.addr() == ret.0,
+    ret.1@.is_init(),
+    ret.1@.value().wf(),
+    forall|i:usize|
+        #![trigger ret.1@.value()[i].is_empty()]
+        0<=i<512 ==> ret.1@.value()[i].is_empty(),
+{
+    (page_ptr, Tracked::assume_new())
+}
+
 }

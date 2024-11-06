@@ -397,6 +397,7 @@ impl MemoryManager{
                 ==>
                 old(self).get_pagetable_mapping_by_pcid(pcid)[va].addr != page_map_ptr,
         ensures
+            self.wf(),
             self.kernel_entries =~= old(self).kernel_entries,
             self.kernel_entries_ghost =~= old(self).kernel_entries_ghost,
             self.free_pcids =~= old(self).free_pcids,
@@ -411,11 +412,19 @@ impl MemoryManager{
             self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
             forall|p:Pcid|
                 #![trigger self.pcid_active(p)]
-                self.pcid_active(p) && p != target_pcid
+                self.pcid_active(p) == old(self).pcid_active(p),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.get_pagetable_mapping_by_pcid(p)]
+                self.pcid_active(p)
                 ==>
-                old(self).get_pagetable_mapping_by_pcid(p) == self.get_pagetable_mapping_by_pcid(p)
-                &&
-                old(self).get_pagetable_by_pcid(p) == self.get_pagetable_by_pcid(p),
+                old(self).get_pagetable_mapping_by_pcid(p) == self.get_pagetable_mapping_by_pcid(p),
+            forall|i:IOid|
+                #![trigger self.ioid_active(i)]
+                #![trigger self.get_iommu_table_mapping_by_ioid(i)]
+                self.ioid_active(i)
+                ==>
+                old(self).get_iommu_table_mapping_by_ioid(i) == self.get_iommu_table_mapping_by_ioid(i),
             self.get_pagetable_by_pcid(target_pcid).is_Some(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().wf(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().pcid == old(self).get_pagetable_by_pcid(target_pcid).unwrap().pcid, 
@@ -484,6 +493,7 @@ impl MemoryManager{
             self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l4(target_l4i) =~= Some(*l4_entry),
         ensures
             self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_l3(target_l4i, target_l3i) =~= ret,
+            ret.is_Some() ==> self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_1g_l3(target_l4i, target_l3i).is_None(),
             forall|l2i: L2Index, l1i: L1Index| 
                 #![trigger spec_index2va((target_l4i, target_l3i, l2i, l1i))]
                 #![trigger self.get_pagetable_by_pcid(pcid).unwrap().spec_resolve_mapping_4k_l1(target_l4i, target_l3i, l2i, l1i)]
@@ -494,6 +504,120 @@ impl MemoryManager{
                 self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, l2i, l1i))) == false,
     {
         self.page_tables.get(pcid).as_ref().unwrap().get_entry_l3(target_l4i, target_l3i, l4_entry)
+    }
+
+    pub fn create_pagetable_l3_entry(&mut self, target_pcid:Pcid, target_l4i: L4Index, target_l3i: L3Index, target_l3_p:PageMapPtr, page_map_ptr: PageMapPtr, Tracked(page_map_perm): Tracked<PointsTo<PageMap>>)
+        requires
+            old(self).wf(),
+            old(self).pcid_active(target_pcid),
+            KERNEL_MEM_END_L4INDEX <= target_l4i < 512,
+            0 <= target_l3i < 512,
+            old(self).get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l4(target_l4i).is_Some(),
+            old(self).get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l4(target_l4i).unwrap().addr == target_l3_p,
+            page_ptr_valid(page_map_ptr),
+            old(self).page_closure().contains(page_map_ptr) == false,
+            page_map_perm.addr() == page_map_ptr,
+            page_map_perm.is_init(),
+            page_map_perm.value().wf(),
+            forall|i:usize|
+                #![trigger page_map_perm.value()[i].is_empty()]
+                0<=i<512 ==> page_map_perm.value()[i].is_empty(),
+            forall|pcid:Pcid, va:VAddr|
+                #![trigger old(self).get_pagetable_mapping_by_pcid(pcid).dom().contains(va)]
+                #![trigger old(self).get_pagetable_mapping_by_pcid(pcid)[va]]
+                old(self).pcid_active(pcid)
+                &&
+                old(self).get_pagetable_mapping_by_pcid(pcid).dom().contains(va)
+                ==>
+                old(self).get_pagetable_mapping_by_pcid(pcid)[va].addr != page_map_ptr,
+        ensures
+            self.wf(),
+            self.kernel_entries =~= old(self).kernel_entries,
+            self.kernel_entries_ghost =~= old(self).kernel_entries_ghost,
+            self.free_pcids =~= old(self).free_pcids,
+            // self.page_tables =~= old(self).page_tables,
+            // self.page_table_pages =~= old(self).page_table_pages,
+            self.free_ioids =~= old(self).free_ioids,
+            self.iommu_tables =~= old(self).iommu_tables,
+            self.iommu_table_pages =~= old(self).iommu_table_pages,
+            self.root_table =~= old(self).root_table,
+            self.root_table_cache =~= old(self).root_table_cache,
+            self.pci_bitmap =~= old(self).pci_bitmap,
+            self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                self.pcid_active(p) == old(self).pcid_active(p),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.get_pagetable_mapping_by_pcid(p)]
+                self.pcid_active(p)
+                ==>
+                old(self).get_pagetable_mapping_by_pcid(p) == self.get_pagetable_mapping_by_pcid(p),
+            forall|i:IOid|
+                #![trigger self.ioid_active(i)]
+                #![trigger self.get_iommu_table_mapping_by_ioid(i)]
+                self.ioid_active(i)
+                ==>
+                old(self).get_iommu_table_mapping_by_ioid(i) == self.get_iommu_table_mapping_by_ioid(i),
+            self.get_pagetable_by_pcid(target_pcid).is_Some(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().wf(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().pcid == old(self).get_pagetable_by_pcid(target_pcid).unwrap().pcid, 
+            self.get_pagetable_by_pcid(target_pcid).unwrap().kernel_l4_end == old(self).get_pagetable_by_pcid(target_pcid).unwrap().kernel_l4_end,  
+            self.get_pagetable_by_pcid(target_pcid).unwrap().page_closure() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().page_closure().insert(page_map_ptr),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_4k() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapping_4k(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_2m() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapping_2m(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l4(target_l4i) == old(self).get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l4(target_l4i),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l3(target_l4i, target_l3i).is_Some(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l3(target_l4i, target_l3i).get_Some_0().addr == page_map_ptr,
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_1g_l3(target_l4i, target_l3i).is_None(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().kernel_entries =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().kernel_entries,
+    {
+        assert(
+            old(self).get_pagetable_mapping_by_pcid(target_pcid) =~= old(self).page_tables@[target_pcid as int].unwrap().mapping_4k()
+        );
+        assert(
+            forall|va:VAddr|
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_4k().dom().contains(va)]
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_4k()[va]]
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_4k().dom().contains(va)
+            ==>
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_4k()[va].addr != page_map_ptr);
+        assert(
+            forall|va:VAddr|
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_2m().dom().contains(va)]
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_2m()[va]]
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_2m().dom().contains(va)
+            ==>
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_2m()[va].addr != page_map_ptr);
+        assert(
+            forall|va:VAddr|
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_1g().dom().contains(va)]
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_1g()[va]]
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_1g().dom().contains(va)
+            ==>
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_1g()[va].addr != page_map_ptr);
+            
+        assert(self.get_pagetable_by_pcid(target_pcid).is_Some());
+        assert(self.get_pagetable_by_pcid(target_pcid).unwrap().wf());
+        proof{
+            self.get_pagetable_by_pcid(target_pcid).unwrap().no_mapping_infer_not_mapped(page_map_ptr);
+        }
+        self.page_tables.pagetable_array_create_pagetable_l3_entry_t(target_pcid, target_l4i, target_l3i, target_l3_p, page_map_ptr, Tracked(page_map_perm));
+        proof{
+        self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr);
+        }
+        assert(self.wf()) by {
+            assert(self.pagetables_wf());
+            assert(self.iommutables_wf());
+            assert(self.pagetable_iommu_table_disjoint());
+            assert(self.root_table_wf());
+            assert(self.root_table_cache_wf());
+            assert(self.kernel_entries_wf());
+        };
     }
 
     pub fn get_pagetable_l2_entry(&self, pcid:Pcid, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, l3_entry: &PageEntry) -> (ret: Option<PageEntry>)
@@ -536,6 +660,123 @@ impl MemoryManager{
                 self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k()[spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))] == page_entry_to_map_entry(&ret.unwrap()),
     {
         self.page_tables.get(pcid).as_ref().unwrap().get_entry_l1(target_l4i, target_l3i, target_l2i, target_l1i, l2_entry)
+    }
+
+        pub fn create_pagetable_l2_entry(&mut self, target_pcid:Pcid, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, target_l2_p:PageMapPtr, page_map_ptr: PageMapPtr, Tracked(page_map_perm): Tracked<PointsTo<PageMap>>)
+        requires
+            old(self).wf(),
+            old(self).pcid_active(target_pcid),
+            KERNEL_MEM_END_L4INDEX <= target_l4i < 512,
+            0 <= target_l3i < 512,
+            0 <= target_l2i < 512,
+            old(self).get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l3(target_l4i, target_l3i).is_Some(),
+            old(self).get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_1g_l3(target_l4i, target_l3i).is_None(),
+            old(self).get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l3(target_l4i, target_l3i).unwrap().addr == target_l2_p,
+            page_ptr_valid(page_map_ptr),
+            old(self).page_closure().contains(page_map_ptr) == false,
+            page_map_perm.addr() == page_map_ptr,
+            page_map_perm.is_init(),
+            page_map_perm.value().wf(),
+            forall|i:usize|
+                #![trigger page_map_perm.value()[i].is_empty()]
+                0<=i<512 ==> page_map_perm.value()[i].is_empty(),
+            forall|pcid:Pcid, va:VAddr|
+                #![trigger old(self).get_pagetable_mapping_by_pcid(pcid).dom().contains(va)]
+                #![trigger old(self).get_pagetable_mapping_by_pcid(pcid)[va]]
+                old(self).pcid_active(pcid)
+                &&
+                old(self).get_pagetable_mapping_by_pcid(pcid).dom().contains(va)
+                ==>
+                old(self).get_pagetable_mapping_by_pcid(pcid)[va].addr != page_map_ptr,
+        ensures
+            self.wf(),
+            self.kernel_entries =~= old(self).kernel_entries,
+            self.kernel_entries_ghost =~= old(self).kernel_entries_ghost,
+            self.free_pcids =~= old(self).free_pcids,
+            // self.page_tables =~= old(self).page_tables,
+            // self.page_table_pages =~= old(self).page_table_pages,
+            self.free_ioids =~= old(self).free_ioids,
+            self.iommu_tables =~= old(self).iommu_tables,
+            self.iommu_table_pages =~= old(self).iommu_table_pages,
+            self.root_table =~= old(self).root_table,
+            self.root_table_cache =~= old(self).root_table_cache,
+            self.pci_bitmap =~= old(self).pci_bitmap,
+            self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                self.pcid_active(p) == old(self).pcid_active(p),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.get_pagetable_mapping_by_pcid(p)]
+                self.pcid_active(p)
+                ==>
+                old(self).get_pagetable_mapping_by_pcid(p) == self.get_pagetable_mapping_by_pcid(p),
+            forall|i:IOid|
+                #![trigger self.ioid_active(i)]
+                #![trigger self.get_iommu_table_mapping_by_ioid(i)]
+                self.ioid_active(i)
+                ==>
+                old(self).get_iommu_table_mapping_by_ioid(i) == self.get_iommu_table_mapping_by_ioid(i),
+            self.get_pagetable_by_pcid(target_pcid).is_Some(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().wf(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().pcid == old(self).get_pagetable_by_pcid(target_pcid).unwrap().pcid, 
+            self.get_pagetable_by_pcid(target_pcid).unwrap().kernel_l4_end == old(self).get_pagetable_by_pcid(target_pcid).unwrap().kernel_l4_end,  
+            self.get_pagetable_by_pcid(target_pcid).unwrap().page_closure() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().page_closure().insert(page_map_ptr),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_4k() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapping_4k(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_2m() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapping_2m(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapping_1g(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapped_4k_pages(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapped_2m_pages(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages() =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().mapped_1g_pages(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_1g_l3(target_l4i, target_l3i) == old(self).get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_1g_l3(target_l4i, target_l3i),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l3(target_l4i, target_l3i) == old(self).get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l3(target_l4i, target_l3i),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l2(target_l4i, target_l3i, target_l2i).is_Some(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_l2(target_l4i, target_l3i, target_l2i).get_Some_0().addr == page_map_ptr,
+            self.get_pagetable_by_pcid(target_pcid).unwrap().spec_resolve_mapping_2m_l2(target_l4i, target_l3i, target_l2i).is_None(),
+            self.get_pagetable_by_pcid(target_pcid).unwrap().kernel_entries =~= old(self).get_pagetable_by_pcid(target_pcid).unwrap().kernel_entries,
+    {
+        assert(
+            old(self).get_pagetable_mapping_by_pcid(target_pcid) =~= old(self).page_tables@[target_pcid as int].unwrap().mapping_4k()
+        );
+        assert(
+            forall|va:VAddr|
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_4k().dom().contains(va)]
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_4k()[va]]
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_4k().dom().contains(va)
+            ==>
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_4k()[va].addr != page_map_ptr);
+        assert(
+            forall|va:VAddr|
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_2m().dom().contains(va)]
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_2m()[va]]
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_2m().dom().contains(va)
+            ==>
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_2m()[va].addr != page_map_ptr);
+        assert(
+            forall|va:VAddr|
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_1g().dom().contains(va)]
+            #![trigger old(self).page_tables@[target_pcid as int].unwrap().mapping_1g()[va]]
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_1g().dom().contains(va)
+            ==>
+            old(self).page_tables@[target_pcid as int].unwrap().mapping_1g()[va].addr != page_map_ptr);
+            
+        assert(self.get_pagetable_by_pcid(target_pcid).is_Some());
+        assert(self.get_pagetable_by_pcid(target_pcid).unwrap().wf());
+        proof{
+            self.get_pagetable_by_pcid(target_pcid).unwrap().no_mapping_infer_not_mapped(page_map_ptr);
+        }
+        self.page_tables.pagetable_array_create_pagetable_l2_entry_t(target_pcid, target_l4i, target_l3i, target_l2i, target_l2_p, page_map_ptr, Tracked(page_map_perm));
+        proof{
+        self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr);
+        }
+        assert(self.wf()) by {
+            assert(self.pagetables_wf());
+            assert(self.iommutables_wf());
+            assert(self.pagetable_iommu_table_disjoint());
+            assert(self.root_table_wf());
+            assert(self.root_table_cache_wf());
+            assert(self.kernel_entries_wf());
+        };
     }
 
     pub fn reslove_pagetable_mapping(&self, pcid:Pcid, va:VAddr) -> (ret: Option<PageEntry>)
