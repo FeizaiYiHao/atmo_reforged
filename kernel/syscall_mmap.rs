@@ -13,19 +13,65 @@ use crate::pagetable::entry::*;
 use crate::kernel::Kernel;
 use crate::va_range::VaRange4K;
 
+pub open spec fn syscall_mmap_requirement(old:Kernel,  target_thread_ptr: ThreadPtr, va_range: VaRange4K) -> bool{
+    let target_proc_ptr = old.proc_man.get_thread(target_thread_ptr).owning_proc;
+    let target_pcid = old.proc_man.get_proc(target_proc_ptr).pcid;
+    let target_container_ptr = old.proc_man.get_proc(target_proc_ptr).owning_container;
+
+    if old.get_container_quota(target_container_ptr) < va_range.len * 4{
+        false
+    }else if old.get_num_of_free_pages() < va_range.len * 4 {
+        false
+    }else if old.address_space_range_free(target_proc_ptr, va_range) == false {
+        false
+    }else{
+        true
+    }
+}
+
 impl Kernel{
+
+pub fn syscall_mmap(&mut self, target_thread_ptr: ThreadPtr, va_range: VaRange4K) ->  (ret: SyscallReturnStruct)
+    requires
+        old(self).wf(),
+        old(self).thread_dom().contains(target_thread_ptr),
+        va_range.wf(),
+        va_range.len * 4 < usize::MAX,
+    ensures
+        syscall_mmap_requirement(*old(self), target_thread_ptr, va_range) == false <==> ret.is_error()
+{
+    let target_proc_ptr = self.proc_man.get_thread(target_thread_ptr).owning_proc;
+    let target_pcid = self.proc_man.get_proc(target_proc_ptr).pcid;
+    let target_container_ptr = self.proc_man.get_proc(target_proc_ptr).owning_container;
+
+    if self.proc_man.get_container(target_container_ptr).mem_quota < va_range.len * 4{
+        return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+    }
+
+    if self.page_alloc.free_pages_4k.len() < va_range.len * 4{
+        return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+    }
+
+    if self.check_address_space_va_range(target_proc_ptr, &va_range) == false {
+        return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+    }
+
+    self.range_alloc_and_map(target_proc_ptr, &va_range);
+    
+    return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Else);
+}
 
 pub open spec fn address_space_range_free(&self, target_proc_ptr:ProcPtr, va_range:VaRange4K) -> bool{
     forall|j:int| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]) == false
 }
 
-pub fn check_address_space_va_range(&self, target_proc_ptr:ProcPtr, va_range:VaRange4K) -> (ret:bool)
+pub fn check_address_space_va_range(&self, target_proc_ptr:ProcPtr, va_range:&VaRange4K) -> (ret:bool)
     requires
         self.wf(),
         self.proc_dom().contains(target_proc_ptr),
         va_range.wf(),
     ensures
-        ret == self.address_space_range_free(target_proc_ptr, va_range),
+        ret == self.address_space_range_free(target_proc_ptr, *va_range),
 {
     let target_pcid = self.proc_man.get_proc(target_proc_ptr).pcid;
     for i in 0..va_range.len
@@ -98,6 +144,12 @@ pub fn create_entry(&mut self, proc_ptr:ProcPtr, va:VAddr) -> (ret: (usize, Page
         forall|p:PagePtr|
         #![trigger self.page_alloc.page_is_mapped(p)] 
         self.page_alloc.page_is_mapped(p) == old(self).page_alloc.page_is_mapped(p),
+        forall|p:Pcid|
+            #![trigger self.mem_man.pcid_active(p)]
+            #![trigger self.mem_man.pcid_to_proc_ptr(p)]
+            self.mem_man.pcid_active(p)
+            ==>
+            old(self).mem_man.pcid_to_proc_ptr(p) == self.mem_man.pcid_to_proc_ptr(p),
     {
         let mut ret = 0;
         let container_ptr = self.proc_man.get_proc(proc_ptr).owning_container;
@@ -249,12 +301,20 @@ pub fn alloc_and_map(&mut self, target_proc_ptr:ProcPtr, target_va:VAddr, tagret
             #![auto]
             self.container_dom().contains(c_ptr) && c_ptr != self.get_proc(target_proc_ptr).owning_container
             ==>
-            self.get_container(c_ptr) =~= old(self).get_container(c_ptr),
+            self.get_container(c_ptr) =~= old(self).get_container(c_ptr)
+            &&
+            self.get_container_owned_pages(c_ptr) =~= old(self).get_container_owned_pages(c_ptr),
         forall|e_ptr:EndpointPtr|
             #![auto]
             self.endpoint_dom().contains(e_ptr)
             ==>
             self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
+        forall|p:Pcid|
+            #![trigger self.mem_man.pcid_active(p)]
+            #![trigger self.mem_man.pcid_to_proc_ptr(p)]
+            self.mem_man.pcid_active(p)
+            ==>
+            old(self).mem_man.pcid_to_proc_ptr(p) == self.mem_man.pcid_to_proc_ptr(p),
         self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs =~= self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs,
         self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent =~= self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent,
         self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent_rev_ptr =~= self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent_rev_ptr,
@@ -285,6 +345,9 @@ pub fn alloc_and_map(&mut self, target_proc_ptr:ProcPtr, target_va:VAddr, tagret
     let new_page_ptr = self.page_alloc.alloc_and_map_4k(target_pcid, target_va, target_container_ptr);
     self.mem_man.pagetable_map_4k_page(target_pcid, l4i, l3i, l2i, l1i, tagret_l1_p, &MapEntry{addr:new_page_ptr, write:true, execute_disable:false});
     self.proc_man.set_container_mem_quota(target_container_ptr, old_quota - 1);
+    proof{
+        self.page_mapping@ = self.page_mapping@.insert(new_page_ptr, Set::empty().insert((target_proc_ptr, target_va)));
+    }
     assert(self.wf()) by {
         assert(self.mem_man.wf());
         assert(self.page_alloc.wf());
@@ -395,7 +458,7 @@ pub fn get_address_space_va_range_none(&self, target_proc_ptr:ProcPtr, va_range:
     return true;
 }
 
-pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: VaRange4K) -> (ret: (usize, Ghost<Seq<PagePtr>>))
+pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: &VaRange4K) -> (ret: (usize, Ghost<Seq<PagePtr>>))
     requires
         old(self).wf(),
         old(self).proc_dom().contains(target_proc_ptr),
@@ -454,7 +517,7 @@ pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: VaRange
             // && 
             va_range@.contains(va) == false
             ==>
-            self.get_address_space(target_proc_ptr)[va] == old(self).get_address_space(target_proc_ptr)[va]
+            self.get_address_space(target_proc_ptr)[va] == old(self).get_address_space(target_proc_ptr)[va],
 {
     let mut num_page = 0;
     let mut page_diff: Ghost<Seq<PagePtr>> = Ghost(Seq::empty());
@@ -533,17 +596,6 @@ pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: VaRange
     }
     (num_page, page_diff)
 }
-
-
-pub fn syscall_mmap(&mut self, thread_ptr: ThreadPtr, va_range: VaRange4K) ->  (ret: SyscallReturnStruct)
-    requires
-        old(self).wf(),
-        old(self).thread_dom().contains(thread_ptr),
-        va_range.wf(),
-    {
-
-        return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
-    }
 
 }
 }

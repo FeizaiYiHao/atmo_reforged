@@ -10,6 +10,8 @@ pub struct Kernel{
     pub page_alloc: PageAllocator,
     pub mem_man: MemoryManager,
     pub proc_man: ProcessManager,
+
+    pub page_mapping: Ghost<Map<PagePtr, Set<(ProcPtr,VAddr)>>>,
 }
 
 //spec
@@ -33,6 +35,29 @@ impl Kernel{
         self.page_alloc.allocated_pages_1g() =~= Set::empty()
         &&&
         self.page_alloc.container_map_4k@.dom() =~= self.proc_man.container_dom()
+    }
+
+    pub open spec fn page_mapping_wf(&self) -> bool{
+        &&&
+        self.page_mapping@.dom() == self.page_alloc.mapped_pages_4k()
+        &&&
+        forall|page_ptr:PagePtr, p_ptr: ProcPtr, va:VAddr|
+            #![trigger self.page_mapping@[page_ptr].contains((p_ptr, va))]
+            #![trigger self.page_alloc.page_mappings(page_ptr).contains((self.proc_man.get_proc(p_ptr).pcid, va))]
+            self.page_mapping@.dom().contains(page_ptr) && self.page_mapping@[page_ptr].contains((p_ptr, va))
+            ==>
+            self.page_alloc.page_is_mapped(page_ptr)
+            &&
+            self.proc_man.proc_dom().contains(p_ptr)
+            &&
+            self.page_alloc.page_mappings(page_ptr).contains((self.proc_man.get_proc(p_ptr).pcid, va))
+        &&&
+        forall|page_ptr:PagePtr, pcid: Pcid, va:VAddr|
+            #![trigger self.page_alloc.page_mappings(page_ptr).contains((pcid, va))]
+            #![trigger self.page_mapping@[page_ptr].contains((self.mem_man.pcid_to_proc_ptr(pcid), va))]
+            self.page_alloc.page_is_mapped(page_ptr) && self.page_alloc.page_mappings(page_ptr).contains((pcid, va))
+            ==>
+            self.page_mapping@.dom().contains(page_ptr) && self.page_mapping@[page_ptr].contains((self.mem_man.pcid_to_proc_ptr(pcid), va))
     }
 
     pub open spec fn mapping_wf(&self) -> bool{
@@ -84,10 +109,20 @@ impl Kernel{
     pub open spec fn pcid_ioid_wf(&self) -> bool{
         &&&
         forall|proc_ptr:ProcPtr|
-        #![trigger self.proc_man.get_proc(proc_ptr).pcid]
-        self.proc_man.proc_dom().contains(proc_ptr) 
-        ==>
-        self.mem_man.pcid_active(self.proc_man.get_proc(proc_ptr).pcid)
+            #![trigger self.proc_man.get_proc(proc_ptr).pcid]
+            self.proc_man.proc_dom().contains(proc_ptr) 
+            ==>
+            self.mem_man.pcid_active(self.proc_man.get_proc(proc_ptr).pcid)
+            &&
+            self.mem_man.pcid_to_proc_ptr(self.proc_man.get_proc(proc_ptr).pcid) == proc_ptr
+        &&&
+        forall|pcid:Pcid|
+            #![trigger self.mem_man.pcid_to_proc_ptr(pcid)]
+            self.mem_man.pcid_active(pcid)
+            ==>
+            self.proc_man.proc_dom().contains(self.mem_man.pcid_to_proc_ptr(pcid)) 
+            &&
+            self.proc_man.get_proc(self.mem_man.pcid_to_proc_ptr(pcid)).pcid == pcid
         &&&
         forall|proc_ptr:ProcPtr|
         #![trigger self.proc_man.get_proc(proc_ptr).ioid]
@@ -111,6 +146,8 @@ impl Kernel{
         self.mapping_wf()
         &&&
         self.pcid_ioid_wf()
+        &&&
+        self.page_mapping_wf()
     }
 
 }

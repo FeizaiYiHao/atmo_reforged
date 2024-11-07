@@ -111,9 +111,10 @@ impl ProcessManager{
     pub fn get_thread(&self, thread_ptr:ThreadPtr) -> (ret:&Thread)
         requires
             self.wf(),
-            self.thread_perms@.dom().contains(thread_ptr),
+            self.thread_dom().contains(thread_ptr),
         ensures
-            ret == self.get_thread(thread_ptr)
+            ret == self.get_thread(thread_ptr),
+            self.proc_dom().contains(ret.owning_proc),
     {
         let tracked thread_perm = self.thread_perms.borrow().tracked_borrow(thread_ptr);
         let thread : &Thread = PPtr::<Thread>::from_usize(thread_ptr).borrow(Tracked(thread_perm));

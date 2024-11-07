@@ -101,6 +101,7 @@ pub enum ErrorCodeType{
     Success{ value:usize },
     CpuIdle,
     Error,
+    Else,
 }
 // -------------------- End of Types --------------------
 

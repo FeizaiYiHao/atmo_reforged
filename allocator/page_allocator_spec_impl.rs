@@ -1089,6 +1089,12 @@ verus! {
                 !old(self).page_is_mapped(ret),
                 self.page_is_mapped(ret),
                 self.free_pages_4k.len() == old(self).free_pages_4k.len() - 1,
+                forall|c:ContainerPtr|
+                    #![auto]
+                    self.container_map_4k@.dom().contains(c) && c_ptr != c
+                    ==>
+                    self.get_container_owned_pages(c) =~= old(self).get_container_owned_pages(c),
+                self.get_container_owned_pages(c_ptr) =~= old(self).get_container_owned_pages(c_ptr).insert(ret),
         {
             proof{
                 page_ptr_lemma();

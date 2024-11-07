@@ -87,6 +87,11 @@ impl Kernel{
         self.page_alloc.get_container_owned_pages(c_ptr)
     }
 
+    pub open spec fn get_physical_page_mapping(&self, page_ptr:PagePtr) -> Set<(ProcPtr,VAddr)>
+    {
+        self.page_mapping@
+    }
+
     pub open spec fn get_is_cpu_running(&self, cpu_i:CpuId) -> bool
         recommends
             self.wf(),

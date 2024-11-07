@@ -17,6 +17,7 @@ pub struct MemoryManager{
     pub kernel_entries_ghost: Ghost<Seq<PageEntry>>,
 
     pub free_pcids: ArrayVec<Pcid,PCID_MAX>,
+    pub pcid_to_proc_ptr: Array<Option<ProcPtr>,PCID_MAX>,
     pub page_tables: Array<Option<PageTable>,PCID_MAX>,
     pub page_table_pages: Ghost<Set<PagePtr>>,
 
@@ -33,6 +34,13 @@ pub struct MemoryManager{
 }
 
 impl MemoryManager{
+    pub open spec fn pcid_to_proc_ptr(&self, pcid:Pcid) -> ProcPtr
+        recommends
+            self.pcid_active(pcid)
+    {
+        self.pcid_to_proc_ptr@[pcid as int].unwrap()
+    }
+
     pub open spec fn pcid_active(&self, pcid:Pcid) -> bool{
         &&&
         0 <= pcid < PCID_MAX
@@ -323,6 +331,14 @@ impl MemoryManager{
         return self.root_table.get_ioid(bus,dev,fun);
     }
 
+    pub open spec fn pcid_to_proc_wf(&self) -> bool{
+        &&&
+        forall|pcid:Pcid|
+            #![trigger self.pcid_active(pcid)]
+            #![trigger self.pcid_to_proc_ptr@[pcid as int]]
+            self.pcid_active(pcid) == self.pcid_to_proc_ptr@[pcid as int].is_Some()
+    }
+
     // #[verifier(inline)]
     pub open spec fn wf(&self) -> bool
     {
@@ -425,6 +441,12 @@ impl MemoryManager{
                 self.ioid_active(i)
                 ==>
                 old(self).get_iommu_table_mapping_by_ioid(i) == self.get_iommu_table_mapping_by_ioid(i),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.pcid_to_proc_ptr(p)]
+                self.pcid_active(p)
+                ==>
+                old(self).pcid_to_proc_ptr(p) == self.pcid_to_proc_ptr(p),
             self.get_pagetable_by_pcid(target_pcid).is_Some(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().wf(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().pcid == old(self).get_pagetable_by_pcid(target_pcid).unwrap().pcid, 
@@ -559,6 +581,12 @@ impl MemoryManager{
                 self.ioid_active(i)
                 ==>
                 old(self).get_iommu_table_mapping_by_ioid(i) == self.get_iommu_table_mapping_by_ioid(i),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.pcid_to_proc_ptr(p)]
+                self.pcid_active(p)
+                ==>
+                old(self).pcid_to_proc_ptr(p) == self.pcid_to_proc_ptr(p),
             self.get_pagetable_by_pcid(target_pcid).is_Some(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().wf(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().pcid == old(self).get_pagetable_by_pcid(target_pcid).unwrap().pcid, 
@@ -717,6 +745,12 @@ impl MemoryManager{
                 self.ioid_active(i)
                 ==>
                 old(self).get_iommu_table_mapping_by_ioid(i) == self.get_iommu_table_mapping_by_ioid(i),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.pcid_to_proc_ptr(p)]
+                self.pcid_active(p)
+                ==>
+                old(self).pcid_to_proc_ptr(p) == self.pcid_to_proc_ptr(p),
             self.get_pagetable_by_pcid(target_pcid).is_Some(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().wf(),
             self.get_pagetable_by_pcid(target_pcid).unwrap().pcid == old(self).get_pagetable_by_pcid(target_pcid).unwrap().pcid, 
@@ -815,6 +849,12 @@ impl MemoryManager{
                 self.pcid_active(p) && p != target_pcid
                 ==>
                 old(self).get_pagetable_mapping_by_pcid(p) == self.get_pagetable_mapping_by_pcid(p),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.pcid_to_proc_ptr(p)]
+                self.pcid_active(p)
+                ==>
+                old(self).pcid_to_proc_ptr(p) == self.pcid_to_proc_ptr(p),
             forall|i:IOid|
                 #![trigger self.ioid_active(i)]
                 #![trigger self.get_iommu_table_mapping_by_ioid(i)]
