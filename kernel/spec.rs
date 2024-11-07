@@ -149,7 +149,22 @@ impl Kernel{
         &&&
         self.page_mapping_wf()
     }
+}
 
+impl Kernel {
+    pub proof fn process_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|p_ptr:ProcPtr|
+                #![trigger self.proc_dom().contains(p_ptr)]
+                #![trigger self.get_proc(p_ptr)]
+                self.proc_dom().contains(p_ptr)
+                ==>
+                self.container_dom().contains(self.get_proc(p_ptr).owning_container)
+    {
+        self.proc_man.process_inv();
+    }
 }
 
 }

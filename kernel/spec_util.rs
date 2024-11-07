@@ -89,7 +89,7 @@ impl Kernel{
 
     pub open spec fn get_physical_page_mapping(&self, page_ptr:PagePtr) -> Set<(ProcPtr,VAddr)>
     {
-        self.page_mapping@
+        self.page_mapping@[page_ptr]
     }
 
     pub open spec fn get_is_cpu_running(&self, cpu_i:CpuId) -> bool
