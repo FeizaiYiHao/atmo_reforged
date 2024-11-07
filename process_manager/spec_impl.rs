@@ -794,6 +794,14 @@ impl ProcessManager{
 
 //proofs
 impl ProcessManager{
+    pub proof fn pcid_unique(&self, target_proc_ptr:ProcPtr)
+        requires
+            self.wf(),
+            self.proc_dom().contains(target_proc_ptr) 
+        ensures
+            forall|p_ptr:ProcPtr| #![auto] self.proc_dom().contains(p_ptr) && target_proc_ptr != p_ptr ==> self.get_proc(p_ptr).pcid != self.get_proc(target_proc_ptr).pcid,
+    {}
+
     pub proof fn wf_imply_proc_to_unique_pcid(&self) 
         requires
             self.wf(),

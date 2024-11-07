@@ -1059,7 +1059,6 @@ verus! {
                 old(self).container_map_4k@.dom().contains(c_ptr),
             ensures
                 self.wf(),
-                self.wf(),
                 // self.free_pages_4k() =~= old(self).free_pages_4k(),
                 self.free_pages_2m() =~= old(self).free_pages_2m(),
                 self.free_pages_4k() =~= old(self).free_pages_4k().remove(ret),
@@ -1070,13 +1069,26 @@ verus! {
                 self.mapped_pages_4k() =~= old(self).mapped_pages_4k().insert(ret),
                 self.mapped_pages_2m() =~= old(self).mapped_pages_2m(),
                 self.mapped_pages_1g() =~= old(self).mapped_pages_1g(),
-                forall|p:PagePtr| 
-                    self.page_is_mapped(p) && p != ret ==> 
+                forall|p:PagePtr|
+                    #![trigger self.page_is_mapped(p)] 
+                    #![trigger self.page_mappings(p)] 
+                    self.page_is_mapped(p) && p != ret
+                     ==> 
                     self.page_mappings(p) =~= old(self).page_mappings(p)
                     &&
                     self.page_io_mappings(p) =~= old(self).page_io_mappings(p),
                 self.page_mappings(ret) =~= Set::<(Pcid,VAddr)>::empty().insert((pcid,va)),
+                self.page_mappings(ret).contains((pcid,va)),
                 self.page_io_mappings(ret) =~= Set::<(IOid,VAddr)>::empty(),
+                old(self).allocated_pages_4k().contains(ret) == false,
+                page_ptr_valid(ret),
+                self.container_map_4k@.dom() =~= old(self).container_map_4k@.dom(),
+                forall|p:PagePtr|
+                    #![auto] 
+                    self.page_is_mapped(p) <== old(self).page_is_mapped(p),
+                !old(self).page_is_mapped(ret),
+                self.page_is_mapped(ret),
+                self.free_pages_4k.len() == old(self).free_pages_4k.len() - 1,
         {
             proof{
                 page_ptr_lemma();

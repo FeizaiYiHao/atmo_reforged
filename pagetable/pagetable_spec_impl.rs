@@ -1431,7 +1431,7 @@ impl PageTable{
             0<=target_l1i<512,
             old(self).spec_resolve_mapping_l2(target_l4i, target_l3i, target_l2i).is_Some(),
             old(self).spec_resolve_mapping_l2(target_l4i, target_l3i, target_l2i).get_Some_0().addr == target_l1_p,
-            old(self).spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, target_l1i).is_None(),
+            old(self).spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, target_l1i).is_None() || old(self).mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))) == false,
             old(self).page_closure().contains(target_entry.addr) == false,
             page_ptr_valid(target_entry.addr),
         ensures
