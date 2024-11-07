@@ -316,6 +316,21 @@ pub fn va_add_range(va: usize, i: usize) -> (ret:usize)
     (va + (i*4096)) as usize
 }
 
+#[verifier(external_body)]
+pub proof fn va_range_lemma(va:usize, len:usize)
+    requires
+        va_4k_valid(va),
+        spec_va_4k_range_valid(va,len),
+    ensures
+        forall|i:usize, j:usize|
+        #![trigger spec_va_add_range(va, i), spec_va_add_range(va, j)]
+        0 <= i < len 
+        &&
+        0 <= i < len 
+        ==> 
+        ( (i == j) == (spec_va_add_range(va, i) == spec_va_add_range(va, j)))
+{}
+
 
 #[verifier(external_body)]
 pub proof fn page_index_lemma()

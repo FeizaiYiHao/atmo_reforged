@@ -10,6 +10,7 @@ pub mod pagetable;
 pub mod allocator;
 pub mod process_manager;
 pub mod memory_manager;
+pub mod va_range;
 
 pub mod kernel;
 
