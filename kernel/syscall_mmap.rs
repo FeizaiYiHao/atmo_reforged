@@ -4,6 +4,7 @@ verus! {
 // use crate::memory_manager::spec_impl::*;
 // use crate::process_manager::spec_impl::*;
 // use crate::util::page_ptr_util_u::*;
+use crate::lemma::lemma_u::*;
 use crate::util::page_ptr_util_u::*;
 use crate::define::*;
 use crate::trap::*;
@@ -364,26 +365,79 @@ pub fn get_address_space_va_range_none(&self, target_proc_ptr:ProcPtr, va_range:
     return true;
 }
 
-pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: VaRange4K)
+pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: VaRange4K) -> (ret: (usize, Ghost<Seq<PagePtr>>))
     requires
         old(self).wf(),
         old(self).proc_dom().contains(target_proc_ptr),
         va_range.wf(),
         old(self).get_container_quota(old(self).get_proc(target_proc_ptr).owning_container) >= 4 * va_range.len,
         old(self).get_num_of_free_pages() >= 4 * va_range.len,
-        forall|i:int| #![auto] 0<=i<va_range.len ==> old(self).get_address_space(target_proc_ptr).dom().contains(va_range@[i]) == false
+        forall|i:int| #![auto] 0<=i<va_range.len ==> old(self).get_address_space(target_proc_ptr).dom().contains(va_range@[i]) == false,
+        va_range.len * 4 < usize::MAX,
+    ensures
+        self.wf(),
+        self.proc_dom() == old(self).proc_dom(),
+        self.thread_dom() == old(self).thread_dom(),
+        self.endpoint_dom() == old(self).endpoint_dom(),
+        self.container_dom() == old(self).container_dom(),
+        forall|p_ptr:ProcPtr|
+            #![auto]
+            self.proc_dom().contains(p_ptr) && p_ptr != target_proc_ptr
+            ==>
+            self.get_address_space(p_ptr) =~= old(self).get_address_space(p_ptr),
+        forall|p_ptr:ProcPtr|
+            #![auto]
+            self.proc_dom().contains(p_ptr)
+            ==>
+            self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
+        forall|t_ptr:ThreadPtr|
+            #![auto]
+            self.thread_dom().contains(t_ptr)
+            ==>
+            self.get_thread(t_ptr) =~= old(self).get_thread(t_ptr),
+        forall|c_ptr:ContainerPtr|
+            #![auto]
+            self.container_dom().contains(c_ptr) && c_ptr != self.get_proc(target_proc_ptr).owning_container
+            ==>
+            self.get_container(c_ptr) =~= old(self).get_container(c_ptr),
+        forall|e_ptr:EndpointPtr|
+            #![auto]
+            self.endpoint_dom().contains(e_ptr)
+            ==>
+            self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
+        forall|j:usize| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j as int]),
+        ret.1@.len() == va_range.len,
+        forall|j:usize| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr)[va_range@[j as int]].addr == ret.1@[j as int],
+        forall|p:PagePtr|
+            #![trigger self.page_alloc.page_is_mapped(p)] 
+            ret.1@.contains(p) == false
+            ==> 
+            self.page_alloc.page_is_mapped(p) == old(self).page_alloc.page_is_mapped(p),
+        forall|j:usize| #![auto] 0<=j<va_range.len ==> old(self).page_alloc.page_is_mapped(ret.1@[j as int]) == false,
+        forall|j:usize| #![auto] 0<=j<va_range.len ==> self.page_alloc.page_is_mapped(ret.1@[j as int]) == true,
+        self.get_num_of_free_pages() == old(self).get_num_of_free_pages() - ret.0,
+        self.get_container_quota(self.get_proc(target_proc_ptr).owning_container) == old(self).get_container_quota(self.get_proc(target_proc_ptr).owning_container) - ret.0,
+        forall|va:VAddr|
+            #![trigger self.get_address_space(target_proc_ptr)[va]]
+            // #![trigger va_4k_valid(va)]
+            // va_4k_valid(va) 
+            // && 
+            va_range@.contains(va) == false
+            ==>
+            self.get_address_space(target_proc_ptr)[va] == old(self).get_address_space(target_proc_ptr)[va]
 {
     let mut num_page = 0;
-    let mut page_diff: Ghost<Set<PagePtr>> = Ghost(Set::empty());
+    let mut page_diff: Ghost<Seq<PagePtr>> = Ghost(Seq::empty());
     for i in 0..va_range.len
         invariant
             0<=i<=va_range.len,
+            va_range.len * 4 < usize::MAX,
+            old(self).wf(),
             self.wf(),
             self.proc_dom().contains(target_proc_ptr),
             va_range.wf(),
             self.get_container_quota(self.get_proc(target_proc_ptr).owning_container) >= 4 * (va_range.len - i),
             self.get_num_of_free_pages() >= 4 * (va_range.len - i),
-            // forall|j:int| #![auto] 0<=j<i ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]),
             self.proc_dom() == old(self).proc_dom(),
             self.thread_dom() == old(self).thread_dom(),
             self.endpoint_dom() == old(self).endpoint_dom(),
@@ -414,9 +468,40 @@ pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: VaRange
                 ==>
                 self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
             forall|j:int| #![auto] i<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]) == false,
+            forall|j:usize| #![auto] 0<=j<i ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j as int]),
+            page_diff@.len() == i,
+            forall|j:usize| #![auto] 0<=j<i ==> self.get_address_space(target_proc_ptr)[va_range@[j as int]].addr == page_diff@[j as int],
+            forall|p:PagePtr|
+                #![trigger self.page_alloc.page_is_mapped(p)] 
+                page_diff@.contains(p) == false
+                ==> 
+                self.page_alloc.page_is_mapped(p) == old(self).page_alloc.page_is_mapped(p),
+            forall|j:usize| #![auto] 0<=j<i ==> old(self).page_alloc.page_is_mapped(page_diff@[j as int]) == false,
+            forall|j:usize| #![auto] 0<=j<i ==> self.page_alloc.page_is_mapped(page_diff@[j as int]) == true,
+            num_page <= i * 4,
+            self.get_num_of_free_pages() == old(self).get_num_of_free_pages() - num_page,
+            self.get_container_quota(self.get_proc(target_proc_ptr).owning_container) == old(self).get_container_quota(self.get_proc(target_proc_ptr).owning_container) - num_page,
+            forall|va:VAddr|
+                #![trigger self.get_address_space(target_proc_ptr)[va]]
+                // #![trigger va_4k_valid(va)]
+                // va_4k_valid(va) 
+                // && 
+                va_range@.subrange(0, i as int).contains(va) == false
+                ==>
+                self.get_address_space(target_proc_ptr)[va] == old(self).get_address_space(target_proc_ptr)[va]
     {
+        proof{
+            seq_push_lemma::<PagePtr>();
+            map_insert_lemma::<VAddr, MapEntry>();
+        }
         let (num, map_entry) = self.create_entry_and_alloc_and_map(target_proc_ptr, va_range.index(i));
+        assert(va_range@.subrange(0, i + 1 as int) == va_range@.subrange(0, i as int).push(va_range@[i as int]));
+        num_page = num_page + num;
+        proof{
+            page_diff@ = page_diff@.push(map_entry.addr);
+        }
     }
+    (num_page, page_diff)
 }
 
 

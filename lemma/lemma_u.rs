@@ -24,7 +24,14 @@ pub proof fn seq_push_lemma<A>()
             #![auto]
             s.push(v).contains(v),
 {
+}
 
+#[verifier(external_body)]
+pub proof fn map_insert_lemma<A,B>()
+    ensures
+        forall|m: Map<A,B>, x:A, y:A, v:B|
+            x != y ==> m.insert(x,v)[y] == m[y],
+{
 }
 
 #[verifier(external_body)]
