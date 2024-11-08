@@ -326,7 +326,7 @@ impl ProcessManager{
         }
     }
 
-    pub closed spec fn spec_get_endpoint_ptr_by_endpoint_idx(&self, thread_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> Option<EndpointPtr>
+    pub open spec fn spec_get_endpoint_ptr_by_endpoint_idx(&self, thread_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> Option<EndpointPtr>
         recommends
             self.wf(),
             self.thread_dom().contains(thread_ptr),
@@ -650,7 +650,7 @@ impl ProcessManager{
             self.thread_perms@[t_ptr].value().owning_container == c_ptr 
         &&&
         forall|t_ptr:ThreadPtr| 
-            #![trigger self.thread_perms@[t_ptr].value().owning_container]
+            #![trigger self.container_perms@.dom().contains(self.thread_perms@[t_ptr].value().owning_container)]
             self.thread_perms@.dom().contains(t_ptr) 
             ==>
             self.container_perms@.dom().contains(self.thread_perms@[t_ptr].value().owning_container) 
@@ -713,6 +713,14 @@ impl ProcessManager{
             self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue.node_ref_valid(self.thread_perms@[t_ptr].value().endpoint_rev_ptr.unwrap())
             &&
             self.endpoint_perms@[self.thread_perms@[t_ptr].value().blocking_endpoint_ptr.unwrap()].value().queue.node_ref_resolve(self.thread_perms@[t_ptr].value().endpoint_rev_ptr.unwrap()) == t_ptr
+        &&&
+        forall|e_ptr:EndpointPtr, i:int| 
+            #![trigger self.endpoint_perms@[e_ptr].value().queue@[i]]
+            self.endpoint_perms@.dom().contains(e_ptr) && 0 <= i < self.endpoint_perms@[e_ptr].value().queue@.len()
+            ==>
+            self.thread_perms@.dom().contains(self.endpoint_perms@[e_ptr].value().queue@[i])
+            &&
+            self.endpoint_perms@[e_ptr].value().owning_threads@.contains(self.endpoint_perms@[e_ptr].value().queue@[i])
     }
 
     pub closed spec fn endpoints_container_wf(&self) -> bool{
@@ -1085,7 +1093,7 @@ impl ProcessManager{
             self.endpoint_dom() == old(self).endpoint_dom(),
             self.container_dom() == old(self).container_dom(),
             self.thread_dom() == old(self).thread_dom().insert(ret),
-            old(self).get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota - 1 == self.get_container(self.get_proc(proc_ptr).owning_container).mem_quota,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota - 1 == self.get_container(self.get_thread(thread_ptr).owning_container).mem_quota,
             old(self).get_proc(proc_ptr).pcid =~= self.get_proc(proc_ptr).pcid,
             old(self).get_proc(proc_ptr).ioid =~= self.get_proc(proc_ptr).ioid,
             forall|p_ptr:ProcPtr|
@@ -1103,6 +1111,16 @@ impl ProcessManager{
                 old(self).thread_dom().contains(t_ptr)
                 ==>
                 old(self).get_thread(t_ptr) =~= self.get_thread(t_ptr),
+            forall|e_ptr:EndpointPtr| 
+                #![trigger self.get_endpoint(e_ptr)]
+                self.endpoint_dom().contains(e_ptr) && e_ptr != old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()
+                ==> 
+                old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
+            self.get_proc(proc_ptr).owned_threads@ == old(self).get_proc(proc_ptr).owned_threads@.push(ret),
+            self.get_container(self.get_thread(thread_ptr).owning_container).owned_threads@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_threads@.insert(ret),
+            self.get_thread(ret).owning_container == old(self).get_thread(thread_ptr).owning_container,
+            self.get_thread(ret).endpoint_descriptors@ =~= Seq::new(MAX_NUM_ENDPOINT_DESCRIPTORS as nat,|i: int| {None}).update(0, Some(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap())),
+            self.get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).owning_threads@ =~= old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).owning_threads@.insert(ret),
     {
         proof{seq_push_lemma::<ThreadPtr>();}
         let container_ptr = self.get_proc(proc_ptr).owning_container;

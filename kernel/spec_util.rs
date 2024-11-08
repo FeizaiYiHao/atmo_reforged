@@ -167,13 +167,21 @@ impl Kernel{
         self.page_alloc.free_pages_4k.len()
     }
 
+    pub open spec fn get_thread_endpoint_descriptors(&self, t_ptr:ThreadPtr) -> Seq<Option<EndpointPtr>>
+    recommends
+        self.wf(),
+        self.thread_dom().contains(t_ptr),
+    {
+        self.proc_man.get_thread(t_ptr).endpoint_descriptors@
+    }
+
     pub open spec fn get_endpoint_ptr_by_endpoint_idx(&self, t_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> Option<EndpointPtr> 
     recommends
         self.wf(),
         self.thread_dom().contains(t_ptr),
         0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
     {
-        self.proc_man.get_endpoint_ptr_by_endpoint_idx(t_ptr, endpoint_index)
+        self.proc_man.get_thread(t_ptr).endpoint_descriptors@[endpoint_index as int]
     }
 
     pub open spec fn get_endpoint_shareable(&self, t_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> bool 
