@@ -66,16 +66,16 @@ impl Kernel{
     {
         let proc_ptr = self.proc_man.get_owning_proc_by_thread_ptr(thread_ptr);
         if self.proc_man.get_proc(proc_ptr).owned_threads.len() >= MAX_NUM_THREADS_PER_PROC{
-            return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
         if self.proc_man.get_container_by_proc_ptr(proc_ptr).mem_quota == 0{
-            return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
         if self.proc_man.get_container_by_proc_ptr(proc_ptr).scheduler.len() >= MAX_CONTAINER_SCHEDULER_LEN {
-            return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         } 
         if self.page_alloc.free_pages_4k.len() <= 0 {
-            return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
         assert((self.get_num_of_free_pages() <= 0) == false);
         let (new_page_ptr, new_page_perm) = self.page_alloc.alloc_page_4k();
@@ -116,7 +116,7 @@ impl Kernel{
             self.container_dom().contains(c) ==> 
             old(self).get_container_owned_pages(c) =~= self.get_container_owned_pages(c)
         );
-        return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Success{value: new_thread_ptr});
+        return SyscallReturnStruct::NoSwitchNew(RetValueType::SuccessUsize{value: new_thread_ptr});
     }
 }
 

@@ -844,6 +844,22 @@ impl ProcessManager{
     {
     }
 
+    pub proof fn thread_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|t_ptr:ThreadPtr|
+                #![trigger self.thread_dom().contains(t_ptr)]
+                #![trigger self.get_thread(t_ptr).owning_container]
+                #![trigger self.get_thread(t_ptr).owning_proc]
+                self.thread_dom().contains(t_ptr)
+                ==>
+                self.container_dom().contains(self.get_thread(t_ptr).owning_container)
+                &&
+                self.proc_dom().contains(self.get_thread(t_ptr).owning_proc)
+                &&
+                self.get_proc(self.get_thread(t_ptr).owning_proc).owning_container == self.get_thread(t_ptr).owning_container
+    {}
     pub proof fn pcid_unique(&self, target_proc_ptr:ProcPtr)
         requires
             self.wf(),
@@ -1102,10 +1118,10 @@ impl ProcessManager{
                 ==> 
                 self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
             forall|container_ptr:ContainerPtr|
-                #![trigger self.get_container(container_ptr).owned_procs]
-                self.container_dom().contains(container_ptr) && container_ptr != self.get_proc(proc_ptr).owning_container
+                #![trigger self.get_container(container_ptr)]
+                self.container_dom().contains(container_ptr) && container_ptr != self.get_thread(thread_ptr).owning_container
                 ==> 
-                self.get_container(container_ptr).owned_procs =~= old(self).get_container(container_ptr).owned_procs,
+                self.get_container(container_ptr) =~= old(self).get_container(container_ptr),
             forall|t_ptr:ThreadPtr| 
                 #![trigger old(self).get_thread(t_ptr)]
                 old(self).thread_dom().contains(t_ptr)

@@ -95,10 +95,11 @@ pub enum PageTableErrorCode {
     EntryTakenBy1g,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[allow(inconsistent_fields)]
-pub enum ErrorCodeType{
-    Success{ value:usize },
+pub enum RetValueType{
+    SuccessUsize{ value:usize },
+    SuccessSeqUsize{ value:Ghost<Seq<usize>> },
     CpuIdle,
     Error,
     Else,
@@ -154,26 +155,34 @@ pub const MAX_CONTAINER_SCHEDULER_LEN:usize = 10;
 // -------------------- End of Const --------------------
 
 // -------------------- Begin of Structs --------------------
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct SyscallReturnStruct{
-    pub error_code: ErrorCodeType,
+    pub error_code: RetValueType,
     pub pcid: Option<Pcid>,
     pub cr3: Option<usize>,
 }
 
 impl SyscallReturnStruct{
 
-    pub open spec fn get_return_vaule(&self) -> Option<usize>
+    pub open spec fn get_return_vaule_usize(&self) -> Option<usize>
     {
         match self.error_code {
-            ErrorCodeType::Success{value:value} => Some(value),
+            RetValueType::SuccessUsize{value:value} => Some(value),
+            _ => None,
+        }
+    }
+
+    pub open spec fn get_return_vaule_seq_usize(&self) -> Option<Seq<usize>>
+    {
+        match self.error_code {
+            RetValueType::SuccessSeqUsize{value:value} => Some(value@),
             _ => None,
         }
     }
 
     pub open spec fn spec_is_error(&self) -> bool{
         match self.error_code {
-            ErrorCodeType::Error => true,
+            RetValueType::Error => true,
             _ => false,
         }
     }
@@ -184,12 +193,12 @@ impl SyscallReturnStruct{
             ret == self.is_error()
     {
         match self.error_code {
-            ErrorCodeType::Error => true,
+            RetValueType::Error => true,
             _ => false,
         }
     }
 
-    pub fn NoSwitchNew(error_code:ErrorCodeType )->(ret:Self)
+    pub fn NoSwitchNew(error_code:RetValueType )->(ret:Self)
         ensures
             ret.error_code == error_code,
             ret.pcid.is_None(),

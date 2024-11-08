@@ -20,7 +20,7 @@ verus! {
         pub endpoint_descriptors: Array<Option<EndpointPtr>,MAX_NUM_ENDPOINT_DESCRIPTORS>,
         pub ipc_payload: Option<IPCPayLoad>,
         
-        pub error_code: Option<ErrorCodeType>, //this will only be set when it comes out of endpoint and goes to scheduler.
+        pub error_code: Option<RetValueType>, //this will only be set when it comes out of endpoint and goes to scheduler.
         
         pub trap_frame: TrapFrameOption,
     }

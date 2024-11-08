@@ -29,6 +29,60 @@ pub open spec fn syscall_mmap_requirement(old:Kernel,  target_thread_ptr: Thread
     }
 }
 
+pub open spec fn syscall_mmap_spec(old:Kernel, new:Kernel, thread_id: ThreadPtr, va_range: VaRange4K, ret: SyscallReturnStruct) -> bool{
+    let target_proc_ptr = old.get_thread(thread_id).owning_proc;
+    let target_container_ptr = old.get_thread(thread_id).owning_container;
+
+    &&&
+    syscall_mmap_requirement(old, thread_id, va_range) == false ==> new =~= old
+    &&&
+    syscall_mmap_requirement(old, thread_id, va_range) == true ==>
+        // things that did not change
+        old.thread_dom() =~= new.thread_dom()
+        &&
+        old.proc_dom() =~= new.proc_dom()
+        &&
+        old.container_dom() =~= new.container_dom()
+        &&
+        old.endpoint_dom() =~= new.endpoint_dom()
+        &&
+        forall|t_ptr:ThreadPtr| 
+            #![trigger new.get_thread(t_ptr)]
+            old.thread_dom().contains(t_ptr)
+            ==>
+            new.get_thread(t_ptr) =~= old.get_thread(t_ptr)
+        &&
+        forall|proc_ptr:ProcPtr| 
+            #![trigger new.get_proc(proc_ptr)]
+            new.proc_dom().contains(proc_ptr) && proc_ptr != target_proc_ptr
+            ==>
+            new.get_proc(proc_ptr) =~= old.get_proc(proc_ptr)
+        &&
+        forall|c:ContainerPtr| 
+            #![trigger new.get_container_owned_pages(c)]
+            new.container_dom().contains(c) && c != target_container_ptr
+            ==>
+            old.get_container(c) =~= new.get_container(c)
+        &&
+        forall|e_ptr:EndpointPtr| 
+            #![trigger new.get_endpoint(e_ptr)]
+            new.endpoint_dom().contains(e_ptr)
+            ==> 
+            old.get_endpoint(e_ptr) =~= new.get_endpoint(e_ptr)
+        // &&
+        // forall|c:ContainerPtr| 
+        //     #![trigger new.get_container_owned_pages(c)]
+        //     new.container_dom().contains(c) && c != target_container_ptr
+        //     ==> 
+        //     old.get_container_owned_pages(c) =~= new.get_container_owned_pages(c)
+        &&
+        forall|p_ptr:ProcPtr| 
+            #![trigger new.get_address_space(p_ptr)]
+            new.proc_dom().contains(p_ptr) && p_ptr != target_proc_ptr
+            ==>
+            new.get_address_space(p_ptr) =~= old.get_address_space(p_ptr)
+}
+
 impl Kernel{
 
 pub fn syscall_mmap(&mut self, target_thread_ptr: ThreadPtr, va_range: VaRange4K) ->  (ret: SyscallReturnStruct)
@@ -38,27 +92,32 @@ pub fn syscall_mmap(&mut self, target_thread_ptr: ThreadPtr, va_range: VaRange4K
         va_range.wf(),
         va_range.len * 4 < usize::MAX,
     ensures
-        syscall_mmap_requirement(*old(self), target_thread_ptr, va_range) == false <==> ret.is_error()
+        syscall_mmap_requirement(*old(self), target_thread_ptr, va_range) == false <==> ret.is_error(),
+        syscall_mmap_spec(*old(self), *self, target_thread_ptr, va_range, ret),
 {
     let target_proc_ptr = self.proc_man.get_thread(target_thread_ptr).owning_proc;
     let target_pcid = self.proc_man.get_proc(target_proc_ptr).pcid;
     let target_container_ptr = self.proc_man.get_proc(target_proc_ptr).owning_container;
 
+    proof{
+        self.proc_man.thread_inv();
+    }
+
     if self.proc_man.get_container(target_container_ptr).mem_quota < va_range.len * 4{
-        return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+        return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
     if self.page_alloc.free_pages_4k.len() < va_range.len * 4{
-        return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+        return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
     if self.check_address_space_va_range(target_proc_ptr, &va_range) == false {
-        return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+        return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
     self.range_alloc_and_map(target_proc_ptr, &va_range);
     
-    return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Else);
+    return SyscallReturnStruct::NoSwitchNew(RetValueType::Else);
 }
 
 pub open spec fn address_space_range_free(&self, target_proc_ptr:ProcPtr, va_range:VaRange4K) -> bool{
@@ -129,6 +188,13 @@ pub fn create_entry(&mut self, proc_ptr:ProcPtr, va:VAddr) -> (ret: (usize, Page
             self.endpoint_dom().contains(e_ptr)
             ==>
             self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
+        forall|c_ptr:ContainerPtr|
+            #![auto]
+            self.container_dom().contains(c_ptr) && c_ptr != self.get_proc(proc_ptr).owning_container
+            ==>
+            self.get_container(c_ptr) =~= old(self).get_container(c_ptr)
+            &&
+            self.get_container_owned_pages(c_ptr) =~= old(self).get_container_owned_pages(c_ptr),
         self.get_container(old(self).get_proc(proc_ptr).owning_container).owned_procs =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).owned_procs,
         self.get_container(old(self).get_proc(proc_ptr).owning_container).parent =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).parent,
         self.get_container(old(self).get_proc(proc_ptr).owning_container).parent_rev_ptr =~= self.get_container(old(self).get_proc(proc_ptr).owning_container).parent_rev_ptr,
@@ -409,6 +475,11 @@ pub fn create_entry_and_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, target
             self.endpoint_dom().contains(e_ptr)
             ==>
             self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
+        forall|c:ContainerPtr|
+            #![auto]
+            self.container_dom().contains(c) && old(self).get_proc(target_proc_ptr).owning_container != c
+            ==>
+            self.get_container_owned_pages(c) =~= old(self).get_container_owned_pages(c),
         self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs =~= self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs,
         self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent =~= self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent,
         self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent_rev_ptr =~= self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent_rev_ptr,
@@ -498,6 +569,11 @@ pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: &VaRang
             self.endpoint_dom().contains(e_ptr)
             ==>
             self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
+        forall|c:ContainerPtr|
+            #![auto]
+            self.container_dom().contains(c) && old(self).get_proc(target_proc_ptr).owning_container != c
+            ==>
+            self.get_container_owned_pages(c) =~= old(self).get_container_owned_pages(c),
         forall|j:usize| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j as int]),
         ret.1@.len() == va_range.len,
         forall|j:usize| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr)[va_range@[j as int]].addr == ret.1@[j as int],
@@ -518,6 +594,7 @@ pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: &VaRang
             va_range@.contains(va) == false
             ==>
             self.get_address_space(target_proc_ptr)[va] == old(self).get_address_space(target_proc_ptr)[va],
+        
 {
     let mut num_page = 0;
     let mut page_diff: Ghost<Seq<PagePtr>> = Ghost(Seq::empty());
@@ -555,6 +632,11 @@ pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: &VaRang
                 self.container_dom().contains(c_ptr) && c_ptr != self.get_proc(target_proc_ptr).owning_container
                 ==>
                 self.get_container(c_ptr) =~= old(self).get_container(c_ptr),
+            forall|c:ContainerPtr|
+                #![auto]
+                self.container_dom().contains(c) && old(self).get_proc(target_proc_ptr).owning_container != c
+                ==>
+                self.get_container_owned_pages(c) =~= old(self).get_container_owned_pages(c),
             forall|e_ptr:EndpointPtr|
                 #![auto]
                 self.endpoint_dom().contains(e_ptr)

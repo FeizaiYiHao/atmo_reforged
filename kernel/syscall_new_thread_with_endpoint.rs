@@ -39,7 +39,7 @@ pub open spec fn syscall_new_thread_with_endpoint_spec(old:Kernel, new:Kernel, t
     let target_proc_ptr = old.get_thread(thread_id).owning_proc;
     let target_container_ptr = old.get_thread(thread_id).owning_container;
     let target_endpoint_ptr = old.get_endpoint_ptr_by_endpoint_idx(thread_id, endpoint_index).unwrap();
-    let new_thread_ptr = ret.get_return_vaule().unwrap();
+    let new_thread_ptr = ret.get_return_vaule_usize().unwrap();
 
     &&&
     syscall_new_thread_with_endpoint_requirement(old, thread_id, endpoint_index) == false ==> new =~= old
@@ -66,8 +66,9 @@ pub open spec fn syscall_new_thread_with_endpoint_spec(old:Kernel, new:Kernel, t
         &&
         forall|c:ContainerPtr| 
             #![trigger new.get_container_owned_pages(c)]
-            new.container_dom().contains(c) ==> 
-            old.get_container_owned_pages(c) =~= new.get_container_owned_pages(c)
+            new.container_dom().contains(c) && c != target_container_ptr
+            ==>
+            old.get_container(c) =~= new.get_container(c)
         &&
         forall|e_ptr:EndpointPtr| 
             #![trigger new.get_endpoint(e_ptr)]
@@ -116,26 +117,26 @@ impl Kernel{
     {
         let proc_ptr = self.proc_man.get_owning_proc_by_thread_ptr(thread_ptr);
         if self.proc_man.get_proc(proc_ptr).owned_threads.len() >= MAX_NUM_THREADS_PER_PROC{
-            return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
         if self.proc_man.get_container_by_proc_ptr(proc_ptr).mem_quota == 0{
-            return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
         if self.proc_man.get_container_by_proc_ptr(proc_ptr).scheduler.len() >= MAX_CONTAINER_SCHEDULER_LEN {
-            return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         } 
         if self.page_alloc.free_pages_4k.len() <= 0 {
-            return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
 
         let endpoint_ptr_op = self.proc_man.get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index);
         if endpoint_ptr_op.is_none(){
-            return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
 
         let endpoint_ptr = endpoint_ptr_op.unwrap();
         if self.proc_man.get_endpoint(endpoint_ptr).rf_counter == usize::MAX {
-            return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Error);
+            return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
         }
 
         let (new_page_ptr, new_page_perm) = self.page_alloc.alloc_page_4k();
@@ -176,7 +177,7 @@ impl Kernel{
             self.container_dom().contains(c) ==> 
             old(self).get_container_owned_pages(c) =~= self.get_container_owned_pages(c)
         );
-        return SyscallReturnStruct::NoSwitchNew(ErrorCodeType::Success{value: new_thread_ptr});
+        return SyscallReturnStruct::NoSwitchNew(RetValueType::SuccessUsize{value: new_thread_ptr});
     }
 }
 
