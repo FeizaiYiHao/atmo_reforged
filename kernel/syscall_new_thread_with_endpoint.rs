@@ -34,16 +34,23 @@ pub open spec fn syscall_new_thread_with_endpoint_requirement(old:Kernel, thread
     }
 }
 
-pub open spec fn syscall_new_thread_with_endpoint_spec(old:Kernel, new:Kernel, thread_id: ThreadPtr, endpoint_index: EndpointIdx) -> bool{
+pub open spec fn syscall_new_thread_with_endpoint_spec(old:Kernel, new:Kernel, thread_id: ThreadPtr, endpoint_index: EndpointIdx, ret: SyscallReturnStruct) -> bool{
     &&&
     syscall_new_thread_with_endpoint_requirement(old, thread_id, endpoint_index) == false ==> new =~= old
     &&&
     syscall_new_thread_with_endpoint_requirement(old, thread_id, endpoint_index) == true ==>
+        // things that did not change
         old.proc_dom() =~= new.proc_dom()
         &&
         old.container_dom() =~= new.container_dom()
         &&
         old.endpoint_dom() =~= new.endpoint_dom()
+        &&
+        forall|t_ptr:ThreadPtr| 
+            #![trigger new.get_thread(t_ptr)]
+            old.thread_dom().contains(t_ptr)
+            ==>
+            new.get_thread(t_ptr) =~= old.get_thread(t_ptr)
         &&
         forall|proc_ptr:ProcPtr| 
             #![trigger new.get_address_space(proc_ptr)]
@@ -51,10 +58,19 @@ pub open spec fn syscall_new_thread_with_endpoint_spec(old:Kernel, new:Kernel, t
             ==>
             new.get_address_space(proc_ptr) =~= old.get_address_space(proc_ptr)
         &&
+        forall|proc_ptr:ProcPtr| 
+            #![trigger new.get_proc(proc_ptr)]
+            new.proc_dom().contains(proc_ptr) && proc_ptr != old.get_thread(thread_id).owning_proc
+            ==>
+            new.get_proc(proc_ptr) =~= old.get_proc(proc_ptr)
+        &&
         forall|c:ContainerPtr| 
             #![trigger new.get_container_owned_pages(c)]
             new.container_dom().contains(c) ==> 
             old.get_container_owned_pages(c) =~= new.get_container_owned_pages(c)
+        // things that changed
+        &&
+        old.thread_dom().insert(ret.get_return_vaule().unwrap()) =~= new.thread_dom()
 }
 
 impl Kernel{
@@ -67,7 +83,7 @@ impl Kernel{
         ensures
             self.wf(),
             // syscall_new_thread_with_endpoint_requirement(*old(self), thread_ptr, endpoint_index) == false <==> ret.is_error(),
-            syscall_new_thread_with_endpoint_spec(*old(self),*self,thread_ptr,endpoint_index),
+            syscall_new_thread_with_endpoint_spec(*old(self),*self,thread_ptr,endpoint_index, ret),
     {
         let proc_ptr = self.proc_man.get_owning_proc_by_thread_ptr(thread_ptr);
         if self.proc_man.get_proc(proc_ptr).owned_threads.len() >= MAX_NUM_THREADS_PER_PROC{

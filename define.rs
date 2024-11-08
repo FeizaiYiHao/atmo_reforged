@@ -163,6 +163,14 @@ pub struct SyscallReturnStruct{
 
 impl SyscallReturnStruct{
 
+    pub open spec fn get_return_vaule(&self) -> Option<usize>
+    {
+        match self.error_code {
+            ErrorCodeType::Success{value:value} => Some(value),
+            _ => None,
+        }
+    }
+
     pub open spec fn spec_is_error(&self) -> bool{
         match self.error_code {
             ErrorCodeType::Error => true,

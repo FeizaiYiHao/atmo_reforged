@@ -1068,6 +1068,11 @@ impl ProcessManager{
                 self.container_dom().contains(container_ptr) && container_ptr != self.get_proc(proc_ptr).owning_container
                 ==> 
                 self.get_container(container_ptr).owned_procs =~= old(self).get_container(container_ptr).owned_procs,
+            forall|t_ptr:ThreadPtr| 
+                #![trigger old(self).get_thread(t_ptr)]
+                old(self).thread_dom().contains(t_ptr)
+                ==>
+                old(self).get_thread(t_ptr) =~= self.get_thread(t_ptr),
     {
         proof{seq_push_lemma::<ThreadPtr>();}
         let container_ptr = self.get_proc(proc_ptr).owning_container;
