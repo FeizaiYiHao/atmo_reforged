@@ -86,6 +86,8 @@ pub open spec fn syscall_new_thread_with_endpoint_spec(old:Kernel, new:Kernel, t
             new.proc_dom().contains(proc_ptr)
             ==>
             new.get_address_space(proc_ptr) =~= old.get_address_space(proc_ptr)
+        &&
+        new.get_physical_page_mapping() =~= old.get_physical_page_mapping()
         // things that changed
         &&
         old.thread_dom().insert(new_thread_ptr) =~= new.thread_dom()

@@ -87,7 +87,12 @@ impl Kernel{
         self.page_alloc.get_container_owned_pages(c_ptr)
     }
 
-    pub open spec fn get_physical_page_mapping(&self, page_ptr:PagePtr) -> Set<(ProcPtr,VAddr)>
+    pub open spec fn get_physical_page_mapping(&self) -> Map<PagePtr, Set<(ProcPtr,VAddr)>>
+    {
+        self.page_mapping@
+    }
+
+    pub open spec fn get_physical_page_mapping_of_page(&self, page_ptr:PagePtr) -> Set<(ProcPtr,VAddr)>
     {
         self.page_mapping@[page_ptr]
     }
