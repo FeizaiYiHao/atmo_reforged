@@ -26,6 +26,7 @@ pub fn scheduler_push_thread(container_ptr:ContainerPtr, container_perm: &mut Tr
         container_perm@.value().mem_quota =~= old(container_perm)@.value().mem_quota,
         container_perm@.value().mem_used =~= old(container_perm)@.value().mem_used,
         container_perm@.value().owned_cpus =~= old(container_perm)@.value().owned_cpus,
+        container_perm@.value().owned_threads =~= old(container_perm)@.value().owned_threads,
         // container_perm@.value().scheduler =~= old(container_perm)@.value().scheduler,
 
         container_perm@.value().scheduler.wf(),
@@ -71,12 +72,35 @@ pub fn container_set_mem_quota(container_ptr:ContainerPtr, container_perm: &mut 
         container_perm@.value().mem_used =~= old(container_perm)@.value().mem_used,
         container_perm@.value().owned_cpus =~= old(container_perm)@.value().owned_cpus,
         container_perm@.value().scheduler =~= old(container_perm)@.value().scheduler,
+        container_perm@.value().owned_threads =~= old(container_perm)@.value().owned_threads,
         container_perm@.value().mem_quota =~= value,
 {
     unsafe{
         let uptr = container_ptr as *mut MaybeUninit<Container>;
         (*uptr).assume_init_mut().mem_quota = value;
     }
+}
+
+#[verifier(external_body)]
+pub fn container_set_owned_threads(container_ptr:ContainerPtr, container_perm: &mut Tracked<PointsTo<Container>>, owned_threads: Ghost<Set<ThreadPtr>>) 
+    requires    
+        old(container_perm)@.is_init(),
+        old(container_perm)@.addr() == container_ptr,
+    ensures
+        container_perm@.is_init(),
+        container_perm@.addr() == container_ptr, 
+        container_perm@.value().owned_procs =~= old(container_perm)@.value().owned_procs,
+        container_perm@.value().parent =~= old(container_perm)@.value().parent,
+        container_perm@.value().parent_rev_ptr =~= old(container_perm)@.value().parent_rev_ptr,
+        container_perm@.value().children =~= old(container_perm)@.value().children,
+        container_perm@.value().owned_endpoints =~= old(container_perm)@.value().owned_endpoints,
+        container_perm@.value().mem_quota =~= old(container_perm)@.value().mem_quota,
+        container_perm@.value().mem_used =~= old(container_perm)@.value().mem_used,
+        container_perm@.value().owned_cpus =~= old(container_perm)@.value().owned_cpus,
+        container_perm@.value().scheduler =~= old(container_perm)@.value().scheduler,
+        // container_perm@.value().owned_threads =~= old(container_perm)@.value().owned_threads,
+        container_perm@.value().owned_threads =~= owned_threads,
+{
 }
 
 }

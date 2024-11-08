@@ -632,6 +632,32 @@ impl ProcessManager{
         self.thread_perms@[t_ptr].value().endpoint_descriptors.wf()
     }
 
+    pub closed spec fn threads_container_wf(&self) -> bool{
+        &&&
+        forall|c_ptr:ContainerPtr| 
+        // #![trigger self.container_perms@.dom().contains(c_ptr)]
+        #![trigger self.container_perms@[c_ptr].value().owned_threads]
+            self.container_perms@.dom().contains(c_ptr)
+            ==>
+            self.container_perms@[c_ptr].value().owned_threads@.subset_of(self.thread_perms@.dom())
+        &&&
+        forall|c_ptr:ContainerPtr, t_ptr:ThreadPtr| 
+            #![trigger self.container_perms@[c_ptr].value().owned_threads@.contains(t_ptr)]
+            self.container_perms@.dom().contains(c_ptr) 
+            &&
+            self.container_perms@[c_ptr].value().owned_threads@.contains(t_ptr)
+            ==>
+            self.thread_perms@[t_ptr].value().owning_container == c_ptr 
+        &&&
+        forall|t_ptr:ThreadPtr| 
+            #![trigger self.thread_perms@[t_ptr].value().owning_container]
+            self.thread_perms@.dom().contains(t_ptr) 
+            ==>
+            self.container_perms@.dom().contains(self.thread_perms@[t_ptr].value().owning_container) 
+            &&
+            self.container_perms@[self.thread_perms@[t_ptr].value().owning_container].value().owned_threads@.contains(t_ptr)
+    }
+
     pub closed spec fn endpoint_perms_wf(&self) -> bool {
         &&&
         forall|e_ptr:EndpointPtr| 
@@ -790,6 +816,8 @@ impl ProcessManager{
         self.pcid_ioid_wf()
         &&&
         self.threads_cpu_wf()
+        &&&
+        self.threads_container_wf()
     }
 }
 
@@ -940,6 +968,7 @@ impl ProcessManager{
         proof{seq_push_lemma::<ThreadPtr>();}
         let container_ptr = self.get_proc(target_proc_ptr).owning_container;
         let old_mem_quota =  self.get_container(container_ptr).mem_quota;
+        let old_owned_threads = self.get_container(container_ptr).owned_threads;
         let mut proc_perm = Tracked(self.process_perms.borrow_mut().tracked_remove(target_proc_ptr));
         let proc_node_ref = proc_push_thread(target_proc_ptr,&mut proc_perm, &page_ptr);
         proof {
@@ -949,6 +978,7 @@ impl ProcessManager{
         let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
         let scheduler_node_ref = scheduler_push_thread(container_ptr,&mut container_perm, &page_ptr);
         container_set_mem_quota(container_ptr,&mut container_perm, old_mem_quota - 1);
+        container_set_owned_threads(container_ptr,&mut container_perm, Ghost(old_owned_threads@.insert(page_ptr)));
         proof {
             self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
         }
@@ -1077,6 +1107,7 @@ impl ProcessManager{
         proof{seq_push_lemma::<ThreadPtr>();}
         let container_ptr = self.get_proc(proc_ptr).owning_container;
         let old_mem_quota =  self.get_container(container_ptr).mem_quota;
+        let old_owned_threads = self.get_container(container_ptr).owned_threads;
         let endpoint_ptr = self.get_thread(thread_ptr).endpoint_descriptors.get(endpoint_index).unwrap();
         let mut proc_perm = Tracked(self.process_perms.borrow_mut().tracked_remove(proc_ptr));
         let proc_node_ref = proc_push_thread(proc_ptr,&mut proc_perm, &page_ptr);
@@ -1087,6 +1118,7 @@ impl ProcessManager{
         let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
         let scheduler_node_ref = scheduler_push_thread(container_ptr,&mut container_perm, &page_ptr);
         container_set_mem_quota(container_ptr,&mut container_perm, old_mem_quota - 1);
+        container_set_owned_threads(container_ptr,&mut container_perm, Ghost(old_owned_threads@.insert(page_ptr)));
         proof {
             self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
         }

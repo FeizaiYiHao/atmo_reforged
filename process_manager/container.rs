@@ -23,5 +23,7 @@ verus! {
 
         pub owned_cpus: ArraySet<NUM_CPUS>,
         pub scheduler: StaticLinkedList<ThreadPtr,MAX_CONTAINER_SCHEDULER_LEN>,
+
+        pub owned_threads: Ghost<Set<ThreadPtr>>,
     }
 }
