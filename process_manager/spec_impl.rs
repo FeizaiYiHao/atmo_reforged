@@ -940,15 +940,16 @@ impl ProcessManager{
                 self.endpoint_dom().contains(e_ptr)
                 ==>
                 self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
-            self.get_container(container_ptr).owned_procs =~= self.get_container(container_ptr).owned_procs,
-            self.get_container(container_ptr).parent =~= self.get_container(container_ptr).parent,
-            self.get_container(container_ptr).parent_rev_ptr =~= self.get_container(container_ptr).parent_rev_ptr,
-            self.get_container(container_ptr).children =~= self.get_container(container_ptr).children,
-            self.get_container(container_ptr).owned_endpoints =~= self.get_container(container_ptr).owned_endpoints,
-            // self.get_container(container_ptr).mem_quota =~= self.get_container(container_ptr).mem_quota,
-            self.get_container(container_ptr).mem_used =~= self.get_container(container_ptr).mem_used,
-            self.get_container(container_ptr).owned_cpus =~= self.get_container(container_ptr).owned_cpus,
-            self.get_container(container_ptr).scheduler =~= self.get_container(container_ptr).scheduler,
+            self.get_container(container_ptr).owned_procs =~= old(self).get_container(container_ptr).owned_procs,
+            self.get_container(container_ptr).parent =~= old(self).get_container(container_ptr).parent,
+            self.get_container(container_ptr).parent_rev_ptr =~= old(self).get_container(container_ptr).parent_rev_ptr,
+            self.get_container(container_ptr).children =~= old(self).get_container(container_ptr).children,
+            self.get_container(container_ptr).owned_endpoints =~= old(self).get_container(container_ptr).owned_endpoints,
+            self.get_container(container_ptr).owned_threads =~= old(self).get_container(container_ptr).owned_threads,
+            // self.get_container(container_ptr).mem_quota =~= old(self).get_container(container_ptr).mem_quota,
+            self.get_container(container_ptr).mem_used =~= old(self).get_container(container_ptr).mem_used,
+            self.get_container(container_ptr).owned_cpus =~= old(self).get_container(container_ptr).owned_cpus,
+            self.get_container(container_ptr).scheduler =~= old(self).get_container(container_ptr).scheduler,
             self.get_container(container_ptr).mem_quota =~= new_quota,
     {
         let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
@@ -1133,6 +1134,8 @@ impl ProcessManager{
                 ==> 
                 old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
             self.get_proc(proc_ptr).owned_threads@ == old(self).get_proc(proc_ptr).owned_threads@.push(ret),
+            self.get_container(self.get_thread(thread_ptr).owning_container).owned_procs@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_procs@,
+            self.get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@,
             self.get_container(self.get_thread(thread_ptr).owning_container).owned_threads@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_threads@.insert(ret),
             self.get_thread(ret).owning_container == old(self).get_thread(thread_ptr).owning_container,
             self.get_thread(ret).endpoint_descriptors@ =~= Seq::new(MAX_NUM_ENDPOINT_DESCRIPTORS as nat,|i: int| {None}).update(0, Some(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap())),

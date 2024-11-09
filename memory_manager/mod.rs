@@ -11,5 +11,5 @@ pub mod mmu_util;
 pub use spec_impl::*;
 pub use pci_bitmap::*;
 pub use root_table::*;
-pub use mmu_util::*;
+// pub use mmu_util::*;
 // pub use pagetable_array::*;

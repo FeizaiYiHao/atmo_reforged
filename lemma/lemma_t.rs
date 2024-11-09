@@ -19,6 +19,17 @@ pub proof fn lemma_usize_int(x: int)
     unimplemented!();
 }
 
+#[verifier(external_body)]
+pub proof fn set_lemma<A>()
+    ensures
+        forall|s1:Set<A>, s2:Set<A>, e:A|
+            (s1 + s2).insert(e) == s1 + (s2.insert(e))
+            &&
+            s1 + (s2.insert(e)) == s2 + (s1.insert(e))
+            &&
+            (s1 + s2).insert(e) == s2 + (s1.insert(e))
+{}
+
 //TODO: @Xiangdong prove this
 #[verifier(external_body)]
 pub proof fn page_ptr_lemma()
