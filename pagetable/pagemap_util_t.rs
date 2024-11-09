@@ -8,6 +8,7 @@ use crate::util::page_ptr_util_u::*;
 // use crate::pagetable::pagetable_util::*;
 use crate::pagetable::entry::*;
 use crate::pagetable::pagemap::*;
+use core::mem::MaybeUninit;
 
 
 #[verifier(external_body)]
@@ -29,6 +30,10 @@ ensures
         page_map_perm.value()[i] =~= old(page_map_perm).value()[i],
     page_map_perm.value()[index] =~= value
 {
+    unsafe{
+        let uptr = page_map_ptr as *mut MaybeUninit<PageMap>;
+        (*uptr).assume_init_mut().set(index, value);
+    }
 }
 
 #[verifier(external_body)]
