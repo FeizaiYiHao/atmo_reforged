@@ -773,6 +773,15 @@ verus! {
     }
 
     impl PageAllocator{
+        pub fn get_page_reference_counter(&self, page_ptr:PagePtr) -> (ret:usize)
+            requires
+                self.wf(),
+                self.page_is_mapped(page_ptr),
+            ensures
+                ret == self.page_mappings(page_ptr).len() + self.page_io_mappings(page_ptr).len()
+        {
+            self.page_array.get(page_ptr2page_index(page_ptr)).ref_count
+        }
         
         pub fn alloc_page_2m(&mut self) 
             -> (ret:(PagePtr, Tracked<PagePerm2m>))

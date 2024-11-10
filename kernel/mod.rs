@@ -4,6 +4,7 @@ pub mod syscall_new_thread;
 pub mod syscall_new_thread_with_endpoint;
 pub mod syscall_mmap;
 pub mod syscall_new_proc;
+pub mod mem_util;
 
 pub use spec::*;
 // pub use spec_util::*;
@@ -11,3 +12,4 @@ pub use syscall_new_thread::*;
 pub use syscall_new_thread_with_endpoint::*;
 pub use syscall_mmap::*;
 pub use syscall_new_proc::*;
+pub use mem_util::*;
