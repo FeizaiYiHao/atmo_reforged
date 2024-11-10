@@ -228,6 +228,8 @@ use crate::lemma::lemma_u::*;
     
         pub closed spec fn wf(&self) -> bool{
             &&&
+            N <= i32::MAX
+            &&&
             N > 2
             &&&
             self.array_wf()
@@ -260,113 +262,81 @@ use crate::lemma::lemma_u::*;
 
     impl<T: Copy, const N: usize> StaticLinkedList<T,N> {
 
-        // pub fn init(&mut self)
-        // requires
-        //     old(self).arr_seq@.len() == N,
-        //     N>2,
-        //     N<SLLIndex::MAX,
-        // ensures
-        //     self.wf(),
-        //     self.len() == 0,
-        //     self@ =~= Seq::empty(),
-        // {
-        //     // assume(N>2);
-        //     // assume(N<SLLIndex::MAX);
-        //     self.value_list = Ghost(Seq::empty());
-        //     self.value_list_head = -1;
-        //     self.value_list_tail = -1;
-        //     self.value_list_len = 0;
-        //     self.spec_seq = Ghost(Seq::empty());
-        //     self.free_list = Ghost(Seq::empty());
-        //     self.free_list_head = -1;
-        //     self.free_list_tail = -1;
-        //     self.free_list_len = 0;
-        //     assert(self.value_list_wf());
-        //     assert(self.free_list_wf());
+        pub fn init(&mut self)
+            requires
+                N > 2,
+                N < SLLIndex::MAX,
+                old(self).array_wf(),
+            ensures
+                self.wf(),
+                self@ =~= Seq::empty(),
+                self.len() == 0,
+                forall|i:SLLIndex|
+                    #![trigger self.node_ref_valid(i)]
+                    self.node_ref_valid(i) == false,
+        {
+            self.spec_seq = Ghost(Seq::empty());
 
-        //     self.size = N;
+            self.value_list = Ghost(Seq::empty());
+            self.value_list_head = -1;
+            self.value_list_tail = -1;
+            self.value_list_len = 0;
 
-        //     self.free_list_head = 0;
-        //     self.free_list_tail = 0;
-        //     self.free_list_len = 1;
-        //     proof{self.free_list@ = self.free_list@.push(0);}
-        //     self.set_next(0,-1);
-        //     self.set_prev(0,-1);
-        //     self.set_ptr(0,NULL_POINTER);
-        //     // assert(forall|i: nat| #![auto] 0 <= i < self.free_list@.len() ==> self.arr_seq@[self.free_list@[i as int] as int].next == self.next_free_node_of(i));
-        //     // assert(forall|i: nat| #![auto] 0 <= i < self.free_list@.len() ==> self.arr_seq@[self.free_list@[i as int] as int].prev == self.prev_free_node_of(i));
-        //     // assert(forall|i: nat|  #![auto] 0 <= i < self.free_list@.len() ==> (self.free_list@[i as int] < N) );
-        //     // assert(forall|i: nat|  #![auto] 0 <= i < self.free_list@.len() ==> (self.free_list@[i as int] >= 0) );
-        //     // assert(forall|i: nat, j:nat|  #![auto] i != j && 0 <= i < self.free_list@.len() && 0 <= j < self.free_list@.len() ==> (self.free_list@[i as int] != self.free_list@[j as int]) );
-        //     // assert(self.wf_free_node_head());
-        //     // assert(self.wf_free_node_tail());
-        //     // assert(self.free_list_len == self.free_list@.len());
-        //     assert(self.free_list_wf());
-        //     for index in 1..N as SLLIndex
-        //         invariant
-        //             1<= index <= N,
-        //             N<SLLIndex::MAX,
-        //             self.value_list@ =~= Seq::empty(),
-        //             self.value_list@.len() == 0,
-        //             self.spec_seq@.len() == 0,
-        //             self.array_wf(),
-        //             self.spec_seq_wf(),
-        //             self.value_list_wf(),
-        //             self.free_list_wf(),
-        //             index == self.free_list@.len(),
-        //             forall|i: SLLIndex|  #![auto] 0 <= i < self.free_list@.len() ==> (self.free_list@[i as int] == i),
-        //             self.arr_seq@[0].prev == -1,
-        //             self.arr_seq@[(index - 1) as int].next == -1,
-        //             forall|i: int|  #![auto] 0 <= i < index ==> self.arr_seq@[i].prev == i - 1,
-        //             forall|i: int|  #![auto] 0 <= i < index - 1 ==> self.arr_seq@[i].next == i + 1,
-        //             forall|i: int|  #![auto] 0 <= i < index ==> self.arr_seq@[i].value == 0,
-        //             self.free_list_len == index,
-        //             self.free_list_len + self.value_list_len == index,
-        //             forall|i: SLLIndex|  #![auto] 0 <= i < index ==> self.free_list@.contains(i),
-        //             forall|i: SLLIndex| #![auto] 0 <= i < index ==> self.arr_seq@[i as int].value == NULL_POINTER,
-        //         // ensures
-        //         //     self.free_list_len == N,
-        //         //     self.free_list_wf(),
-        //         //     forall|i: SLLIndex|  #![auto] 0 <= i < N ==> (self.free_list@[i as int] == i),
-        //         //     self.value_list@ =~= Seq::empty(),
-        //         //     self.value_list@.len() == 0,
-        //         //     self.spec_seq@.len() == 0,
-        //         //     self.array_wf(),
-        //         //     self.spec_seq_wf(),
-        //         //     self.value_list_wf(),
-        //         //     self.free_list_wf(),
-        //         //     forall|i: SLLIndex|  #![auto] 0 <= i < N ==> self.free_list@.contains(i) ^ self.value_list@.contains(i),
-        //         //     forall|i: SLLIndex| #![auto] 0 <= i < N ==> self.arr_seq@[i as int].value == NULL_POINTER,
-        //         //     self.wf(),
-        //     {
-        //         proof{
-        //             assert forall |s: Seq<SLLIndex>, v: SLLIndex, x: SLLIndex| v==x || s.contains(x) implies #[trigger] s.push(v).contains(x) by {
-        //                 lemma_seq_contains_after_push(s, v, x);
-        //             }
-        //         }
+            self.free_list = Ghost(Seq::empty());
+            self.free_list_head = -1;
+            self.free_list_tail = -1;
+            self.free_list_len = 0;
 
-        //         self.free_list = Ghost(self.free_list@.push((index as SLLIndex)));
-        //         self.set_prev(index,(index - 1));
-        //         self.set_next(index,-1);
-        //         self.set_next((index - 1), index);
-        //         self.set_ptr(index,0);
-        //         self.free_list_tail = index;
-        //         self.free_list_len = (index + 1) as usize;
+            assert(self.value_list_wf());
+            assert(self.free_list_wf());
+            assert(self.spec_seq_wf());
+            assert(            
+                forall|i:int, j:int|
+                    #![trigger self.value_list@[i], self.free_list@[j]]
+                    0 <= i < self.value_list@.len() && 0 <= j < self.free_list@.len() ==> self.value_list@[i] != self.free_list@[j]);
 
-        //         assert(forall|i: nat| #![auto] 0 <= i < self.free_list@.len() ==> self.arr_seq@[self.free_list@[i as int] as int].next == self.next_free_node_of(i));
-        //         assert(forall|i: nat| #![auto] 0 <= i < self.free_list@.len() ==> self.arr_seq@[self.free_list@[i as int] as int].prev == self.prev_free_node_of(i));
-        //         assert(forall|i: nat|  #![auto] 0 <= i < self.free_list@.len() ==> (self.free_list@[i as int] < N) );
-        //         assert(forall|i: nat|  #![auto] 0 <= i < self.free_list@.len() ==> (self.free_list@[i as int] >= 0) );
-        //         assert(forall|i: nat, j:nat|  #![auto] i != j && 0 <= i < self.free_list@.len() && 0 <= j < self.free_list@.len() ==> (self.free_list@[i as int] != self.free_list@[j as int]) );
-        //         assert(self.wf_free_node_head());
-        //         assert(self.wf_free_node_tail());
-        //         assert(self.free_list_len == self.free_list@.len());
-        //     }
-        //     // assert(self.free_list@.len() == N);
-        //     // assert(forall|i: SLLIndex|  #![auto] 0 <= i < N ==> self.free_list@[i as int] == i);
-        //     // assert(forall|i: SLLIndex|  #![auto] 0 <= i < N ==> self.free_list@.index_of(i) == i as int);
-        //     // assert(forall|i: SLLIndex|  #![auto] 0 <= i < N ==> self.free_list@.contains(i));
-        // }
+            for i in 0..N
+                invariant
+                    0<=i<=N,
+                    N > 2,
+                    N < SLLIndex::MAX,
+                    self.array_wf(),
+                    self.free_list_len == i,
+                    self.free_list_len + self.value_list_len == i,
+                    self.value_list_wf(),
+                    self.free_list_wf(),
+                    self.spec_seq_wf(),
+                    forall|i:int, j:int|
+                        #![trigger self.value_list@[i], self.free_list@[j]]
+                        0 <= i < self.value_list@.len() && 0 <= j < self.free_list@.len() ==> self.value_list@[i] != self.free_list@[j],
+                    forall|j:int| 
+                        #![trigger self.free_list@[j]]
+                        0<=j<self.free_list_len ==> self.free_list@[j] == j as SLLIndex,
+                    forall|i:SLLIndex|
+                        #![trigger self.node_ref_valid(i)]
+                        self.node_ref_valid(i) == false,
+            {
+                self.free_list_len = self.free_list_len + 1;
+                if i == 0{
+                    self.free_list_head = 0;
+                    self.free_list_tail = 0;
+                    self.free_list = Ghost(Seq::empty().push(0));
+                    self.set_prev(0 as SLLIndex, -1);
+                    self.set_next(0 as SLLIndex, -1);
+                    self.set_value(0 as SLLIndex, None);
+                    assert(self.free_list_wf());
+                }else{
+                    self.free_list = Ghost(self.free_list@.push(i as SLLIndex));
+                    self.set_next(self.free_list_tail, i as SLLIndex);
+                    self.set_prev(i as SLLIndex, self.free_list_tail);
+                    self.set_next(i as SLLIndex, -1);
+                    self.set_value(i as SLLIndex, None);
+                    self.free_list_tail = i as SLLIndex;
+                    assert(self.free_list_wf());
+                }
+            }
+            assert(self.wf());
+        }
 
 
         pub fn push(&mut self, new_value: &T) -> (free_node_index : SLLIndex)

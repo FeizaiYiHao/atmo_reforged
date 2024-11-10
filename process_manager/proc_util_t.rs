@@ -50,5 +50,35 @@ pub fn proc_push_thread(proc_ptr:ProcPtr, proc_perm: &mut Tracked<PointsTo<Proce
     }
 }
 
+#[verifier(external_body)]
+pub fn page_to_proc(page_ptr: PagePtr, page_perm: Tracked<PagePerm4k>, owning_container:ContainerPtr, rev_ptr: SLLIndex, pcid:Pcid, ioid:Option<IOid>) -> (ret:(ProcPtr,Tracked<PointsTo<Process>>))
+    requires    
+        page_perm@.is_init(),
+        page_perm@.addr() == page_ptr,
+    ensures
+        ret.0 == page_ptr,
+        ret.1@.is_init(),
+        ret.1@.addr() == ret.0,
+        ret.1@.value().owning_container == owning_container,
+        ret.1@.value().rev_ptr == rev_ptr,
+        ret.1@.value().pcid == pcid,
+        ret.1@.value().ioid == ioid,
+        ret.1@.value().owned_threads.wf(),
+        ret.1@.value().owned_threads@ == Seq::<ThreadPtr>::empty(),
+        ret.1@.value().owned_threads.len() == 0,
+        forall|index:SLLIndex|
+            #![trigger ret.1@.value().owned_threads.node_ref_valid(index)]
+            ret.1@.value().owned_threads.node_ref_valid(index) == false
+{
+    unsafe{
+        let uptr = page_ptr as *mut MaybeUninit<Process>;
+        (*uptr).assume_init_mut().owning_container = owning_container;
+        (*uptr).assume_init_mut().rev_ptr = rev_ptr;
+        (*uptr).assume_init_mut().pcid = pcid;
+        (*uptr).assume_init_mut().ioid = ioid;
+        (*uptr).assume_init_mut().owned_threads.init();
+        (page_ptr, Tracked::assume_new())
+    }
+}
 
 }
