@@ -206,7 +206,7 @@ impl Kernel{
             self.wf(),
             self.get_physical_page_mapping().dom().contains(page_ptr),
     {
-        self.page_alloc.page_mappings(page_ptr).len() as usize
+        (self.page_alloc.page_mappings(page_ptr).len() + self.page_alloc.page_io_mappings(page_ptr).len()) as usize
     }
 }
 }
