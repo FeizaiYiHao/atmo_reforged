@@ -1266,6 +1266,7 @@ verus! {
                 old(self).page_mappings(target_ptr).len() + old(self).page_io_mappings(target_ptr).len()< usize::MAX,
             ensures
             self.wf(),
+            self.free_pages_4k.len() == old(self).free_pages_4k.len(),
             self.free_pages_4k() =~= old(self).free_pages_4k(),
             self.free_pages_2m() =~= old(self).free_pages_2m(),
             self.free_pages_4k() =~= old(self).free_pages_4k(),
