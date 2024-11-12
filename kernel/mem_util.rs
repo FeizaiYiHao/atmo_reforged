@@ -90,6 +90,8 @@ pub fn check_address_space_va_range_free(&self, target_proc_ptr:ProcPtr, va_rang
     return true;
 }
 
+
+
 pub fn create_entry(&mut self, proc_ptr:ProcPtr, va:VAddr) -> (ret: (usize, PageMapPtr))
     requires
         old(self).wf(),
@@ -684,6 +686,205 @@ pub fn range_alloc_and_map(&mut self, target_proc_ptr:ProcPtr, va_range: &VaRang
         }
     }
     (num_page, page_diff)
+}
+
+pub fn share_mapping(&mut self, target_proc_ptr:ProcPtr, target_va:VAddr, tagret_l1_p:PageMapPtr, entry:MapEntry)
+    requires
+        old(self).wf(),
+        old(self).proc_dom().contains(target_proc_ptr),
+        va_4k_valid(target_va),
+        old(self).page_alloc.page_is_mapped(entry.addr),
+        page_ptr_valid(entry.addr),
+        old(self).get_address_space(target_proc_ptr).dom().contains(target_va) == false,
+        old(self).mem_man.get_pagetable_by_pcid(old(self).get_proc(target_proc_ptr).pcid).unwrap().spec_resolve_mapping_l2(spec_va2index(target_va).0, spec_va2index(target_va).1, spec_va2index(target_va).2).is_Some(),
+        old(self).mem_man.get_pagetable_by_pcid(old(self).get_proc(target_proc_ptr).pcid).unwrap().spec_resolve_mapping_l2(spec_va2index(target_va).0, spec_va2index(target_va).1, spec_va2index(target_va).2).unwrap().addr == tagret_l1_p,
+        old(self).get_physical_page_reference_counter(entry.addr) <= usize::MAX - 1,
+    ensures
+        // self.wf(),
+        // self.proc_dom() == old(self).proc_dom(),
+        // self.thread_dom() == old(self).thread_dom(),
+        // self.endpoint_dom() == old(self).endpoint_dom(),
+        // self.container_dom() == old(self).container_dom(),
+        // self.get_num_of_free_pages() == old(self).get_num_of_free_pages() - 1,
+        // forall|p_ptr:ProcPtr|
+        //     #![auto]
+        //     self.proc_dom().contains(p_ptr) 
+        //     ==> 
+        //     self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
+        // forall|p_ptr:ProcPtr|
+        //     #![auto]
+        //     self.proc_dom().contains(p_ptr) && p_ptr != target_proc_ptr
+        //     ==> 
+        //     self.get_address_space(p_ptr) =~= old(self).get_address_space(p_ptr),
+        // forall|t_ptr:ThreadPtr|
+        //     #![auto]
+        //     self.thread_dom().contains(t_ptr)
+        //     ==>
+        //     self.get_thread(t_ptr) =~= old(self).get_thread(t_ptr),
+        // forall|c_ptr:ContainerPtr|
+        //     #![auto]
+        //     self.container_dom().contains(c_ptr) && c_ptr != self.get_proc(target_proc_ptr).owning_container
+        //     ==>
+        //     self.get_container(c_ptr) =~= old(self).get_container(c_ptr)
+        //     &&
+        //     self.get_container_owned_pages(c_ptr) =~= old(self).get_container_owned_pages(c_ptr),
+        // forall|e_ptr:EndpointPtr|
+        //     #![auto]
+        //     self.endpoint_dom().contains(e_ptr)
+        //     ==>
+        //     self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
+        // forall|p:Pcid|
+        //     #![trigger self.mem_man.pcid_active(p)]
+        //     #![trigger self.mem_man.pcid_to_proc_ptr(p)]
+        //     self.mem_man.pcid_active(p)
+        //     ==>
+        //     old(self).mem_man.pcid_to_proc_ptr(p) == self.mem_man.pcid_to_proc_ptr(p),
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).parent,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent_rev_ptr =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).parent_rev_ptr,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).children =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).children,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_endpoints =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_endpoints,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_threads =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_threads,
+        // // self.get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota =~= old(self).get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_used =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_used,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_cpus =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_cpus,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).scheduler =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).scheduler,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota as int =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota - 1,
+        // self.get_address_space(target_proc_ptr) =~= old(self).get_address_space(target_proc_ptr).insert(target_va,ret),
+        // old(self).page_alloc.page_is_mapped(ret.addr) == false,
+        // self.page_alloc.page_is_mapped(ret.addr),
+        // forall|p:PagePtr|
+        //     #![trigger self.page_alloc.page_is_mapped(p)] 
+        //     p != ret.addr
+        //     ==> 
+        //     self.page_alloc.page_is_mapped(p) == old(self).page_alloc.page_is_mapped(p),
+        // self.page_mapping@.dom() == old(self).page_mapping@.dom().insert(ret.addr),
+        // forall|page_ptr:PagePtr|
+        //     #![trigger self.page_mapping@[page_ptr]]
+        //     old(self).page_mapping@.dom().contains(page_ptr)
+        //     ==> 
+        //     old(self).page_mapping@[page_ptr] == self.page_mapping@[page_ptr],
+        // self.page_mapping@[ret.addr] == Set::empty().insert((target_proc_ptr, target_va))
+{
+    proof{
+        self.proc_man.pcid_unique(target_proc_ptr);
+    }
+    let target_container_ptr = self.proc_man.get_proc(target_proc_ptr).owning_container;
+    let target_pcid = self.proc_man.get_proc(target_proc_ptr).pcid;
+    proof{
+        va_lemma();
+        assert(self.page_alloc.mapped_pages_2m().contains(entry.addr) == false);
+        assert(self.page_alloc.mapped_pages_1g().contains(entry.addr) == false);
+        assert(self.page_alloc.mapped_pages_4k().contains(entry.addr));
+        self.page_alloc.mapped_page_are_not_allocated(entry.addr);
+    }
+    let (l4i, l3i, l2i, l1i) = va2index(target_va);
+    self.page_alloc.add_mapping_4k(entry.addr, target_pcid, target_va);
+    self.mem_man.pagetable_map_4k_page(target_pcid, l4i, l3i, l2i, l1i, tagret_l1_p, &entry);
+    // proof{
+    //     self.page_mapping@ = self.page_mapping@.insert(new_page_ptr, Set::empty().insert((target_proc_ptr, target_va)));
+    // }
+    // assert(self.wf()) by {
+    //     assert(self.mem_man.wf());
+    //     assert(self.page_alloc.wf());
+    //     assert(self.proc_man.wf());
+    //     assert(self.memory_wf()) by {
+    //         assert(self.mem_man.page_closure().disjoint(self.proc_man.page_closure()));
+    //         assert(self.mem_man.page_closure() + self.proc_man.page_closure() == self.page_alloc.allocated_pages_4k());
+    //         assert(self.page_alloc.mapped_pages_2m() =~= Set::empty());
+    //         assert(self.page_alloc.mapped_pages_1g() =~= Set::empty());
+    //         assert(self.page_alloc.allocated_pages_2m() =~= Set::empty());
+    //         assert(self.page_alloc.allocated_pages_1g() =~= Set::empty());
+    //         assert(self.page_alloc.container_map_4k@.dom() =~= self.proc_man.container_dom());
+    //     };
+    //     assert(self.mapping_wf()) by {
+    //     };
+    //     assert(self.pcid_ioid_wf());
+    // };
+    // MapEntry{addr:new_page_ptr, write:true, execute_disable:false}
+}
+
+pub fn create_entry_and_share(&mut self, dst_proc_ptr:ProcPtr,dst_va:VAddr, target_proc_ptr:ProcPtr, target_va:VAddr) -> (ret: usize)
+    requires
+        old(self).wf(),
+        old(self).proc_dom().contains(target_proc_ptr),
+        old(self).get_container_quota(old(self).get_proc(target_proc_ptr).owning_container) >= 4,
+        old(self).get_num_of_free_pages() >= 3,
+        va_4k_valid(dst_va),
+        va_4k_valid(target_va),
+        old(self).get_address_space(target_proc_ptr).dom().contains(target_va) == false,
+        old(self).get_address_space(dst_proc_ptr).dom().contains(dst_va) == true,
+        old(self).get_physical_page_reference_counter(old(self).get_address_space(dst_proc_ptr)[dst_va].addr) <= usize::MAX - 1,
+    ensures
+        // ret.0 <= 4,
+        // self.wf(),
+        // self.proc_dom() == old(self).proc_dom(),
+        // self.thread_dom() == old(self).thread_dom(),
+        // self.endpoint_dom() == old(self).endpoint_dom(),
+        // self.container_dom() == old(self).container_dom(),
+        // self.get_num_of_free_pages() == old(self).get_num_of_free_pages() - ret.0,
+        // forall|p_ptr:ProcPtr|
+        //     #![auto]
+        //     self.proc_dom().contains(p_ptr) 
+        //     ==> 
+        //     self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
+        // forall|p_ptr:ProcPtr|
+        //     #![auto]
+        //     self.proc_dom().contains(p_ptr) && p_ptr != target_proc_ptr
+        //     ==> 
+        //     self.get_address_space(p_ptr) =~= old(self).get_address_space(p_ptr),
+        // forall|t_ptr:ThreadPtr|
+        //     #![auto]
+        //     self.thread_dom().contains(t_ptr)
+        //     ==>
+        //     self.get_thread(t_ptr) =~= old(self).get_thread(t_ptr),
+        // forall|c_ptr:ContainerPtr|
+        //     #![auto]
+        //     self.container_dom().contains(c_ptr) && c_ptr != self.get_proc(target_proc_ptr).owning_container
+        //     ==>
+        //     self.get_container(c_ptr) =~= old(self).get_container(c_ptr),
+        // forall|e_ptr:EndpointPtr|
+        //     #![auto]
+        //     self.endpoint_dom().contains(e_ptr)
+        //     ==>
+        //     self.get_endpoint(e_ptr) =~= old(self).get_endpoint(e_ptr),
+        // forall|c:ContainerPtr|
+        //     #![auto]
+        //     self.container_dom().contains(c) && old(self).get_proc(target_proc_ptr).owning_container != c
+        //     ==>
+        //     self.get_container_owned_pages(c) =~= old(self).get_container_owned_pages(c),
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_procs,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).parent,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).parent_rev_ptr =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).parent_rev_ptr,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).children =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).children,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_endpoints =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_endpoints,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_threads =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_threads,
+        // // self.get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota =~= old(self).get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_used =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_used,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_cpus =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).owned_cpus,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).scheduler =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).scheduler,
+        // self.get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota as int =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota - ret.0,
+        // self.get_address_space(target_proc_ptr).dom() =~= old(self).get_address_space(target_proc_ptr).dom().insert(target_va),
+        // self.get_address_space(target_proc_ptr) =~= old(self).get_address_space(target_proc_ptr).insert(target_va,ret.1),
+        // old(self).page_alloc.page_is_mapped(ret.1.addr) == false,
+        // self.page_alloc.page_is_mapped(ret.1.addr),
+        // forall|p:PagePtr|
+        //     #![trigger self.page_alloc.page_is_mapped(p)] 
+        //     p != ret.1.addr
+        //     ==> 
+        //     self.page_alloc.page_is_mapped(p) == old(self).page_alloc.page_is_mapped(p),
+        // self.page_mapping@.dom() == old(self).page_mapping@.dom().insert(ret.1.addr),
+        // forall|page_ptr:PagePtr|
+        //     #![trigger self.page_mapping@[page_ptr]]
+        //     old(self).page_mapping@.dom().contains(page_ptr)
+        //     ==> 
+        //     old(self).page_mapping@[page_ptr] == self.page_mapping@[page_ptr],
+        // self.page_mapping@[ret.1.addr] == Set::empty().insert((target_proc_ptr, target_va)),
+{
+    // let (ret, new_entry) = self.create_entry(target_proc_ptr, target_va);
+    // (ret + 1, self.alloc_and_map(target_proc_ptr, target_va, new_entry))
+    0
+    
 }
 
 }

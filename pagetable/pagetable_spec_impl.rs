@@ -10,7 +10,7 @@ use crate::pagetable::pagemap_util_t::*;
 use crate::pagetable::entry::*;
 use crate::pagetable::pagemap::*;
 use crate::lemma::lemma_u::*;
-use crate::array::Array;
+// use crate::array::Array;
 
 // pub closed spec fn map_entry_equals_to_page_entry_unwrapped(m:MapEntry, p:PageEntry) -> bool{
 //     &&&

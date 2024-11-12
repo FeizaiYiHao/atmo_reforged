@@ -301,8 +301,6 @@ verus! {
                 page_ptr_valid(p)
                 &&
                 self.page_array@[page_ptr2page_index(p) as int].state == PageState::Mapped4k
-                &&
-                self.page_array@[page_ptr2page_index(p) as int].ref_count == self.page_array@[page_ptr2page_index(p) as int].mappings@.len() + self.page_array@[page_ptr2page_index(p) as int].io_mappings@.len()
             &&&
             forall|i:int|
                 #![trigger self.page_array@[i].addr]
@@ -331,8 +329,6 @@ verus! {
                 page_ptr_2m_valid(p)
                 &&
                 self.page_array@[page_ptr2page_index(p) as int].state == PageState::Mapped2m
-                &&
-                self.page_array@[page_ptr2page_index(p) as int].ref_count == self.page_array@[page_ptr2page_index(p) as int].mappings@.len() + self.page_array@[page_ptr2page_index(p) as int].io_mappings@.len()
         }
         
         pub open spec fn mapped_pages_1g_wf(&self) -> bool{
@@ -354,8 +350,6 @@ verus! {
                 page_ptr_1g_valid(p)
                 &&
                 self.page_array@[page_ptr2page_index(p) as int].state == PageState::Mapped1g
-                &&
-                self.page_array@[page_ptr2page_index(p) as int].ref_count == self.page_array@[page_ptr2page_index(p) as int].mappings@.len() + self.page_array@[page_ptr2page_index(p) as int].io_mappings@.len()
         }
 
         pub open spec fn merged_pages_wf(&self) -> bool{
@@ -538,6 +532,27 @@ verus! {
                 self.page_array@[page_ptr2page_index(page_ptr) as int].owning_container.unwrap() == c_ptr
         }
         
+        pub open spec fn mapped_pages_have_reference_counter(&self) -> bool
+        {
+            &&&
+            forall|i:int| 
+                #![trigger self.page_array@[i].ref_count]
+                #![trigger self.page_array@[i].state]
+                #![trigger self.page_array@[i].mappings]
+                #![trigger self.page_array@[i].io_mappings]
+                0<=i<NUM_PAGES ==> 
+                (self.page_array@[i].ref_count != 0 
+                <==>
+                (   self.page_array@[i].state == PageState::Mapped4k
+                    ||
+                    self.page_array@[i].state == PageState::Mapped2m
+                    ||
+                    self.page_array@[i].state == PageState::Mapped1g
+                ))
+                &&
+                self.page_array@[i].ref_count == self.page_array@[i].mappings@.len() + self.page_array@[i].io_mappings@.len()
+        }
+
         pub open spec fn wf(&self) -> bool{
             &&&
             self.page_array_wf()
@@ -567,11 +582,40 @@ verus! {
             self.perm_wf()
             &&&
             self.container_wf()
+            &&&
+            self.mapped_pages_have_reference_counter()
         }
     }
 
     // proof
     impl PageAllocator{
+        pub proof fn pages_with_mappings_are_mapped(&self, page_ptr:PagePtr)
+            requires
+                self.wf(),
+                page_ptr_valid(page_ptr),
+                self.page_mappings(page_ptr).len() > 0,
+            ensures
+                self.page_is_mapped(page_ptr) == true,
+        {
+            page_index_lemma();
+            page_ptr_lemma();
+            page_ptr_2m_lemma();
+            page_ptr_1g_lemma();
+            assert(self.page_array@[page_ptr2page_index(page_ptr) as int].ref_count != 0);
+        }
+
+        pub proof fn mapped_page_are_not_allocated(&self, page_ptr:PagePtr)
+            requires
+                self.wf(),
+                page_ptr_valid(page_ptr),
+                self.page_is_mapped(page_ptr) == true,
+            ensures
+                self.allocated_pages_4k().contains(page_ptr) == false,
+                self.allocated_pages_2m().contains(page_ptr) == false,
+                self.allocated_pages_1g().contains(page_ptr) == false,
+        {}
+
+
         pub proof fn free_pages_are_not_mapped(&self)
             requires
                 self.wf(),
@@ -1221,23 +1265,37 @@ verus! {
                 old(self).page_mappings(target_ptr).contains((pcid, va)) == false,
                 old(self).page_mappings(target_ptr).len() + old(self).page_io_mappings(target_ptr).len()< usize::MAX,
             ensures
-                self.wf(),
-                self.free_pages_4k() =~= old(self).free_pages_4k(),
-                self.free_pages_2m() =~= old(self).free_pages_2m(),
-                self.free_pages_1g() =~= old(self).free_pages_1g(),
-                self.allocated_pages_4k() =~= old(self).allocated_pages_4k(),
-                self.allocated_pages_2m() =~= old(self).allocated_pages_2m(),
-                self.allocated_pages_1g() =~= old(self).allocated_pages_1g(),
-                self.mapped_pages_4k() =~= old(self).mapped_pages_4k(),
-                self.mapped_pages_2m() =~= old(self).mapped_pages_2m(),
-                self.mapped_pages_1g() =~= old(self).mapped_pages_1g(),
-                forall|p:PagePtr| 
-                    self.page_is_mapped(p) && p != target_ptr ==> 
-                    self.page_mappings(p) =~= old(self).page_mappings(p)
-                    &&
-                    self.page_io_mappings(p) =~= old(self).page_io_mappings(p),
-                self.page_mappings(target_ptr) =~= old(self).page_mappings(target_ptr).insert((pcid,va)),
-                self.page_io_mappings(target_ptr) =~= old(self).page_io_mappings(target_ptr),
+            self.wf(),
+            self.free_pages_4k() =~= old(self).free_pages_4k(),
+            self.free_pages_2m() =~= old(self).free_pages_2m(),
+            self.free_pages_4k() =~= old(self).free_pages_4k(),
+            self.free_pages_1g() =~= old(self).free_pages_1g(),
+            self.allocated_pages_4k() =~= old(self).allocated_pages_4k(),
+            self.allocated_pages_2m() =~= old(self).allocated_pages_2m(),
+            self.allocated_pages_1g() =~= old(self).allocated_pages_1g(),
+            self.mapped_pages_4k() =~= old(self).mapped_pages_4k(),
+            self.mapped_pages_2m() =~= old(self).mapped_pages_2m(),
+            self.mapped_pages_1g() =~= old(self).mapped_pages_1g(),
+            forall|p:PagePtr|
+                #![trigger self.page_is_mapped(p)] 
+                #![trigger self.page_mappings(p)] 
+                self.page_is_mapped(p) && p != target_ptr
+                 ==> 
+                self.page_mappings(p) =~= old(self).page_mappings(p)
+                &&
+                self.page_io_mappings(p) =~= old(self).page_io_mappings(p),
+            self.page_mappings(target_ptr) =~= old(self).page_mappings(target_ptr).insert((pcid,va)),
+            self.page_mappings(target_ptr).contains((pcid,va)),
+            self.page_io_mappings(target_ptr) =~= old(self).page_io_mappings(target_ptr),
+            self.container_map_4k@.dom() =~= old(self).container_map_4k@.dom(),
+            forall|p:PagePtr|
+                #![auto] 
+                self.page_is_mapped(p) <==> old(self).page_is_mapped(p),
+            forall|c:ContainerPtr|
+                #![auto]
+                self.container_map_4k@.dom().contains(c)
+                ==>
+                self.get_container_owned_pages(c) =~= old(self).get_container_owned_pages(c),
         {
             proof{
                 page_ptr_lemma();

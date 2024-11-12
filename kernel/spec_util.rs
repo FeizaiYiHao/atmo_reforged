@@ -201,12 +201,12 @@ impl Kernel{
         self.get_endpoint(self.get_endpoint_ptr_by_endpoint_idx(t_ptr, endpoint_index).unwrap()).rf_counter != usize::MAX
     }
 
-    pub open spec fn get_physical_page_reference_counter(&self, page_ptr:PagePtr) -> usize
+    pub open spec fn get_physical_page_reference_counter(&self, page_ptr:PagePtr) -> nat
         recommends
             self.wf(),
             self.get_physical_page_mapping().dom().contains(page_ptr),
     {
-        (self.page_alloc.page_mappings(page_ptr).len() + self.page_alloc.page_io_mappings(page_ptr).len()) as usize
+        self.page_alloc.page_mappings(page_ptr).len() + self.page_alloc.page_io_mappings(page_ptr).len()
     }
 }
 }

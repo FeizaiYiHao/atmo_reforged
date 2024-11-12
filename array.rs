@@ -56,7 +56,7 @@ impl<A, const N: usize> Array<A, N> {
 
 }
 
-impl<A: Copy, const N: usize> Array<A, N> {
+impl<A, const N: usize> Array<A, N> {
     #[verifier(external_body)]
     pub fn set(&mut self, i: usize, out: A)
         requires
@@ -152,7 +152,7 @@ impl<T: Copy, const N: usize> Array<Option<T>, N> {
 }
 
 
-    fn test<const N: usize>(ar: &mut Array<u64, N>)
+fn test<const N: usize>(ar: &mut Array<u64, N>)
     requires
         old(ar).wf(),
         old(ar)[1] == 0,

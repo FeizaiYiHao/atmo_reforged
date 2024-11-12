@@ -37,7 +37,7 @@ impl<T: Copy, const N: usize> ArrayVec<T, N> {
         self.len
     }
 
-    pub closed spec fn spec_len(&self) -> usize {
+    pub open spec fn spec_len(&self) -> usize {
         self.len
     }
 
@@ -66,7 +66,7 @@ impl<T: Copy, const N: usize> ArrayVec<T, N> {
         self.data@.subrange(0,len as int)
     }
 
-    pub closed spec fn wf(&self) -> bool {
+    pub open spec fn wf(&self) -> bool {
         &&& 0 <= N <= usize::MAX
         &&& self.len() <= self.capacity()
         &&& self.data.wf()
@@ -135,6 +135,7 @@ impl<T: Copy, const N: usize> ArrayVec<T, N> {
             old(self).len() > 0,
         ensures
             self.wf(),
+            self.len() == old(self).len() - 1,
             ret == old(self)@[old(self).len() - 1],
             self@ =~= old(self)@.drop_last(),
     {
@@ -149,10 +150,11 @@ impl<T: Copy, const N: usize> ArrayVec<T, N> {
     pub fn pop_unique(&mut self) -> (ret: &T)
         requires
             old(self).wf(),
-            old(self).len() > 0,
+            old(self)@.len() > 0,
             old(self)@.no_duplicates(),
         ensures
             self.wf(),
+            self@.len() == old(self)@.len() - 1,
             ret == old(self)@[old(self).len() - 1],
             self@ =~= old(self)@.drop_last(),
             self@.no_duplicates(),
@@ -215,6 +217,20 @@ impl<T: Copy, const N: usize> ArrayVec<T, N> {
         }
     }
     */
+
+}
+
+fn test<const N: usize>(ar: &mut ArrayVec<u64, N>)
+requires
+    old(ar).wf(),
+    old(ar).len() == 1,
+    old(ar)@[0] == 0,
+    N == 2,
+
+{
+    let v_0 = ar.pop();
+    assert(ar@ == Seq::<u64>::empty());
+    assert(v_0 == 0);
 }
 
 }
