@@ -927,7 +927,6 @@ impl MemoryManager{
         self.get_pagetable_l1_entry(pcid, l4i, l3i, l2i, l1i, &l2_entry)
     }
 
-<<<<<<< HEAD
     // pub fn pagetable_unmap_4k_page(&self, pcid:Pcid, va:VAddr) -> (ret: Option<PageEntry>)
     //     requires
     //         old(self).wf(),
@@ -967,7 +966,6 @@ impl MemoryManager{
     //     self.pagetable_unmap_4k_page(pcid, l4i, l3i, l2i, l1i, &l2_entry, target_entry);
     //     l1_entry_op
     // }
-=======
     pub fn new_page_table(&mut self, new_proc_ptr:ProcPtr, page_map_ptr: PageMapPtr, mut page_map_perm: Tracked<PointsTo<PageMap>>) -> (ret:Pcid)
         requires
             old(self).wf(),
@@ -1045,7 +1043,6 @@ impl MemoryManager{
         assert(self.pcid_to_proc_wf());
         new_pcid
     }
->>>>>>> refs/remotes/origin/main
 }
 }
 
