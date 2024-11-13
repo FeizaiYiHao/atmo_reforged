@@ -356,6 +356,7 @@ impl MemoryManager{
         self.kernel_entries_wf()
     }
 
+
     pub fn get_pagetable_l4_entry(&self, pcid:Pcid, l4i: L4Index) -> (ret: Option<PageEntry>)
         requires
             self.wf(),
@@ -884,7 +885,7 @@ impl MemoryManager{
         };
     }
 
-    pub fn reslove_pagetable_mapping(&self, pcid:Pcid, va:VAddr) -> (ret: Option<PageEntry>)
+    pub fn resolve_pagetable_mapping(&self, pcid:Pcid, va:VAddr) -> (ret: Option<PageEntry>)
         requires
             self.wf(),
             self.pcid_active(pcid),
@@ -916,12 +917,48 @@ impl MemoryManager{
             return None;
         }
         let l2_entry = l2_entry_op.unwrap();        
-        let l1_entry_op = self.get_pagetable_l1_entry(pcid, l4i, l3i, l2i, l1i, &l2_entry);
-        if l1_entry_op.is_none(){
-            return None;
-        }
-        l1_entry_op
+        self.get_pagetable_l1_entry(pcid, l4i, l3i, l2i, l1i, &l2_entry)
     }
+
+    // pub fn pagetable_unmap_4k_page(&self, pcid:Pcid, va:VAddr) -> (ret: Option<PageEntry>)
+    //     requires
+    //         old(self).wf(),
+    //         old(self).pcid_active(pcid),
+    //         va_4k_valid(va),
+    //     ensures
+    //         !(self.get_pagetable_by_pcid(pcid).unwrap().mapping_4k().dom().contains(va)),
+    //         self.wf(),
+    //         self.pcid_active(pcid),
+    // {
+    //     proof{va_lemma();}
+    //     let va: Vaddr = va_range.index(i);
+    //     assert(spec_index2va((l4i, l3i, l2i, l1i)) == va);
+
+    //     let (l4i, l3i, l2i, l1i) = va2index(va);
+    //     let mut l4_entry_op = self.get_pagetable_l4_entry(target_pcid, l4i);
+    //     if l4_entry_op.is_none() {
+    //         return None;
+    //     }
+    //     let l4_entry = l4_entry_op.unwrap();                
+    //     let mut l3_entry_op = self.get_pagetable_l3_entry(target_pcid, l4i, l3i, &l4_entry);
+    //     if l3_entry_op.is_none() {
+    //         return None;        
+    //     }
+    //     let l3_entry = l3_entry_op.unwrap();
+    //     let mut l2_entry_op = self.get_pagetable_l2_entry(target_pcid, l4i, l3i, l2i, &l3_entry);
+    //     if l2_entry_op.is_none() {
+    //         return None;        
+    //     }
+    //     let l2_entry = l2_entry_op.unwrap();
+    //     let mut l1_entry_op = self.get_pagetable_l1_entry(target_pcid, l4i, l3i, l2i, l1i, &l2_entry);        
+    //     if(l1_entry_op.is_none()){
+    //         return None;        
+    //     } 
+
+    //     let target_entry = l1_entry_op.unwrap();
+    //     self.pagetable_unmap_4k_page(pcid, l4i, l3i, l2i, l1i, &l2_entry, target_entry);
+    //     l1_entry_op
+    // }
 }
 }
 

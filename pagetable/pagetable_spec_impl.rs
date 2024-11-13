@@ -1,3 +1,6 @@
+use std::borrow::Borrow;
+use std::borrow::BorrowMut;
+
 use vstd::prelude::*;
 
 verus! {
@@ -709,6 +712,8 @@ impl PageTable{
     //     forall|l4i: L4Index| #![auto] 0<=l4i<KERNEL_MEM_END_L4INDEX ==> self.l4_table@[self.cr3]@.value.get_Some_0()[l4i].is_None()
     // }
 
+    
+
 
     pub closed spec fn l4_entry_exists(&self, l4i: L4Index) -> bool
         recommends self.wf(),
@@ -959,6 +964,9 @@ impl PageTable{
     // {
 
     // }
+
+
+
 
     pub fn get_entry_l4(&self, target_l4i: L4Index) -> (ret: Option<PageEntry>)
         requires
@@ -1468,6 +1476,148 @@ impl PageTable{
             assert(self.spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, target_l1i).is_Some());
             self.mapping_4k@ = self.mapping_4k@.insert(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i)), *target_entry);
         }
+        assert(self.wf_l4());
+        assert(self.wf_l3());
+        assert(self.wf_l2());
+        assert(self.wf_l1());
+        assert(self.wf_mapping_4k()) by {
+            va_lemma();
+            assert(
+                forall|l4i: L4Index,l3i: L3Index,l2i: L2Index,l1i: L2Index| 
+                #![trigger self.mapping_4k@.dom().contains(spec_index2va((l4i,l3i,l2i,l1i)))]
+                #![trigger old(self).mapping_4k@.dom().contains(spec_index2va((l4i,l3i,l2i,l1i)))]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 && !((target_l4i, target_l3i, target_l2i, target_l1i) =~= (l4i,l3i,l2i,l1i)) ==>
+                    self.mapping_4k@.dom().contains(spec_index2va((l4i,l3i,l2i,l1i))) == old(self).mapping_4k@.dom().contains(spec_index2va((l4i,l3i,l2i,l1i))));
+
+            assert(
+                forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
+                #![trigger self.spec_resolve_mapping_l2(l4i,l3i,l2i)]
+                #![trigger old(self).spec_resolve_mapping_l2(l4i,l3i,l2i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512  && !((target_l4i, target_l3i, target_l2i) =~= (l4i,l3i,l2i)) ==>
+                    self.spec_resolve_mapping_l2(l4i,l3i,l2i) =~= old(self).spec_resolve_mapping_l2(l4i,l3i,l2i)
+            );
+
+            assert(
+                forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
+                #![trigger self.spec_resolve_mapping_l2(l4i,l3i,l2i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512  && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && !((target_l4i, target_l3i, target_l2i) =~= (l4i,l3i,l2i)) ==>
+                    self.spec_resolve_mapping_l2(l4i,l3i,l2i).get_Some_0().addr != target_l1_p
+            ) by {
+                old(self).internal_resolve_disjoint();
+            };
+
+            assert(
+                forall|l4i: L4Index,l3i: L3Index,l2i: L2Index,l1i: L2Index| 
+                #![trigger self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
+                #![trigger old(self).spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l1i < 512 && !((target_l4i, target_l3i, target_l2i) =~= (l4i,l3i,l2i)) ==>
+                    self.spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).is_Some() == old(self).spec_resolve_mapping_4k_l1(l4i,l3i,l2i,l1i).is_Some());
+        };
+        assert(self.wf_mapping_2m()) by {
+            assert(forall|l4i: L4Index,l3i: L3Index,l2i: L2Index| 
+                #![trigger self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
+                #![trigger old(self).spec_resolve_mapping_2m_l2(l4i,l3i,l2i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 ==>
+                    old(self).spec_resolve_mapping_2m_l2(l4i,l3i,l2i) == self.spec_resolve_mapping_2m_l2(l4i,l3i,l2i));
+        };
+        assert(self.wf_mapping_1g())by {
+            assert(forall|l4i: L4Index,l3i: L3Index| 
+                #![trigger self.spec_resolve_mapping_1g_l3(l4i,l3i)]
+                #![trigger old(self).spec_resolve_mapping_1g_l3(l4i,l3i)]
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && (l4i,l3i) != (target_l4i, target_l3i) ==>
+                    old(self).spec_resolve_mapping_1g_l3(l4i,l3i) =~= self.spec_resolve_mapping_1g_l3(l4i,l3i));
+        };
+        assert(self.user_only());
+        assert(self.rwx_upper_level_entries());
+        assert(self.present_or_zero());
+        assert(self.table_pages_wf());
+        assert(self.mapping_2m() =~= old(self).mapping_2m());
+        assert(self.mapping_1g() =~= old(self).mapping_1g());
+    }
+
+
+
+    pub closed spec fn spec_tlb_flush_4k(self, va: VAddr) -> bool
+    {
+        forall|cpu_id:CpuId| 
+        #![auto] 0 <= cpu_id < NUM_CPUS ==> !self.tlb_mapping_4k@[cpu_id as int].contains_key(va)
+    }
+
+    
+    ///
+    /// 
+    /// Notes: 
+    /// lx_table keep tracks of pagemaps (each level of pagetable)
+    /// 
+    /// Precondition: 
+    /// This unmap method will only be called when all previous level exists, and target entry exists in pagetable
+    /// The VA -> PA mapping should exist. 
+    /// 
+    /// Postcondition: 
+    /// unmap will need to delete target entry mappings in mapping_4k (VA->PA), 
+    /// PageMaps lx_tables should not change.
+    /// 
+    pub fn unmap_4k_page(&mut self, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, target_l1i: L2Index, target_l1_p:PageMapPtr, target_entry: &MapEntry)
+        requires
+            old(self).wf(),
+            old(self).kernel_l4_end <= target_l4i < 512,
+            0<=target_l3i<512,
+            0<=target_l2i<512,
+            0<=target_l1i<512,
+            old(self).spec_resolve_mapping_l2(target_l4i, target_l3i, target_l2i).is_Some(),
+            old(self).spec_resolve_mapping_l2(target_l4i, target_l3i, target_l2i).get_Some_0().addr == target_l1_p,
+            old(self).spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, target_l1i).is_Some() || old(self).mapping_4k().dom().contains(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))) == true,
+            old(self).page_closure().contains(target_entry.addr) == true, 
+            page_ptr_valid(target_entry.addr),
+        ensures
+            self.wf(),      
+            self.kernel_l4_end == old(self).kernel_l4_end,  
+            self.page_closure() =~= old(self).page_closure(),
+            self.mapping_4k@ == old(self).mapping_4k@.remove(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))),
+            self.mapping_2m() =~= old(self).mapping_2m(),
+            self.mapping_1g() =~= old(self).mapping_1g(),
+            // self.mapped_4k_pages() =~= old(self).mapped_4k_pages().insert(target_entry.addr),
+            self.mapped_2m_pages() =~= old(self).mapped_2m_pages(),
+            self.mapped_1g_pages() =~= old(self).mapped_1g_pages(),
+            self.kernel_entries =~= old(self).kernel_entries,
+    {
+        assert(va_4k_valid(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i)))) by {va_lemma();};
+        assert(self.mapping_4k@.dom().contains(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))) == true);
+        let tracked mut l1_perm = self.l1_tables.borrow_mut().tracked_remove(target_l1_p);
+        proof{
+            page_ptr_valid_imply_MEM_valid(target_entry.addr);
+        }
+        // In order to call page_map_set, permission to pagemap is needed, this is stored in lx_table.
+        page_map_set(target_l1_p, Tracked(&mut l1_perm), target_l1i, PageEntry::empty());
+
+        proof {
+            self.l1_tables.borrow_mut().tracked_insert(target_l1_p, l1_perm);
+            self.mapping_4k@ = self.mapping_4k@.remove(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i)));
+        }
+        assert(self.spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, target_l1i).is_None());
+        assert(!self.mapping_4k@.contains_key(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))));
+
+        //flush_tlb_4kentry(self.tlb_mapping_4k, index2va((target_l4i, target_l3i, target_l2i, target_l1i)));
+        // proof {
+        //     let va = spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i));
+        //     // We need to appropriately initialized those mapping first..., then figure out a way to flush them
+        //     assume(
+        //         self.spec_tlb_flush_4k(va)
+        //     );
+        // }
+
+        assert(self.tlb_submap_of_mapping()) by {
+            let va = spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i));
+            assert(old(self).tlb_submap_of_mapping());
+            // TODO: this needs to be proved
+            assume(
+                self.spec_tlb_flush_4k(va)
+            );
+            assert(
+                !self.mapping_4k@.contains_key(va)
+            );
+        }; 
+
         assert(self.wf_l4());
         assert(self.wf_l3());
         assert(self.wf_l2());

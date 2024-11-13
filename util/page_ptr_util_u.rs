@@ -227,6 +227,11 @@ pub open spec fn spec_index2va(i:(L4Index,L3Index,L2Index,L1Index)) -> usize
     (i.0 as usize)<<39 & (i.1 as usize)<<30 & (i.2 as usize)<<21 & (i.3 as usize)<<12
 }
 
+pub fn index2va(i:(L4Index,L3Index,L2Index,L1Index)) -> usize
+{
+    (i.0 as usize)<<39 & (i.1 as usize)<<30 & (i.2 as usize)<<21 & (i.3 as usize)<<12
+}
+
 #[verifier(when_used_as_spec(spec_v2l1index))]
 pub fn v2l1index(va: usize) -> (ret: L1Index)
     requires va_4k_valid(va) || va_2m_valid(va) || va_1g_valid(va),

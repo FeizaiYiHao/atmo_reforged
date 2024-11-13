@@ -53,4 +53,41 @@ ensures
     (page_ptr, Tracked::assume_new())
 }
 
+
+
+pub fn flush_tlb_4kentry(mut tlbmap_4k: Ghost<Seq<Map<VAddr,MapEntry>>> , va: VAddr) -> (ret: Ghost<Seq<Map<VAddr,MapEntry>>>)
+requires
+    NUM_CPUS > 0,
+    tlbmap_4k@.len() == NUM_CPUS,
+ensures
+    tlbmap_4k@.len() == NUM_CPUS,
+    forall|cpu_id:CpuId| #![auto] 0 <= cpu_id < NUM_CPUS ==> ret@[cpu_id as int].contains_key(va) == false,
+{
+    let mut cpu_id = 0;
+
+
+    for cpu_id in 0 .. NUM_CPUS
+    invariant
+        0 <= cpu_id <= NUM_CPUS,
+        tlbmap_4k@.len() == NUM_CPUS,
+        forall|cpu_i:CpuId|
+        #![auto] 0 <= cpu_i < cpu_id ==> tlbmap_4k@[cpu_i as int].contains_key(va) == false,
+    {
+        proof {
+            assert(cpu_id < tlbmap_4k@.len());
+            let tlbmap = tlbmap_4k@[cpu_id as int].remove(va);
+            assert(!tlbmap.contains_key(va)); 
+            let tlbseq = tlbmap_4k@.update(cpu_id as int, tlbmap);
+            assert(tlbseq.index(cpu_id as int) =~= tlbmap);
+            assert(tlbseq.contains(tlbmap));
+            tlbmap_4k@ = tlbseq;
+            assert(!tlbmap_4k@[cpu_id as int].contains_key(va));
+        }
+    }
+
+    tlbmap_4k 
+
+}
+
+
 }

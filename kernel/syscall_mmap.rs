@@ -138,7 +138,7 @@ pub fn syscall_mmap(&mut self, target_thread_ptr: ThreadPtr, va_range: VaRange4K
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    if self.page_alloc.free_pages_4k.len() < va_range.len * 4{
+    if self.page_alloc.free_pages_4k.len() < va_range.len * 4{ 
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 

@@ -50,7 +50,7 @@ pub open spec fn address_space_range_shareable(&self, target_proc_ptr:ProcPtr, v
 //             va_range.wf(),
 //             forall|j:int| #![auto] 0<=j<i ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]) == false,
 //     {
-//         if self.mem_man.reslove_pagetable_mapping(target_pcid, va_range.index(i)).is_some(){
+//         if self.mem_man.resolve_pagetable_mapping(target_pcid, va_range.index(i)).is_some(){
 //             return false;
 //         }
 //     }
@@ -76,7 +76,7 @@ pub fn check_address_space_va_range_free(&self, target_proc_ptr:ProcPtr, va_rang
             va_range.wf(),
             forall|j:int| #![auto] 0<=j<i ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]) == false,
     {
-        if self.mem_man.reslove_pagetable_mapping(target_pcid, va_range.index(i)).is_some(){
+        if self.mem_man.resolve_pagetable_mapping(target_pcid, va_range.index(i)).is_some(){
             return false;
         }
     }
@@ -236,7 +236,7 @@ pub fn create_entry(&mut self, proc_ptr:ProcPtr, va:VAddr) -> (ret: (usize, Page
                     assert(self.page_alloc.allocated_pages_2m() =~= Set::empty());
                     assert(self.page_alloc.allocated_pages_1g() =~= Set::empty());
                     assert(self.page_alloc.container_map_4k@.dom() =~= self.proc_man.container_dom());
-                };
+                };  
                 assert(self.mapping_wf());
                 assert(self.pcid_ioid_wf());
             };
@@ -473,7 +473,7 @@ pub fn get_address_space_va_range_none(&self, target_proc_ptr:ProcPtr, va_range:
             forall|j:int| #![auto] 0<=j<i ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]) == false
     {
         let target_pcid = self.proc_man.get_proc(target_proc_ptr).pcid;
-        if self.mem_man.reslove_pagetable_mapping(target_pcid, va_range.index(i)).is_some(){
+        if self.mem_man.resolve_pagetable_mapping(target_pcid, va_range.index(i)).is_some(){
             return false;
         }
     }

@@ -37,6 +37,22 @@ impl PageEntry{
         &&&
         self.perm.user == false
     }
+
+    pub fn empty() -> (ret: Self)
+    ensures
+        ret.is_empty()
+    {
+        PageEntry{
+            addr: 0,
+            perm: PageEntryPerm {
+                present: false, 
+                ps: false,
+                write: false,
+                execute_disable: false,
+                user: false,
+            }
+        }
+    }
 }
 
 pub struct MapEntry{

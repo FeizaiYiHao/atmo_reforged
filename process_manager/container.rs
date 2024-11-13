@@ -13,7 +13,7 @@ verus! {
 
         pub owned_endpoints: StaticLinkedList<EndpointPtr,CONTAINER_ENDPOINT_LIST_LEN>,
 
-        pub mem_quota: usize,
+        pub mem_quota: usize, 
         // pub mem_quota_2m: usize,        
         // pub mem_quota_1g: usize,
 
