@@ -4,13 +4,13 @@ verus! {
 // use crate::memory_manager::spec_impl::*;
 // use crate::process_manager::spec_impl::*;
 // use crate::util::page_ptr_util_u::*;
-use crate::lemma::lemma_t::set_lemma;
-use crate::lemma::lemma_u::*;
-use crate::util::page_ptr_util_u::*;
+// use crate::lemma::lemma_t::set_lemma;
+// use crate::lemma::lemma_u::*;
+// use crate::util::page_ptr_util_u::*;
 use crate::define::*;
 // use crate::trap::*;
-use crate::pagetable::pagemap_util_t::*;
-use crate::pagetable::entry::*;
+// use crate::pagetable::pagemap_util_t::*;
+// use crate::pagetable::entry::*;
 use crate::kernel::Kernel;
 use crate::va_range::VaRange4K;
 
@@ -23,7 +23,7 @@ pub open spec fn syscall_mmap_requirement(old:Kernel,  target_thread_ptr: Thread
         false
     }else if old.get_num_of_free_pages() < va_range.len * 4 {
         false
-    }else if old.address_space_range_free(target_proc_ptr, va_range) == false {
+    }else if old.address_space_range_free(target_proc_ptr, &va_range) == false {
         false
     }else{
         true

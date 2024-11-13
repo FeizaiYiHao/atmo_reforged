@@ -13,6 +13,7 @@ use crate::pagetable::pagemap_util_t::*;
 use crate::pagetable::entry::*;
 use crate::pagetable::pagemap::*;
 use crate::lemma::lemma_u::*;
+// use crate::array::Array;
 
 // pub closed spec fn map_entry_equals_to_page_entry_unwrapped(m:MapEntry, p:PageEntry) -> bool{
 //     &&&
@@ -61,18 +62,92 @@ pub struct PageTable{
 
 
 impl PageTable{
+    pub fn new(pcid:Pcid, kernel_entries_ghost: Ghost<Seq<PageEntry>>, page_map_ptr: PageMapPtr, Tracked(page_map_perm): Tracked<PointsTo<PageMap>>) -> (ret:Self)
+        requires
+            page_ptr_valid(page_map_ptr),
+            page_map_perm.addr() == page_map_ptr,
+            page_map_perm.is_init(),
+            page_map_perm.value().wf(),
+            kernel_entries_ghost@.len() == KERNEL_MEM_END_L4INDEX,
+            forall|i:usize|
+                #![trigger page_map_perm.value()[i].is_empty()]
+                KERNEL_MEM_END_L4INDEX<=i<512 ==> page_map_perm.value()[i].is_empty(),
+            forall|i:usize|
+                #![trigger kernel_entries_ghost@[i as int]] 
+                #![trigger page_map_perm.value()[i]] 
+                0 <= i < KERNEL_MEM_END_L4INDEX ==> kernel_entries_ghost@[i as int] == page_map_perm.value()[i],
+        ensures
+            ret.wf(),
+            ret.pcid == Some(pcid), 
+            ret.ioid.is_None(),
+            ret.kernel_l4_end == KERNEL_MEM_END_L4INDEX,
+            ret.page_closure() == Set::empty().insert(page_map_ptr),
+            ret.mapping_4k() == Map::<VAddr,MapEntry>::empty(),
+            ret.mapping_2m() == Map::<VAddr,MapEntry>::empty(),
+            ret.mapping_1g() == Map::<VAddr,MapEntry>::empty(),
+            ret.kernel_entries =~= kernel_entries_ghost,
+    {
+        assert(
+            forall|i:usize|
+                #![trigger page_map_perm.value()[i].is_empty()]
+                #![trigger page_map_perm.value()[i].perm.present]
+                KERNEL_MEM_END_L4INDEX<=i<512 ==> page_map_perm.value()[i].is_empty() && page_map_perm.value()[i].perm.present == false && page_map_perm.value()[i].perm.write == false && page_map_perm.value()[i].perm.execute_disable == false 
+        );
+        let mut ret = Self{
+            cr3: page_map_ptr,
+            pcid: Some(pcid),
+            ioid: None,
+            kernel_l4_end:KERNEL_MEM_END_L4INDEX,
+        
+            l4_table:Tracked(Map::<PageMapPtr,PointsTo<PageMap>>::tracked_empty()),
+            l3_rev_map: Ghost(Map::<PageMapPtr, (L4Index)>::empty()),
+            l3_tables: Tracked(Map::<PageMapPtr,PointsTo<PageMap>>::tracked_empty()),
+            l2_rev_map: Ghost(Map::<PageMapPtr,  (L4Index,L3Index)>::empty()),
+            l2_tables: Tracked(Map::<PageMapPtr,PointsTo<PageMap>>::tracked_empty()),
+            l1_rev_map: Ghost(Map::<PageMapPtr,  (L4Index,L3Index,L2Index)>::empty()),
+            l1_tables: Tracked(Map::<PageMapPtr,PointsTo<PageMap>>::tracked_empty()),
+        
+            mapping_4k: Ghost(Map::<VAddr,MapEntry>::empty()),
+            mapping_2m: Ghost(Map::<VAddr,MapEntry>::empty()),
+            mapping_1g: Ghost(Map::<VAddr,MapEntry>::empty()),
+        
+            kernel_entries: kernel_entries_ghost,
+        
+            tlb_mapping_4k: Ghost(Seq::new(NUM_CPUS as nat, |i:int| Map::<VAddr,MapEntry>::empty())),
+            tlb_mapping_2m: Ghost(Seq::new(NUM_CPUS as nat, |i:int| Map::<VAddr,MapEntry>::empty())),
+            tlb_mapping_1g: Ghost(Seq::new(NUM_CPUS as nat, |i:int| Map::<VAddr,MapEntry>::empty())),
+        };
+        assert(ret.l3_tables@.dom() == Set::<PageMapPtr>::empty());
+        assert(ret.l2_tables@.dom() == Set::<PageMapPtr>::empty());
+        assert(ret.l1_tables@.dom() == Set::<PageMapPtr>::empty());
+        assert(ret.l4_table@.dom() == Set::<PageMapPtr>::empty());
+        proof{
+            ret.l4_table.borrow_mut().tracked_insert(page_map_ptr, page_map_perm);
+        }
+        assert(ret.l3_tables@.dom() == Set::<PageMapPtr>::empty());
+        assert(ret.l2_tables@.dom() == Set::<PageMapPtr>::empty());
+        assert(ret.l1_tables@.dom() == Set::<PageMapPtr>::empty());
+        assert(ret.l4_table@.dom() == Set::<PageMapPtr>::empty().insert(page_map_ptr));
+        assert(ret.page_closure() == Set::empty().insert(page_map_ptr));
 
-    // pub fn new(cr3:usize) -> (ret:Self)
-    // {
-    //     Self{
-    //         cr3 : cr3,
-    //         l4_table: Tracked(Map::tracked_empty()),
-    //         l3_tables: Tracked(Map::tracked_empty()),
-    //         l2_tables: Tracked(Map::tracked_empty()),
-    //         l1_tables: Tracked(Map::tracked_empty()),
-    //         mapping: Ghost(Map::empty()),
-    //     }
-    // }
+        assert(ret.wf_l4());
+        assert(ret.wf_l3());
+        assert(ret.wf_l2());
+        assert(ret.wf_l1());
+        assert(ret.wf_mapping_4k());
+        assert(ret.wf_mapping_2m());
+        assert(ret.wf_mapping_1g());
+        assert(ret.user_only());
+        assert(ret.rwx_upper_level_entries());
+        assert(ret.present_or_zero());
+        assert(ret.table_pages_wf());
+        assert(ret.kernel_entries_wf());
+        assert(ret.pcid_ioid_wf());
+        assert(ret.tlb_wf());
+        assert(ret.tlb_submap_of_mapping());
+
+        ret
+    }
 
     // pub fn init(&mut self)
     //     requires
@@ -195,14 +270,14 @@ impl PageTable{
         forall|i: L4Index, j: L4Index|
             // #![trigger self.l4_table@[self.cr3].value()[i].perm.present, self.l4_table@[self.cr3].value()[j].perm.present]
             #![trigger self.l4_table@[self.cr3].value()[i].perm.present, self.l4_table@[self.cr3].value()[j].perm.present, self.l4_table@[self.cr3].value()[i].addr, self.l4_table@[self.cr3].value()[j].addr]
-            i != j && 0 <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present && 0 <= j < 512 && self.l4_table@[self.cr3].value()[j].perm.present ==>
+            i != j && self.kernel_l4_end <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present && self.kernel_l4_end <= j < 512 && self.l4_table@[self.cr3].value()[j].perm.present ==>
                 self.l4_table@[self.cr3].value()[i].addr != self.l4_table@[self.cr3].value()[j].addr
         &&&
         forall|i: L4Index| 
             // #![trigger self.l4_table@[self.cr3].value()[i].perm.present]
             #![trigger self.l2_tables@.dom().contains(self.l4_table@[self.cr3].value()[i].addr)]
             #![trigger self.l1_tables@.dom().contains(self.l4_table@[self.cr3].value()[i].addr)]
-            0 <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
+            self.kernel_l4_end <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
                 self.l2_tables@.dom().contains(self.l4_table@[self.cr3].value()[i].addr) == false
                 &&
                 self.l1_tables@.dom().contains(self.l4_table@[self.cr3].value()[i].addr) == false
@@ -213,19 +288,19 @@ impl PageTable{
         forall|i: L4Index| 
             // #![trigger self.l4_table@[self.cr3].value()[i].perm.present]
             #![trigger self.l4_table@[self.cr3].value()[i].addr]
-            0 <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==>
+            self.kernel_l4_end <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==>
                 self.cr3 != self.l4_table@[self.cr3].value()[i].addr
         //all l4 points to valid l3 tables 
         &&&
         forall|i: L4Index|
             #![trigger self.l3_tables@.dom().contains(self.l4_table@[self.cr3].value()[i].addr)]
-            0 <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present && !self.l4_table@[self.cr3].value()[i].perm.ps ==>
+            self.kernel_l4_end <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present && !self.l4_table@[self.cr3].value()[i].perm.ps ==>
                 self.l3_tables@.dom().contains(self.l4_table@[self.cr3].value()[i].addr)
         //no hugepage in L4 (hardware limit)        
         &&&
         forall|i: L4Index| 
             #![trigger self.l4_table@[self.cr3].value()[i].perm.ps]
-            0 <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
+            self.kernel_l4_end <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
                 !self.l4_table@[self.cr3].value()[i].perm.ps 
     }
 
@@ -398,7 +473,7 @@ impl PageTable{
         &&&
         forall|i: L4Index| 
             #![trigger self.l4_table@[self.cr3].value()[i].perm.user]
-            0 <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
+            self.kernel_l4_end <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
                 self.l4_table@[self.cr3].value()[i].perm.user
         &&&
         forall|p: PageMapPtr, i: L3Index| 
@@ -421,7 +496,7 @@ impl PageTable{
         &&&
         forall|i: L4Index| 
             #![trigger self.l4_table@[self.cr3].value()[i].is_empty()]
-            0 <= i < 512 && !self.l4_table@[self.cr3].value()[i].perm.present ==> 
+            self.kernel_l4_end <= i < 512 && !self.l4_table@[self.cr3].value()[i].perm.present ==> 
                 self.l4_table@[self.cr3].value()[i].is_empty()
         &&&
         forall|p: PageMapPtr, i: L3Index| 
@@ -445,7 +520,7 @@ impl PageTable{
         forall|i: L4Index| 
             #![trigger self.l4_table@[self.cr3].value()[i].perm.write] 
             #![trigger self.l4_table@[self.cr3].value()[i].perm.execute_disable]
-            0 <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
+            self.kernel_l4_end <= i < 512 && self.l4_table@[self.cr3].value()[i].perm.present ==> 
                 self.l4_table@[self.cr3].value()[i].perm.write && !self.l4_table@[self.cr3].value()[i].perm.execute_disable
         &&&
         forall|p: PageMapPtr, i: L3Index| 
@@ -504,7 +579,7 @@ impl PageTable{
         recommends
             self.kernel_l4_end <= l4i < 512,
     {
-        if self.l4_table@[self.cr3].value()[l4i].perm.present{
+        if self.l4_table@[self.cr3].value()[l4i].perm.present || l4i < self.kernel_l4_end {
             Some(self.l4_table@[self.cr3].value()[l4i])
         }else{
             None
@@ -898,21 +973,21 @@ impl PageTable{
         ensures
             forall|l4i: L4Index, l4j: L4Index| 
                 #![trigger self.spec_resolve_mapping_l4(l4i), self.spec_resolve_mapping_l4(l4j)]
-                self.kernel_l4_end <= l4i < 512 && 0 <= l4j < 512 && l4i != l4j && self.spec_resolve_mapping_l4(l4i).is_Some() && self.spec_resolve_mapping_l4(l4j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && self.kernel_l4_end <= l4j < 512 && l4i != l4j && self.spec_resolve_mapping_l4(l4i).is_Some() && self.spec_resolve_mapping_l4(l4j).is_Some() ==>
                     self.spec_resolve_mapping_l4(l4i).get_Some_0().addr != self.spec_resolve_mapping_l4(l4j).get_Some_0().addr,
             forall|l4i: L4Index, l3i: L3Index, l4j: L4Index, l3j: L3Index| 
                 #![trigger self.spec_resolve_mapping_l3(l4i,l3i), self.spec_resolve_mapping_l3(l4j,l3j)]
-                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && (l4i,l3i) != (l4j,l3j) && self.spec_resolve_mapping_l3(l4i,l3i).is_Some() && self.spec_resolve_mapping_l3(l4j,l3j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && self.kernel_l4_end <= l4j < 512 && 0 <= l3j < 512 && (l4i,l3i) != (l4j,l3j) && self.spec_resolve_mapping_l3(l4i,l3i).is_Some() && self.spec_resolve_mapping_l3(l4j,l3j).is_Some() ==>
                     self.spec_resolve_mapping_l3(l4i,l3i).get_Some_0().addr != self.spec_resolve_mapping_l3(l4j,l3j).get_Some_0().addr,
             forall|l4i: L4Index, l3i: L3Index, l2i: L3Index, l4j: L4Index, l3j: L3Index, l2j: L2Index| 
             #![trigger self.spec_resolve_mapping_l2(l4i,l3i,l2i), self.spec_resolve_mapping_l2(l4j,l3j,l2j)]
-                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && 0 <= l2j < 512 && (l4i,l3i,l2i) != (l4j,l3j,l2j) && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && self.spec_resolve_mapping_l2(l4j,l3j,l2j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && self.kernel_l4_end <= l4j < 512 && 0 <= l3j < 512 && 0 <= l2j < 512 && (l4i,l3i,l2i) != (l4j,l3j,l2j) && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && self.spec_resolve_mapping_l2(l4j,l3j,l2j).is_Some() ==>
                     self.spec_resolve_mapping_l2(l4i,l3i,l2i).get_Some_0().addr != self.spec_resolve_mapping_l2(l4j,l3j,l2j).get_Some_0().addr
     {
         assert(
             forall|l4i: L4Index, l4j: L4Index| 
                 #![trigger self.spec_resolve_mapping_l4(l4i), self.spec_resolve_mapping_l4(l4j)]
-                self.kernel_l4_end <= l4i < 512 && 0 <= l4j < 512 && l4i != l4j && self.spec_resolve_mapping_l4(l4i).is_Some() && self.spec_resolve_mapping_l4(l4j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && self.kernel_l4_end <= l4j < 512 && l4i != l4j && self.spec_resolve_mapping_l4(l4i).is_Some() && self.spec_resolve_mapping_l4(l4j).is_Some() ==>
                     self.spec_resolve_mapping_l4(l4i).get_Some_0().addr != self.spec_resolve_mapping_l4(l4j).get_Some_0().addr
         );
 
@@ -929,7 +1004,7 @@ impl PageTable{
         assert(
             forall|l4i: L4Index, l3i: L3Index, l4j: L4Index, l3j: L3Index| 
                 #![auto]
-                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && (l4i,l3i) != (l4j,l3j) && self.spec_resolve_mapping_l3(l4i,l3i).is_Some() && self.spec_resolve_mapping_l3(l4j,l3j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && self.kernel_l4_end <= l4j < 512 && 0 <= l3j < 512 && (l4i,l3i) != (l4j,l3j) && self.spec_resolve_mapping_l3(l4i,l3i).is_Some() && self.spec_resolve_mapping_l3(l4j,l3j).is_Some() ==>
                     self.spec_resolve_mapping_l3(l4i,l3i).get_Some_0().addr != self.spec_resolve_mapping_l3(l4j,l3j).get_Some_0().addr
         );
         assert(
@@ -945,7 +1020,7 @@ impl PageTable{
         assert(
             forall|l4i: L4Index, l3i: L3Index, l2i: L3Index, l4j: L4Index, l3j: L3Index, l2j: L2Index| 
                 #![auto]
-                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && 0 <= l4j < 512 && 0 <= l3j < 512 && 0 <= l2j < 512 && (l4i,l3i,l2i) != (l4j,l3j,l2j) && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && self.spec_resolve_mapping_l2(l4j,l3j,l2j).is_Some() ==>
+                self.kernel_l4_end <= l4i < 512 && 0 <= l3i < 512 && 0 <= l2i < 512 && self.kernel_l4_end <= l4j < 512 && 0 <= l3j < 512 && 0 <= l2j < 512 && (l4i,l3i,l2i) != (l4j,l3j,l2j) && self.spec_resolve_mapping_l2(l4i,l3i,l2i).is_Some() && self.spec_resolve_mapping_l2(l4j,l3j,l2j).is_Some() ==>
                     self.spec_resolve_mapping_l2(l4i,l3i,l2i).get_Some_0().addr != self.spec_resolve_mapping_l2(l4j,l3j,l2j).get_Some_0().addr
         );
 

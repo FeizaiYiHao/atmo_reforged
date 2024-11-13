@@ -19,6 +19,8 @@ verus! {
                 forall|i:int| 
                     #![trigger self.page_array@[i]]
                     #![trigger old(self).page_array@[i]]
+                    #![trigger self.page_array@[i].ref_count]
+                    #![trigger old(self).page_array@[i].ref_count]
                     0 <= i < NUM_PAGES && i != index ==> self.page_array@[i] =~= old(self).page_array@[i],
                 self.page_array@[index as int].addr =~= old(self).page_array@[index as int].addr,
                 // self.page_array@[index as int].state =~= old(self).page_array@[index as int].state,

@@ -27,6 +27,33 @@ pub proof fn seq_push_lemma<A>()
 }
 
 #[verifier(external_body)]
+pub proof fn seq_pop_unique_lemma<A>()
+    ensures
+        forall|s: Seq<A>, i:int|
+            s.no_duplicates() && 0 <= i < s.len() - 1
+            ==>  
+            s.drop_last().contains(s[s.len() - 1]) && s.drop_last()[i] == s[i],
+        forall|s: Seq<A>, v:A|
+            s.no_duplicates() && s[s.len() - 1] == v
+            ==>  
+            s.drop_last().to_set().contains(v) == false,
+        forall|s: Seq<A>, v:A|
+            s.no_duplicates() && s[s.len() - 1] != v 
+            ==>  
+            s.drop_last().to_set().contains(v) == s.to_set().contains(v),
+        
+{
+}
+
+#[verifier(external_body)]
+pub proof fn seq_update_lemma<A>()
+    ensures
+        forall|s: Seq<A>, i:int, j: int, v:A|
+            0 <= i < s.len() && 0 <= j < s.len() && i != j ==>  s.update(j,v)[i] == s[i] &&  s.update(j,v)[j] == v
+{
+}
+
+#[verifier(external_body)]
 pub proof fn map_insert_lemma<A,B>()
     ensures
         forall|m: Map<A,B>, x:A, y:A, v:B|

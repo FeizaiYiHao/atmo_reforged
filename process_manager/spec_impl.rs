@@ -102,7 +102,7 @@ impl ProcessManager{
     pub closed spec fn spec_get_thread(&self, thread_ptr:ThreadPtr) -> &Thread
         recommends
             self.wf(),
-            self.thread_perms@.dom().contains(thread_ptr),
+            self.thread_dom().contains(thread_ptr),
     {
         &self.thread_perms@[thread_ptr].value()
     }
@@ -115,6 +115,9 @@ impl ProcessManager{
         ensures
             ret == self.get_thread(thread_ptr),
             self.proc_dom().contains(ret.owning_proc),
+            self.container_dom().contains(ret.owning_container),
+            self.get_container(ret.owning_container).scheduler.wf(),
+            self.get_container(ret.owning_container).owned_procs.wf(),
     {
         let tracked thread_perm = self.thread_perms.borrow().tracked_borrow(thread_ptr);
         let thread : &Thread = PPtr::<Thread>::from_usize(thread_ptr).borrow(Tracked(thread_perm));
@@ -163,7 +166,7 @@ impl ProcessManager{
     pub closed spec fn spec_get_container(&self, container_ptr:ContainerPtr) -> &Container
         recommends
             self.wf(),
-            self.container_perms@.dom().contains(container_ptr),
+            self.container_dom().contains(container_ptr),
     {
         &self.container_perms@[container_ptr].value()
     }
@@ -832,19 +835,6 @@ impl ProcessManager{
 
 //proofs
 impl ProcessManager{
-    pub proof fn process_inv(&self)
-        requires
-            self.wf()
-        ensures
-            forall|p_ptr:ProcPtr|
-                #![trigger self.proc_dom().contains(p_ptr)]
-                #![trigger self.get_proc(p_ptr)]
-                self.proc_dom().contains(p_ptr)
-                ==>
-                self.container_dom().contains(self.get_proc(p_ptr).owning_container)
-    {
-    }
-
     pub proof fn thread_inv(&self)
         requires
             self.wf()
@@ -860,6 +850,31 @@ impl ProcessManager{
                 self.proc_dom().contains(self.get_thread(t_ptr).owning_proc)
                 &&
                 self.get_proc(self.get_thread(t_ptr).owning_proc).owning_container == self.get_thread(t_ptr).owning_container
+    {}
+    pub proof fn process_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|p_ptr:ProcPtr|
+                #![trigger self.proc_dom().contains(p_ptr)]
+                #![trigger self.get_proc(p_ptr)]
+                self.proc_dom().contains(p_ptr)
+                ==>
+                self.container_dom().contains(self.get_proc(p_ptr).owning_container)
+    {}
+    pub proof fn container_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|c_ptr:ContainerPtr|
+                #![trigger self.container_dom().contains(c_ptr)]
+                #![trigger self.get_container(c_ptr).owned_cpus.wf()]
+                #![trigger self.get_container(c_ptr).scheduler.wf()]
+                self.container_dom().contains(c_ptr)
+                ==>
+                self.get_container(c_ptr).owned_cpus.wf()
+                &&
+                self.get_container(c_ptr).scheduler.wf()
     {}
     pub proof fn pcid_unique(&self, target_proc_ptr:ProcPtr)
         requires
@@ -1286,17 +1301,17 @@ impl ProcessManager{
             old(self).thread_dom().contains(thread_ptr),
             old(self).page_closure().contains(page_ptr_1) == false,
             old(self).page_closure().contains(page_ptr_2) == false,
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota >= 2,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota >= 3,
             old(self).get_container(old(self).get_thread(thread_ptr).owning_container).owned_procs.len() < CONTAINER_PROC_LIST_LEN,
             old(self).get_container(old(self).get_thread(thread_ptr).owning_container).scheduler.len() < MAX_CONTAINER_SCHEDULER_LEN,
             0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
             old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).is_Some() || old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).is_Some(),
             old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).unwrap().rf_counter_is_full() == false || old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).rf_counter_is_full() == false,
             forall|p_ptr_i:ProcPtr| 
-                #![trigger old(self).process_perms@[p_ptr_i].value().pcid]
-                old(self).process_perms@.dom().contains(p_ptr_i) 
+                #![trigger old(self).proc_dom().contains(p_ptr_i) ]
+                old(self).proc_dom().contains(p_ptr_i) 
                 ==>
-                old(self).process_perms@[p_ptr_i].value().pcid != new_pcid,
+                old(self).get_proc(p_ptr_i).pcid != new_pcid,
             page_perm_1@.is_init(),
             page_perm_1@.addr() == page_ptr_1,
             page_perm_2@.is_init(),
@@ -1304,6 +1319,42 @@ impl ProcessManager{
             page_ptr_1 != page_ptr_2,
         ensures
             self.wf(),
+            self.page_closure() =~= old(self).page_closure().insert(page_ptr_1).insert(page_ptr_2),
+            self.proc_dom() =~= old(self).proc_dom().insert(page_ptr_1),
+            self.endpoint_dom() == old(self).endpoint_dom(),
+            self.container_dom() == old(self).container_dom(),
+            self.thread_dom() == old(self).thread_dom().insert(page_ptr_2),
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota - 3 == self.get_container(self.get_thread(thread_ptr).owning_container).mem_quota,
+            forall|p_ptr:ProcPtr|
+                #![trigger self.get_proc(p_ptr)]
+                old(self).proc_dom().contains(p_ptr)
+                ==> 
+                self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
+            forall|container_ptr:ContainerPtr|
+                #![trigger self.get_container(container_ptr)]
+                self.container_dom().contains(container_ptr) && container_ptr != self.get_thread(thread_ptr).owning_container
+                ==> 
+                self.get_container(container_ptr) =~= old(self).get_container(container_ptr),
+            forall|t_ptr:ThreadPtr| 
+                #![trigger old(self).get_thread(t_ptr)]
+                old(self).thread_dom().contains(t_ptr)
+                ==>
+                old(self).get_thread(t_ptr) =~= self.get_thread(t_ptr),
+            forall|e_ptr:EndpointPtr| 
+                #![trigger self.get_endpoint(e_ptr)]
+                self.endpoint_dom().contains(e_ptr) && e_ptr != old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()
+                ==> 
+                old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
+            self.get_proc(page_ptr_1).pcid =~= new_pcid,
+            self.get_proc(page_ptr_1).ioid.is_None(),
+            self.get_proc(page_ptr_1).owned_threads@ == Seq::<ThreadPtr>::empty().push(page_ptr_2),
+            self.get_proc(page_ptr_1).owning_container == self.get_thread(thread_ptr).owning_container,
+            self.get_container(self.get_thread(thread_ptr).owning_container).owned_procs@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_procs@.push(page_ptr_1),
+            self.get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@,
+            self.get_container(self.get_thread(thread_ptr).owning_container).owned_threads@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_threads@.insert(page_ptr_2),
+            self.get_thread(page_ptr_2).owning_container == old(self).get_thread(thread_ptr).owning_container,
+            self.get_thread(page_ptr_2).endpoint_descriptors@ =~= Seq::new(MAX_NUM_ENDPOINT_DESCRIPTORS as nat,|i: int| {None}).update(0, Some(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap())),
+            self.get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).owning_threads@ =~= old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).owning_threads@.insert(page_ptr_2),
     {
         // proof{seq_push_lemma::<ThreadPtr>();}
         let container_ptr = self.get_thread(thread_ptr).owning_container;
@@ -1314,7 +1365,7 @@ impl ProcessManager{
         let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
         let proc_list_node_ref = container_push_proc(container_ptr,&mut container_perm, page_ptr_1);
         let scheduler_node_ref = scheduler_push_thread(container_ptr,&mut container_perm, &page_ptr_2);
-        container_set_mem_quota(container_ptr,&mut container_perm, old_mem_quota - 2);
+        container_set_mem_quota(container_ptr,&mut container_perm, old_mem_quota - 3);
         container_set_owned_threads(container_ptr,&mut container_perm, Ghost(old_owned_threads@.insert(page_ptr_2)));
         proof {
             self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());

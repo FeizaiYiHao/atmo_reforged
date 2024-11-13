@@ -11,6 +11,9 @@ use crate::pagetable::entry::*;
 use crate::util::page_ptr_util_u::*;
 use vstd::simple_pptr::PointsTo;
 use crate::pagetable::pagemap::PageMap;
+use crate::pagetable::pagemap_util_t::*;
+use crate::lemma::lemma_u::*;
+use crate::lemma::lemma_t::*;
 
 pub struct MemoryManager{
     pub kernel_entries: Array<usize,KERNEL_MEM_END_L4INDEX>,
@@ -333,6 +336,8 @@ impl MemoryManager{
 
     pub open spec fn pcid_to_proc_wf(&self) -> bool{
         &&&
+        self.pcid_to_proc_ptr.wf()
+        &&&
         forall|pcid:Pcid|
             #![trigger self.pcid_active(pcid)]
             #![trigger self.pcid_to_proc_ptr@[pcid as int]]
@@ -354,6 +359,8 @@ impl MemoryManager{
         self.root_table_cache_wf()
         &&&
         self.kernel_entries_wf()
+        &&&
+        self.pcid_to_proc_wf()
     }
 
 
@@ -920,6 +927,7 @@ impl MemoryManager{
         self.get_pagetable_l1_entry(pcid, l4i, l3i, l2i, l1i, &l2_entry)
     }
 
+<<<<<<< HEAD
     // pub fn pagetable_unmap_4k_page(&self, pcid:Pcid, va:VAddr) -> (ret: Option<PageEntry>)
     //     requires
     //         old(self).wf(),
@@ -959,6 +967,85 @@ impl MemoryManager{
     //     self.pagetable_unmap_4k_page(pcid, l4i, l3i, l2i, l1i, &l2_entry, target_entry);
     //     l1_entry_op
     // }
+=======
+    pub fn new_page_table(&mut self, new_proc_ptr:ProcPtr, page_map_ptr: PageMapPtr, mut page_map_perm: Tracked<PointsTo<PageMap>>) -> (ret:Pcid)
+        requires
+            old(self).wf(),
+            old(self).page_closure().contains(page_map_ptr) == false,
+            page_ptr_valid(page_map_ptr),
+            page_map_perm@.addr() == page_map_ptr,
+            page_map_perm@.is_init(),
+            page_map_perm@.value().wf(),
+            forall|i:usize|
+                #![trigger page_map_perm@.value()[i].is_empty()]
+                0<=i<512 ==> page_map_perm@.value()[i].is_empty(),
+            old(self).free_pcids.len() > 0,
+        ensures
+            self.wf(),
+            self.kernel_entries =~= old(self).kernel_entries,
+            self.kernel_entries_ghost =~= old(self).kernel_entries_ghost,
+            // self.free_pcids =~= old(self).free_pcids,
+            // self.page_tables =~= old(self).page_tables,
+            // self.page_table_pages =~= old(self).page_table_pages,
+            self.free_ioids =~= old(self).free_ioids,
+            self.iommu_tables =~= old(self).iommu_tables,
+            self.iommu_table_pages =~= old(self).iommu_table_pages,
+            self.root_table =~= old(self).root_table,
+            self.root_table_cache =~= old(self).root_table_cache,
+            self.pci_bitmap =~= old(self).pci_bitmap,
+            self.page_table_pages@ =~= old(self).page_table_pages@.insert(page_map_ptr),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                p != ret ==>
+                self.pcid_active(p) == old(self).pcid_active(p),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.get_pagetable_mapping_by_pcid(p)]
+                self.pcid_active(p) && p != ret
+                ==>
+                old(self).get_pagetable_mapping_by_pcid(p) == self.get_pagetable_mapping_by_pcid(p),
+            forall|i:IOid|
+                #![trigger self.ioid_active(i)]
+                #![trigger self.get_iommu_table_mapping_by_ioid(i)]
+                self.ioid_active(i)
+                ==>
+                old(self).get_iommu_table_mapping_by_ioid(i) == self.get_iommu_table_mapping_by_ioid(i),
+            forall|p:Pcid|
+                #![trigger self.pcid_active(p)]
+                #![trigger self.pcid_to_proc_ptr(p)]
+                self.pcid_active(p) && p != ret
+                ==>
+                old(self).pcid_to_proc_ptr(p) == self.pcid_to_proc_ptr(p),
+            self.pcid_to_proc_ptr(ret) == new_proc_ptr,
+            self.pcid_active(ret),
+            !old(self).pcid_active(ret),
+            self.get_pagetable_mapping_by_pcid(ret).dom() == Set::<PagePtr>::empty(), 
+            self.page_closure() == old(self).page_closure().insert(page_map_ptr),
+    {
+        page_map_set_kernel_entry_range(&self.kernel_entries, page_map_ptr, Tracked(page_map_perm.borrow_mut()));
+        let new_pcid = *self.free_pcids.pop_unique();
+        self.page_tables.set(new_pcid, Some(PageTable::new(new_pcid, self.kernel_entries_ghost, page_map_ptr, page_map_perm)));
+        self.pcid_to_proc_ptr.set(new_pcid,Some(new_proc_ptr));
+        proof{
+            set_lemma::<PagePtr>();
+            self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr);
+        }
+        assert(self.pagetables_wf()) by {
+            seq_pop_unique_lemma::<Pcid>();
+            seq_update_lemma::<Option<PageTable>>();
+            assert(forall|pcid:Pcid| 
+                pcid != new_pcid ==>
+                old(self).get_free_pcids_as_set().contains(pcid) == self.get_free_pcids_as_set().contains(pcid));
+        };
+        assert(self.iommutables_wf());
+        assert(self.pagetable_iommu_table_disjoint());
+        assert(self.root_table_wf());
+        assert(self.root_table_cache_wf());
+        assert(self.kernel_entries_wf());
+        assert(self.pcid_to_proc_wf());
+        new_pcid
+    }
+>>>>>>> refs/remotes/origin/main
 }
 }
 
