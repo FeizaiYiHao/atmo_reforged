@@ -46,7 +46,7 @@ impl Kernel{
                 forall|j:int| #![auto] 0<=j<i ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]),
                 forall|j:int| #![auto] 0<=j<i ==> self.get_physical_page_reference_counter(self.get_address_space(target_proc_ptr)[va_range@[j]].addr) <= usize::MAX - va_range.len,
         {
-            let entry_op = self.mem_man.reslove_pagetable_mapping(target_pcid, va_range.index(i)); 
+            let entry_op = self.mem_man.resolve_pagetable_mapping(target_pcid, va_range.index(i)); 
             if entry_op.is_none() {
                 return false;
             }
@@ -271,7 +271,7 @@ impl Kernel{
     {
         assert(src_proc_ptr != target_proc_ptr || src_va != target_va);
         let src_pcid = self.proc_man.get_proc(src_proc_ptr).pcid;
-        let src_entry = page_entry_to_map_entry(&self.mem_man.reslove_pagetable_mapping(src_pcid, src_va).unwrap());
+        let src_entry = page_entry_to_map_entry(&self.mem_man.resolve_pagetable_mapping(src_pcid, src_va).unwrap());
         proof{
             self.page_alloc.mapped_page_imply_page_ptr_valid(src_entry.addr);
         }

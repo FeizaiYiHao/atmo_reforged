@@ -37,7 +37,7 @@ impl Kernel{
                 va_range.wf(),
                 forall|j:int| #![auto] 0<=j<i ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]) == false,
         {
-            if self.mem_man.reslove_pagetable_mapping(target_pcid, va_range.index(i)).is_some(){
+            if self.mem_man.resolve_pagetable_mapping(target_pcid, va_range.index(i)).is_some(){
                 return false;
             }
         }

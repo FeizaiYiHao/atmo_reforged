@@ -16,21 +16,6 @@ use crate::va_range::VaRange4K;
 
 impl Kernel{
 
-pub open spec fn address_space_range_free(&self, target_proc_ptr:ProcPtr, va_range:VaRange4K) -> bool{
-    forall|j:int| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]) == false
-}
-
-pub open spec fn address_space_range_exists(&self, target_proc_ptr:ProcPtr, va_range:VaRange4K) -> bool{
-    forall|j:int| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j])
-}
-
-pub open spec fn address_space_range_shareable(&self, target_proc_ptr:ProcPtr, va_range:VaRange4K) -> bool{
-    &&&
-    forall|j:int| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j])
-    // &&&
-    // forall|j:int| #![auto] 0<=j<va_range.len ==> self.get_physical_page_mapping()[self.get_address_space(target_proc_ptr)[va_range@[j]]].len() <= va_range.len
-}
-
 // pub fn check_address_space_va_range_shareable(&self, target_proc_ptr:ProcPtr, va_range:&VaRange4K) -> (ret:bool)
 //     requires
 //         self.wf(),
@@ -56,32 +41,6 @@ pub open spec fn address_space_range_shareable(&self, target_proc_ptr:ProcPtr, v
 //     }
 //     return true;
 // }
-
-pub fn check_address_space_va_range_free(&self, target_proc_ptr:ProcPtr, va_range:&VaRange4K) -> (ret:bool)
-    requires
-        self.wf(),
-        self.proc_dom().contains(target_proc_ptr),
-        va_range.wf(),
-    ensures
-        ret == self.address_space_range_free(target_proc_ptr, *va_range),
-{
-    let target_pcid = self.proc_man.get_proc(target_proc_ptr).pcid;
-    for i in 0..va_range.len
-        invariant
-            self.mem_man.pcid_active(target_pcid),
-            target_pcid == self.get_proc(target_proc_ptr).pcid,
-            0<=i<=va_range.len,
-            self.wf(),
-            self.proc_dom().contains(target_proc_ptr),
-            va_range.wf(),
-            forall|j:int| #![auto] 0<=j<i ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]) == false,
-    {
-        if self.mem_man.resolve_pagetable_mapping(target_pcid, va_range.index(i)).is_some(){
-            return false;
-        }
-    }
-    return true;
-}
 
 pub fn create_entry(&mut self, proc_ptr:ProcPtr, va:VAddr) -> (ret: (usize, PageMapPtr))
     requires
