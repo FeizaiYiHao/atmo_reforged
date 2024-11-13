@@ -128,8 +128,6 @@ ensures
     forall|cpu_id:CpuId| #![auto] 0 <= cpu_id < NUM_CPUS ==> ret@[cpu_id as int].contains_key(va) == false,
 {
     let mut cpu_id = 0;
-
-
     for cpu_id in 0 .. NUM_CPUS
     invariant
         0 <= cpu_id <= NUM_CPUS,
@@ -148,9 +146,7 @@ ensures
             assert(!tlbmap_4k@[cpu_id as int].contains_key(va));
         }
     }
-
     tlbmap_4k 
-
 }
 
 

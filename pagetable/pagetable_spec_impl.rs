@@ -1672,7 +1672,8 @@ impl PageTable{
         assert(self.spec_resolve_mapping_4k_l1(target_l4i, target_l3i, target_l2i, target_l1i).is_None());
         assert(!self.mapping_4k@.contains_key(spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i))));
 
-        //flush_tlb_4kentry(self.tlb_mapping_4k, index2va((target_l4i, target_l3i, target_l2i, target_l1i)));
+        proof {
+            self.tlb_mapping_4k = flush_tlb_4kentry(self.tlb_mapping_4k, index2va((target_l4i, target_l3i, target_l2i, target_l1i)));
         // proof {
         //     let va = spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i));
         //     // We need to appropriately initialized those mapping first..., then figure out a way to flush them
@@ -1680,6 +1681,11 @@ impl PageTable{
         //         self.spec_tlb_flush_4k(va)
         //     );
         // }
+            let va = spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i));
+            assert(!self.mapping_4k@.contains_key(va));
+            assert(self.spec_tlb_flush_4k(va));
+            assert(old(self).tlb_submap_of_mapping());
+        }   
 
         assert(self.tlb_submap_of_mapping()) by {
             let va = spec_index2va((target_l4i, target_l3i, target_l2i, target_l1i));
@@ -1688,9 +1694,7 @@ impl PageTable{
             assume(
                 self.spec_tlb_flush_4k(va)
             );
-            assert(
-                !self.mapping_4k@.contains_key(va)
-            );
+            assert(!self.mapping_4k@.contains_key(va));
         }; 
 
         assert(self.wf_l4());
