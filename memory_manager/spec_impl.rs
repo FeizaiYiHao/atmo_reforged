@@ -979,6 +979,7 @@ impl MemoryManager{
                 old(self).pcid_to_proc_ptr(p) == self.pcid_to_proc_ptr(p),
             self.pcid_to_proc_ptr(ret) == new_proc_ptr,
             self.pcid_active(ret),
+            !old(self).pcid_active(ret),
             self.get_pagetable_mapping_by_pcid(ret).dom() == Set::<PagePtr>::empty(), 
     {
         page_map_set_kernel_entry_range(&self.kernel_entries, page_map_ptr, Tracked(page_map_perm.borrow_mut()));

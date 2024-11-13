@@ -615,6 +615,13 @@ verus! {
                 self.allocated_pages_1g().contains(page_ptr) == false,
         {}
 
+        pub proof fn mapped_page_imply_page_ptr_valid(&self, page_ptr:PagePtr)
+            requires
+                self.wf(),
+                self.page_is_mapped(page_ptr) == true,
+            ensures
+                page_ptr_valid(page_ptr),
+        {}
 
         pub proof fn free_pages_are_not_mapped(&self)
             requires
@@ -1286,6 +1293,7 @@ verus! {
                 &&
                 self.page_io_mappings(p) =~= old(self).page_io_mappings(p),
             self.page_mappings(target_ptr) =~= old(self).page_mappings(target_ptr).insert((pcid,va)),
+            self.page_mappings(target_ptr).len() =~= old(self).page_mappings(target_ptr).len() + 1,
             self.page_mappings(target_ptr).contains((pcid,va)),
             self.page_io_mappings(target_ptr) =~= old(self).page_io_mappings(target_ptr),
             self.container_map_4k@.dom() =~= old(self).container_map_4k@.dom(),

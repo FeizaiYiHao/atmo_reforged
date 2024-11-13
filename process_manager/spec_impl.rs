@@ -102,7 +102,7 @@ impl ProcessManager{
     pub closed spec fn spec_get_thread(&self, thread_ptr:ThreadPtr) -> &Thread
         recommends
             self.wf(),
-            self.thread_perms@.dom().contains(thread_ptr),
+            self.thread_dom().contains(thread_ptr),
     {
         &self.thread_perms@[thread_ptr].value()
     }
@@ -115,6 +115,9 @@ impl ProcessManager{
         ensures
             ret == self.get_thread(thread_ptr),
             self.proc_dom().contains(ret.owning_proc),
+            self.container_dom().contains(ret.owning_container),
+            self.get_container(ret.owning_container).scheduler.wf(),
+            self.get_container(ret.owning_container).owned_procs.wf(),
     {
         let tracked thread_perm = self.thread_perms.borrow().tracked_borrow(thread_ptr);
         let thread : &Thread = PPtr::<Thread>::from_usize(thread_ptr).borrow(Tracked(thread_perm));
@@ -163,7 +166,7 @@ impl ProcessManager{
     pub closed spec fn spec_get_container(&self, container_ptr:ContainerPtr) -> &Container
         recommends
             self.wf(),
-            self.container_perms@.dom().contains(container_ptr),
+            self.container_dom().contains(container_ptr),
     {
         &self.container_perms@[container_ptr].value()
     }
@@ -832,19 +835,6 @@ impl ProcessManager{
 
 //proofs
 impl ProcessManager{
-    pub proof fn process_inv(&self)
-        requires
-            self.wf()
-        ensures
-            forall|p_ptr:ProcPtr|
-                #![trigger self.proc_dom().contains(p_ptr)]
-                #![trigger self.get_proc(p_ptr)]
-                self.proc_dom().contains(p_ptr)
-                ==>
-                self.container_dom().contains(self.get_proc(p_ptr).owning_container)
-    {
-    }
-
     pub proof fn thread_inv(&self)
         requires
             self.wf()
@@ -860,6 +850,31 @@ impl ProcessManager{
                 self.proc_dom().contains(self.get_thread(t_ptr).owning_proc)
                 &&
                 self.get_proc(self.get_thread(t_ptr).owning_proc).owning_container == self.get_thread(t_ptr).owning_container
+    {}
+    pub proof fn process_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|p_ptr:ProcPtr|
+                #![trigger self.proc_dom().contains(p_ptr)]
+                #![trigger self.get_proc(p_ptr)]
+                self.proc_dom().contains(p_ptr)
+                ==>
+                self.container_dom().contains(self.get_proc(p_ptr).owning_container)
+    {}
+    pub proof fn container_inv(&self)
+        requires
+            self.wf()
+        ensures
+            forall|c_ptr:ContainerPtr|
+                #![trigger self.container_dom().contains(c_ptr)]
+                #![trigger self.get_container(c_ptr).owned_cpus.wf()]
+                #![trigger self.get_container(c_ptr).scheduler.wf()]
+                self.container_dom().contains(c_ptr)
+                ==>
+                self.get_container(c_ptr).owned_cpus.wf()
+                &&
+                self.get_container(c_ptr).scheduler.wf()
     {}
     pub proof fn pcid_unique(&self, target_proc_ptr:ProcPtr)
         requires
@@ -1293,10 +1308,10 @@ impl ProcessManager{
             old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).is_Some() || old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).is_Some(),
             old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).unwrap().rf_counter_is_full() == false || old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).rf_counter_is_full() == false,
             forall|p_ptr_i:ProcPtr| 
-                #![trigger old(self).process_perms@[p_ptr_i].value().pcid]
-                old(self).process_perms@.dom().contains(p_ptr_i) 
+                #![trigger old(self).proc_dom().contains(p_ptr_i) ]
+                old(self).proc_dom().contains(p_ptr_i) 
                 ==>
-                old(self).process_perms@[p_ptr_i].value().pcid != new_pcid,
+                old(self).get_proc(p_ptr_i).pcid != new_pcid,
             page_perm_1@.is_init(),
             page_perm_1@.addr() == page_ptr_1,
             page_perm_2@.is_init(),
