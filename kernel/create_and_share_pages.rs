@@ -15,11 +15,11 @@ use crate::kernel::Kernel;
 use crate::va_range::VaRange4K;
 
 impl Kernel{
-    pub open spec fn address_space_range_exists(&self, target_proc_ptr:ProcPtr, va_range:VaRange4K) -> bool{
+    pub open spec fn address_space_range_exists(&self, target_proc_ptr:ProcPtr, va_range:&VaRange4K) -> bool{
         forall|j:int| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j])
     }
     
-    pub open spec fn address_space_range_shareable(&self, target_proc_ptr:ProcPtr, va_range:VaRange4K) -> bool{
+    pub open spec fn address_space_range_shareable(&self, target_proc_ptr:ProcPtr, va_range:&VaRange4K) -> bool{
         &&&
         forall|j:int| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j])
         &&&
@@ -32,7 +32,7 @@ impl Kernel{
             self.proc_dom().contains(target_proc_ptr),
             va_range.wf(),
         ensures
-            ret == self.address_space_range_shareable(target_proc_ptr, *va_range),
+            ret == self.address_space_range_shareable(target_proc_ptr, va_range),
     {
         let target_pcid = self.proc_man.get_proc(target_proc_ptr).pcid;
         for i in 0..va_range.len
@@ -280,7 +280,7 @@ impl Kernel{
         ret
     }
 
-    pub fn range_create_and_share_mapping(&mut self, src_proc_ptr: ProcPtr, src_va_range:VaRange4K, target_proc_ptr:ProcPtr, target_va_range:VaRange4K) -> (ret:usize)
+    pub fn range_create_and_share_mapping(&mut self, src_proc_ptr: ProcPtr, src_va_range:&VaRange4K, target_proc_ptr:ProcPtr, target_va_range:&VaRange4K) -> (ret:usize)
         requires
             old(self).wf(),
             old(self).proc_dom().contains(src_proc_ptr),
@@ -391,6 +391,11 @@ impl Kernel{
                         &&
                         target_va_range@.contains(va)
                 ),
+            forall|va:VAddr|
+                #![auto]
+                target_va_range@.contains(va) == false
+                ==>
+                self.get_address_space(target_proc_ptr).dom().contains(va) == old(self).get_address_space(target_proc_ptr).dom().contains(va)
     {
         let mut ret = 0;
         for index in 0..src_va_range.len    

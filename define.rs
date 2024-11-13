@@ -100,6 +100,7 @@ pub enum PageTableErrorCode {
 pub enum RetValueType{
     SuccessUsize{ value:usize },
     SuccessSeqUsize{ value:Ghost<Seq<usize>> },
+    SuccessPairUsize{ value1:usize, value2:usize},
     CpuIdle,
     Error,
     Else,
@@ -180,6 +181,13 @@ impl SyscallReturnStruct{
         }
     }
 
+    pub open spec fn get_return_vaule_pair_usize(&self) -> Option<(usize,usize)>
+    {
+        match self.error_code {
+            RetValueType::SuccessPairUsize{value1:value1, value2:value2} => Some((value1, value2)),
+            _ => None,
+        }
+    }
     pub open spec fn spec_is_error(&self) -> bool{
         match self.error_code {
             RetValueType::Error => true,

@@ -15,7 +15,7 @@ use crate::kernel::Kernel;
 use crate::va_range::VaRange4K;
 
 impl Kernel{
-    pub open spec fn address_space_range_free(&self, target_proc_ptr:ProcPtr, va_range:VaRange4K) -> bool{
+    pub open spec fn address_space_range_free(&self, target_proc_ptr:ProcPtr, va_range:&VaRange4K) -> bool{
         forall|j:int| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j]) == false
     }
     pub fn check_address_space_va_range_free(&self, target_proc_ptr:ProcPtr, va_range:&VaRange4K) -> (ret:bool)
@@ -24,7 +24,7 @@ impl Kernel{
             self.proc_dom().contains(target_proc_ptr),
             va_range.wf(),
         ensures
-            ret == self.address_space_range_free(target_proc_ptr, *va_range),
+            ret == self.address_space_range_free(target_proc_ptr, va_range),
     {
         let target_pcid = self.proc_man.get_proc(target_proc_ptr).pcid;
         for i in 0..va_range.len

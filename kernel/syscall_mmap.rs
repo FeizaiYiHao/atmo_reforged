@@ -23,7 +23,7 @@ pub open spec fn syscall_mmap_requirement(old:Kernel,  target_thread_ptr: Thread
         false
     }else if old.get_num_of_free_pages() < va_range.len * 4 {
         false
-    }else if old.address_space_range_free(target_proc_ptr, va_range) == false {
+    }else if old.address_space_range_free(target_proc_ptr, &va_range) == false {
         false
     }else{
         true

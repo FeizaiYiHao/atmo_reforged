@@ -165,6 +165,14 @@ impl Kernel{
         self.get_container(c_ptr).scheduler.len() >= MAX_CONTAINER_SCHEDULER_LEN
     }
 
+    pub open spec fn get_is_proc_list_full(&self, c_ptr:ContainerPtr) -> bool
+        recommends
+            self.wf(),
+            self.container_dom().contains(c_ptr),
+    {
+        self.get_container(c_ptr).owned_procs.len() >= CONTAINER_PROC_LIST_LEN
+    }
+
     pub open spec fn get_num_of_free_pages(&self) -> usize
         recommends
             self.wf(),
@@ -172,6 +180,9 @@ impl Kernel{
         self.page_alloc.free_pages_4k.len()
     }
 
+    pub open spec fn get_is_pcid_exhausted(&self) -> bool{
+        self.mem_man.free_pcids.len() == 0
+    }
     pub open spec fn get_thread_endpoint_descriptors(&self, t_ptr:ThreadPtr) -> Seq<Option<EndpointPtr>>
     recommends
         self.wf(),

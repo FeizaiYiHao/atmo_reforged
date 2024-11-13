@@ -13,6 +13,7 @@ use vstd::simple_pptr::PointsTo;
 use crate::pagetable::pagemap::PageMap;
 use crate::pagetable::pagemap_util_t::*;
 use crate::lemma::lemma_u::*;
+use crate::lemma::lemma_t::*;
 
 pub struct MemoryManager{
     pub kernel_entries: Array<usize,KERNEL_MEM_END_L4INDEX>,
@@ -981,12 +982,14 @@ impl MemoryManager{
             self.pcid_active(ret),
             !old(self).pcid_active(ret),
             self.get_pagetable_mapping_by_pcid(ret).dom() == Set::<PagePtr>::empty(), 
+            self.page_closure() == old(self).page_closure().insert(page_map_ptr),
     {
         page_map_set_kernel_entry_range(&self.kernel_entries, page_map_ptr, Tracked(page_map_perm.borrow_mut()));
         let new_pcid = *self.free_pcids.pop_unique();
         self.page_tables.set(new_pcid, Some(PageTable::new(new_pcid, self.kernel_entries_ghost, page_map_ptr, page_map_perm)));
         self.pcid_to_proc_ptr.set(new_pcid,Some(new_proc_ptr));
         proof{
+            set_lemma::<PagePtr>();
             self.page_table_pages@ = self.page_table_pages@.insert(page_map_ptr);
         }
         assert(self.pagetables_wf()) by {
