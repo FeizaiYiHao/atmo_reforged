@@ -23,6 +23,8 @@ pub proof fn seq_push_lemma<A>()
         forall|s: Seq<A>, v: A| 
             #![auto]
             s.push(v).contains(v),
+        forall|s: Seq<A>, v: A, x: A|
+            !s.contains(x) && v != x ==> !s.push(v).contains(x),
 {
 }
 

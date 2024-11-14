@@ -81,4 +81,31 @@ pub fn page_to_proc(page_ptr: PagePtr, page_perm: Tracked<PagePerm4k>, owning_co
     }
 }
 
+pub fn page_to_proc_with_first_thread(page_ptr: PagePtr, page_perm: Tracked<PagePerm4k>, owning_container:ContainerPtr, rev_ptr: SLLIndex, pcid:Pcid, ioid:Option<IOid>, first_thread:ThreadPtr) -> (ret:(ProcPtr,Tracked<PointsTo<Process>>,SLLIndex))
+    requires    
+        page_perm@.is_init(),
+        page_perm@.addr() == page_ptr,
+    ensures
+        ret.0 == page_ptr,
+        ret.1@.is_init(),
+        ret.1@.addr() == ret.0,
+        ret.1@.value().owning_container == owning_container,
+        ret.1@.value().rev_ptr == rev_ptr,
+        ret.1@.value().pcid == pcid,
+        ret.1@.value().ioid == ioid,
+        ret.1@.value().owned_threads.wf(),
+        ret.1@.value().owned_threads@ == Seq::<ThreadPtr>::empty().push(first_thread),
+        ret.1@.value().owned_threads.len() == 1,
+        // forall|index:SLLIndex|
+        //     #![trigger ret.1@.value().owned_threads.node_ref_valid(index)]
+        //     index != ret.2
+        //     ==>
+        //     ret.1@.value().owned_threads.node_ref_valid(index) == false,
+        ret.1@.value().owned_threads.node_ref_valid(ret.2),
+        ret.1@.value().owned_threads.node_ref_resolve(ret.2) == first_thread,
+{
+    let (p_ptr, mut p_perm) = page_to_proc(page_ptr, page_perm, owning_container, rev_ptr, pcid, ioid);
+    let sll = proc_push_thread(p_ptr, &mut p_perm, &first_thread);
+    (p_ptr, p_perm, sll)
+}
 }

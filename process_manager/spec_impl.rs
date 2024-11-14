@@ -15,6 +15,7 @@ verus! {
     use crate::process_manager::container_util_t::*;
     use crate::process_manager::endpoint_util_t::*;
     use crate::lemma::lemma_u::*;
+    use crate::array_set::ArraySet;
 
 pub struct ProcessManager{
     pub root_container: ContainerPtr,
@@ -525,7 +526,7 @@ impl ProcessManager{
             self.container_perms@.dom().contains(c_ptr) ==> self.container_perms@[c_ptr].value().children@.contains(c_ptr) == false
         &&&
         forall|c_ptr:ContainerPtr, child_c_ptr:ContainerPtr| 
-            // #![trigger self.container_perms@.dom().contains(c_ptr), self.container_perms@[c_ptr].value().children@.contains(child_c_ptr)]
+            #![trigger self.container_perms@[c_ptr].value().children@.contains(child_c_ptr)]
             self.container_perms@.dom().contains(c_ptr) && self.container_perms@[c_ptr].value().children@.contains(child_c_ptr)
             ==> self.container_perms@.dom().contains(child_c_ptr)
                 &&
@@ -1371,8 +1372,7 @@ impl ProcessManager{
             self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
         }
 
-        let (new_proc_ptr, mut proc_perm) = page_to_proc(page_ptr_1, page_perm_1, container_ptr, proc_list_node_ref, new_pcid, None);
-        let proc_thread_list_node_ref = proc_push_thread(new_proc_ptr, &mut proc_perm, &page_ptr_2);
+        let (new_proc_ptr, mut proc_perm, proc_thread_list_node_ref) = page_to_proc_with_first_thread(page_ptr_1, page_perm_1, container_ptr, proc_list_node_ref, new_pcid, None, page_ptr_2);
         proof {
             self.process_perms.borrow_mut().tracked_insert(new_proc_ptr, proc_perm.get());
         }
@@ -1474,6 +1474,188 @@ impl ProcessManager{
         assert(self.threads_cpu_wf());
         assert(self.threads_container_wf());
     } 
+
+    pub fn new_container_with_endpoint(&mut self, thread_ptr:ThreadPtr, endpoint_index:EndpointIdx, pt_regs:Registers, new_pcid:Pcid, new_quota:usize, page_ptr_1: PagePtr, page_perm_1: Tracked<PagePerm4k>, page_ptr_2: PagePtr, page_perm_2: Tracked<PagePerm4k>, page_ptr_3: PagePtr, page_perm_3: Tracked<PagePerm4k>)
+        requires
+            old(self).wf(),
+            old(self).thread_dom().contains(thread_ptr),
+            old(self).page_closure().contains(page_ptr_1) == false,
+            old(self).page_closure().contains(page_ptr_2) == false,
+            old(self).page_closure().contains(page_ptr_3) == false,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota >= 4 + new_quota,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).children.len() < CONTAINER_CHILD_LIST_LEN,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).owned_procs.len() < CONTAINER_PROC_LIST_LEN,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).scheduler.len() < MAX_CONTAINER_SCHEDULER_LEN,
+            0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
+            old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).is_Some() || old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).is_Some(),
+            old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).unwrap().rf_counter_is_full() == false || old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).rf_counter_is_full() == false,
+            forall|p_ptr_i:ProcPtr| 
+                #![trigger old(self).proc_dom().contains(p_ptr_i) ]
+                old(self).proc_dom().contains(p_ptr_i) 
+                ==>
+                old(self).get_proc(p_ptr_i).pcid != new_pcid,
+            page_perm_1@.is_init(),
+            page_perm_1@.addr() == page_ptr_1,
+            page_perm_2@.is_init(),
+            page_perm_2@.addr() == page_ptr_2,
+            page_perm_3@.is_init(),
+            page_perm_3@.addr() == page_ptr_3,
+            page_ptr_1 != page_ptr_2,
+            page_ptr_1 != page_ptr_3,
+            page_ptr_2 != page_ptr_3,
+        ensures
+            self.wf(),
+            self.page_closure() =~= old(self).page_closure().insert(page_ptr_1).insert(page_ptr_2).insert(page_ptr_3),
+            self.proc_dom() =~= old(self).proc_dom().insert(page_ptr_2),
+            self.endpoint_dom() == old(self).endpoint_dom(),
+            self.container_dom() == old(self).container_dom().insert(page_ptr_1),
+            self.thread_dom() == old(self).thread_dom().insert(page_ptr_3),
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota -4 - new_quota == self.get_container(self.get_thread(thread_ptr).owning_container).mem_quota,
+            forall|p_ptr:ProcPtr|
+                #![trigger self.get_proc(p_ptr)]
+                old(self).proc_dom().contains(p_ptr)
+                ==> 
+                self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
+            forall|container_ptr:ContainerPtr|
+                #![trigger self.get_container(container_ptr)]
+                old(self).container_dom().contains(container_ptr) && container_ptr != self.get_thread(thread_ptr).owning_container
+                ==> 
+                self.get_container(container_ptr) =~= old(self).get_container(container_ptr),
+            forall|t_ptr:ThreadPtr| 
+                #![trigger old(self).get_thread(t_ptr)]
+                old(self).thread_dom().contains(t_ptr)
+                ==>
+                old(self).get_thread(t_ptr) =~= self.get_thread(t_ptr),
+            forall|e_ptr:EndpointPtr| 
+                #![trigger self.get_endpoint(e_ptr)]
+                self.endpoint_dom().contains(e_ptr) && e_ptr != old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()
+                ==> 
+                old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
+            self.get_container(page_ptr_1).children@ == Seq::<ContainerPtr>::empty(),
+            self.get_container(page_ptr_1).owned_threads@ == Set::<ThreadPtr>::empty().insert(page_ptr_3),
+            self.get_proc(page_ptr_2).pcid =~= new_pcid,
+            self.get_proc(page_ptr_2).ioid.is_None(),
+            self.get_proc(page_ptr_2).owned_threads@ == Seq::<ThreadPtr>::empty().push(page_ptr_3),
+            self.get_proc(page_ptr_2).owning_container == page_ptr_1,
+            self.get_thread(page_ptr_3).owning_container == page_ptr_1,
+            self.get_thread(page_ptr_3).endpoint_descriptors@ =~= Seq::new(MAX_NUM_ENDPOINT_DESCRIPTORS as nat,|i: int| {None}).update(0, Some(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap())),
+            self.get_container(self.get_thread(thread_ptr).owning_container).children@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).children@.push(page_ptr_1),
+            self.get_container(self.get_thread(thread_ptr).owning_container).owned_procs@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_procs@,
+            self.get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@,
+            self.get_container(self.get_thread(thread_ptr).owning_container).owned_threads@ =~= old(self).get_container(self.get_thread(thread_ptr).owning_container).owned_threads@,
+            self.get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).owning_threads@ =~= old(self).get_endpoint(old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap()).owning_threads@.insert(page_ptr_3),
+    {
+        let container_ptr = self.get_thread(thread_ptr).owning_container;
+        let old_mem_quota =  self.get_container(container_ptr).mem_quota;
+        let old_owned_threads = self.get_container(container_ptr).owned_threads;
+        let endpoint_ptr = self.get_thread(thread_ptr).endpoint_descriptors.get(endpoint_index).unwrap();
+
+        let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
+        let child_list_node_ref = container_push_child(container_ptr,&mut container_perm, page_ptr_1);
+        container_set_mem_quota(container_ptr,&mut container_perm, old_mem_quota - 4 - new_quota);
+        proof {
+            self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
+        }
+
+        let (proc_list_node_ref, scheduler_node_ref, new_container_ptr, container_perm) = page_to_container(page_ptr_1, page_perm_1, page_ptr_2, container_ptr, child_list_node_ref, new_quota, ArraySet::<NUM_CPUS>::new(), page_ptr_3);
+        proof {
+            self.container_perms.borrow_mut().tracked_insert(new_container_ptr, container_perm.get());
+        }
+
+        let (new_proc_ptr, mut proc_perm, proc_thread_list_node_ref) = page_to_proc_with_first_thread(page_ptr_2, page_perm_2, new_container_ptr, proc_list_node_ref, new_pcid, None, page_ptr_3);
+        proof {
+            self.process_perms.borrow_mut().tracked_insert(new_proc_ptr, proc_perm.get());
+        }
+
+        let (new_thread_ptr, thread_perm) = page_to_thread_with_endpoint(page_ptr_3, page_perm_3, &pt_regs, new_container_ptr, new_proc_ptr, proc_thread_list_node_ref, scheduler_node_ref, endpoint_ptr);
+        proof {
+            self.thread_perms.borrow_mut().tracked_insert(new_thread_ptr, thread_perm.get());
+        }
+
+        let mut endpoint_perm = Tracked(self.endpoint_perms.borrow_mut().tracked_remove(endpoint_ptr));
+        endpoint_add_ref(endpoint_ptr,&mut endpoint_perm, new_thread_ptr);
+        proof {
+            self.endpoint_perms.borrow_mut().tracked_insert(endpoint_ptr, endpoint_perm.get());
+        }
+
+        assert(self.cpus_wf());
+        assert(self.container_cpu_wf());
+        assert(self.memory_disjoint()) by {
+        };
+        assert(self.container_perms_wf());
+        assert(self.container_root_wf());
+        assert(self.container_tree_wf()) by {
+            seq_push_lemma::<ContainerPtr>();
+            // assert(self.container_perms@[new_container_ptr].value().parent.unwrap() == container_ptr);
+            // assert(forall|child_c_ptr:ContainerPtr| 
+            //     #![trigger old(self).container_perms@[container_ptr].value().children@.contains(child_c_ptr)]
+            //     old(self).container_perms@[container_ptr].value().children@.contains(child_c_ptr)
+            //     ==> self.container_perms@.dom().contains(child_c_ptr)
+            //        &&
+            //        self.container_perms@[child_c_ptr].value().parent.unwrap() == container_ptr
+            //    );
+            // assert(forall|child_c_ptr:ContainerPtr| 
+            //     #![trigger old(self).container_perms@[container_ptr].value().children@.contains(child_c_ptr)]
+            //     self.container_perms@[container_ptr].value().children@.contains(child_c_ptr) && child_c_ptr != new_container_ptr
+            //     ==> 
+            //         self.container_perms@.dom().contains(child_c_ptr)
+            //     //    &&
+            //     //    self.container_perms@[child_c_ptr].value().parent.unwrap() == container_ptr
+            //    );
+
+
+            // // assert(forall|child_c_ptr:ContainerPtr| 
+            // //     #![trigger old(self).container_perms@[container_ptr].value().children@.contains(child_c_ptr)]
+            // //     old(self).container_perms@[container_ptr].value().children@.contains(child_c_ptr) ==> self.container_perms@[container_ptr].value().children@.contains(child_c_ptr)
+            // //    );
+            // // assert(forall|child_c_ptr:ContainerPtr| 
+            // //     #![trigger old(self).container_perms@[container_ptr].value().children@.contains(child_c_ptr)]
+            // //     (old(self).container_perms@[container_ptr].value().children@.contains(child_c_ptr) == false && child_c_ptr != new_container_ptr) ==> self.container_perms@[container_ptr].value().children@.contains(child_c_ptr) == false
+            // //    );
+            // // assert(forall|child_c_ptr:ContainerPtr| 
+            // //     #![trigger old(self).container_perms@[container_ptr].value().children@.contains(child_c_ptr)]
+            // //     self.container_perms@[container_ptr].value().children@.contains(child_c_ptr) && child_c_ptr != new_container_ptr
+            // //     ==> self.container_perms@.dom().contains(child_c_ptr)
+            // //        &&
+            // //        self.container_perms@[child_c_ptr].value().parent.unwrap() == container_ptr
+            // //    );
+            // // assert(forall|c_ptr:ContainerPtr, child_c_ptr:ContainerPtr| 
+            // //     #![trigger self.container_perms@[c_ptr].value().children@.contains(child_c_ptr)]
+            // //     self.container_perms@.dom().contains(c_ptr) && self.container_perms@[c_ptr].value().children@.contains(child_c_ptr) && c_ptr != container_ptr
+            // //     ==> self.container_perms@.dom().contains(child_c_ptr)
+            // //         &&
+            // //         self.container_perms@[child_c_ptr].value().parent.unwrap() == c_ptr);
+            // // assert(forall|c_ptr:ContainerPtr, child_c_ptr:ContainerPtr| 
+            // //    #![trigger self.container_perms@[c_ptr].value().children@.contains(child_c_ptr)]
+            // //    self.container_perms@.dom().contains(c_ptr) && self.container_perms@[c_ptr].value().children@.contains(child_c_ptr)
+            // //    ==> self.container_perms@.dom().contains(child_c_ptr)
+            // //        &&
+            // //        self.container_perms@[child_c_ptr].value().parent.unwrap() == c_ptr);
+        };
+        assert(self.containers_linkedlist_wf()) by {
+            seq_push_lemma::<ContainerPtr>();
+        };
+        assert(self.processes_container_wf()) by {
+            seq_push_lemma::<ProcPtr>();
+        };
+        assert(self.processes_wf());
+
+        assert(self.threads_process_wf()) by {
+            seq_push_lemma::<ThreadPtr>();
+        };
+        assert(self.threads_perms_wf());
+        assert(self.endpoint_perms_wf());
+        assert(self.threads_endpoint_descriptors_wf());
+        assert(self.endpoints_queue_wf());
+        assert(self.endpoints_container_wf());
+        assert(self.schedulers_wf()) by {
+            seq_push_lemma::<ThreadPtr>();
+        };
+        assert(self.pcid_ioid_wf());
+        assert(self.threads_cpu_wf());
+        assert(self.threads_container_wf());
+
+    }
 
 }
 
