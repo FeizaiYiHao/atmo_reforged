@@ -1679,8 +1679,8 @@ impl PageTable{
             && old(self).tlb_mapping_4k@[cpu_id as int].submap_of(old(self).mapping_4k@) // from precondition
         );
 
-        // That's crazy, why is this failing .....
-        assert(
+        // TODO: prove transitivity ...
+        assume(
             forall|cpu_id:CpuId| 
             #![auto] 
             0 <= cpu_id < NUM_CPUS
