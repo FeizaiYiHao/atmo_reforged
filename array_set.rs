@@ -13,6 +13,31 @@ pub struct ArraySet<const N: usize> {
 }
 
 impl <const N: usize> ArraySet<N> {
+
+    pub fn new() -> (ret:Self)
+        ensures
+            ret.wf(),
+            ret@ == Set::<usize>::empty(),
+    {
+        let mut ret = Self{
+            data: Array::new(),
+            len: 0,
+            set:Ghost(Set::<usize>::empty()),
+        };
+        for i in 0..N
+            invariant
+                0<=i<=N,
+                ret.data.wf(),
+                ret.len == 0,
+                ret.set@ == Set::<usize>::empty(),
+                forall|j:int|
+                    0<=j<i ==> ret.data@[j] == false,
+        {
+            ret.data.set(i,false);
+        }
+        ret
+    }
+
     pub closed spec fn view(&self) -> Set<usize>{
         self.set@
     }
