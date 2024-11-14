@@ -173,6 +173,15 @@ impl Kernel{
         self.get_container(c_ptr).owned_procs.len() >= CONTAINER_PROC_LIST_LEN
     }
 
+    pub open spec fn get_is_children_list_full(&self, c_ptr:ContainerPtr) -> bool
+        recommends
+            self.wf(),
+            self.container_dom().contains(c_ptr),
+    {
+        self.get_container(c_ptr).children.len() >= CONTAINER_CHILD_LIST_LEN
+    }
+
+
     pub open spec fn get_num_of_free_pages(&self) -> usize
         recommends
             self.wf(),
