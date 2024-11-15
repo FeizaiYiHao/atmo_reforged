@@ -3,6 +3,32 @@ verus! {
 // use crate::define::*;
 use crate::util::page_ptr_util_u::*;
 
+#[verifier(external_body)]
+pub broadcast proof fn map_equal_implies_submap_each_other<K, V>(a: Map<K, V>, b: Map<K, V>)  
+    requires
+        a =~= b,
+    ensures
+        #[trigger] a.submap_of(b),
+        b.submap_of(a),
+{
+
+}
+
+pub broadcast proof fn submap_by_transitivity<K, V>(a: Map<K, V>, b: Map<K, V>, c: Map<K, V>)  
+    requires
+        #[trigger] a.submap_of(b),
+        #[trigger] b.submap_of(c),
+    ensures
+        a.submap_of(c),
+{
+    assert(
+        forall |k: K| 
+        #![trigger a.dom().contains(k)] 
+        #![trigger b.dom().contains(k)] 
+        a.dom().contains(k) ==> b.dom().contains(k) && a[k] == b[k]
+    );
+}
+
 pub proof fn page_ptr_valid_imply_MEM_valid(v:usize)
     requires
         page_ptr_valid(v),

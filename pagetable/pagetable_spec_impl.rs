@@ -1610,20 +1610,6 @@ impl PageTable{
         assert(self.mapping_1g() =~= old(self).mapping_1g());
     }
 
-
-
-    pub closed spec fn spec_tlb_flush_4k(self, va: VAddr) -> bool
-    {
-        forall|cpu_id:CpuId| 
-        #![auto] 0 <= cpu_id < NUM_CPUS ==> !self.tlb_mapping_4k@[cpu_id as int].contains_key(va)
-    }
-
-    
-    ///
-    /// 
-    /// Notes: 
-    /// lx_table keep tracks of pagemaps (each level of pagetable)
-    /// 
     /// Precondition: 
     /// This unmap method will only be called when all previous level exists, and target entry exists in pagetable
     /// The VA -> PA mapping should exist. 
@@ -1666,30 +1652,28 @@ impl PageTable{
             assert(!self.mapping_4k@.contains_key(va@));
         }   
         
+        // we need to flush the tlb for all cores.
         self.tlb_mapping_4k = flush_tlb_4kentry(self.tlb_mapping_4k, va);
         
-        // Starting proof for tlb_submap_of_mapping
-        assert(old(self).mapping_4k@.remove(va@) =~= self.mapping_4k@ );
-        assert(
-            forall|cpu_id:CpuId| 
-            #![auto] 
-            0 <= cpu_id < NUM_CPUS
-            ==>
-            self.tlb_mapping_4k@[cpu_id as int].submap_of(old(self).tlb_mapping_4k@[cpu_id as int]) // from flush_tlb_4kentry
-            && old(self).tlb_mapping_4k@[cpu_id as int].submap_of(old(self).mapping_4k@) // from precondition
-        );
-
-        // TODO: prove transitivity ...
-        assume(
-            forall|cpu_id:CpuId| 
-            #![auto] 
-            0 <= cpu_id < NUM_CPUS
-            ==>
-            self.tlb_mapping_4k@[cpu_id as int].submap_of(old(self).mapping_4k@)
-        );
-
-        //assume(self.spec_tlb_flush_4k(va@)); // tlb_mappings_4k doesn't contain va
-        assert(self.tlb_submap_of_mapping());
+        assert(self.tlb_submap_of_mapping()) by {
+            assert(old(self).mapping_4k@.remove(va@) =~= self.mapping_4k@ );
+            assert(
+                forall|cpu_id:CpuId| 
+                #![auto] 
+                0 <= cpu_id < NUM_CPUS
+                ==>
+                self.tlb_mapping_4k@[cpu_id as int].submap_of(old(self).tlb_mapping_4k@[cpu_id as int]) // from flush_tlb_4kentry
+                && old(self).tlb_mapping_4k@[cpu_id as int].submap_of(old(self).mapping_4k@) // from precondition
+            );
+            broadcast use submap_by_transitivity; // show transitivity, so below can be proved.
+            assert(
+                forall|cpu_id:CpuId| 
+                #![auto] 
+                0 <= cpu_id < NUM_CPUS
+                ==>
+                self.tlb_mapping_4k@[cpu_id as int].submap_of(old(self).mapping_4k@)
+            );
+        }; 
 
         assert(self.wf_l4());
         assert(self.wf_l3());
