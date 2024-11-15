@@ -448,6 +448,19 @@ verus! {
         }
 
         pub open spec fn container_wf(&self) -> bool{
+            //@Xiangdong Come back for this
+            // &&&
+            // self.container_map_4k@.dom() == self.container_map_2m@.dom()
+            // &&&
+            // self.container_map_4k@.dom() == self.container_map_1g@.dom()
+            // &&&
+            // self.container_map_2m@.dom() == self.container_map_1g@.dom()
+            &&&
+            self.container_map_4k@.dom().subset_of(self.allocated_pages_4k@)
+            &&&
+            self.container_map_2m@.dom().subset_of(self.allocated_pages_4k@)
+            &&&
+            self.container_map_1g@.dom().subset_of(self.allocated_pages_4k@)
             &&&
             forall|i:int|
                 #![trigger self.page_array@[i], self.page_array@[i].owning_container.is_Some()]
@@ -1050,12 +1063,93 @@ verus! {
             return (ret, Tracked(ret_perm));
         }
 
+        pub fn alloc_page_4k_for_new_container(&mut self) 
+            -> (ret:(PagePtr, Tracked<PagePerm4k>))
+            requires 
+                old(self).wf(),
+                old(self).free_pages_4k.len() > 0,
+            ensures
+                self.wf(),
+                // self.free_pages_4k() =~= old(self).free_pages_4k(),
+                self.free_pages_2m() =~= old(self).free_pages_2m(),
+                self.free_pages_4k() =~= old(self).free_pages_4k().remove(ret.0),
+                self.free_pages_1g() =~= old(self).free_pages_1g(),
+                self.allocated_pages_4k() =~= old(self).allocated_pages_4k().insert(ret.0),
+                self.allocated_pages_2m() =~= old(self).allocated_pages_2m(),
+                self.allocated_pages_1g() =~= old(self).allocated_pages_1g(),
+                self.mapped_pages_4k() =~= old(self).mapped_pages_4k(),
+                self.mapped_pages_2m() =~= old(self).mapped_pages_2m(),
+                self.mapped_pages_1g() =~= old(self).mapped_pages_1g(),
+                self.container_map_4k@ =~= old(self).container_map_4k@.insert(ret.0,Set::empty()),
+                forall|p:PagePtr| 
+                    self.page_is_mapped(p) ==> 
+                    self.page_mappings(p) =~= old(self).page_mappings(p)
+                    &&
+                    self.page_io_mappings(p) =~= old(self).page_io_mappings(p),
+                ret.1@.is_init(),
+                ret.1@.addr() == ret.0,
+                old(self).allocated_pages_4k().contains(ret.0) == false,
+                forall|c:ContainerPtr| 
+                    #![trigger self.get_container_owned_pages(c)]
+                    old(self).container_map_4k@.dom().contains(c) ==> 
+                    self.get_container_owned_pages(c) =~= old(self).get_container_owned_pages(c),
+                page_ptr_valid(ret.0),
+                old(self).free_pages_4k().contains(ret.0),
+                forall|p:PagePtr|
+                    #![auto]
+                    self.page_is_mapped(p) == old(self).page_is_mapped(p),
+                self.free_pages_4k.len() == old(self).free_pages_4k.len() - 1,
+                self.get_container_owned_pages(ret.0) == Set::<PagePtr>::empty(),
+        {
+            proof{
+                page_ptr_lemma();
+                seq_skip_lemma::<PagePtr>();
+                self.free_pages_1g.wf_to_no_duplicates();
+                self.free_pages_2m.wf_to_no_duplicates();
+                self.free_pages_4k.wf_to_no_duplicates();
+            }
+            let ret = self.free_pages_4k.pop().0;
+            assert(page_ptr_valid(ret));
+            self.set_state(page_ptr2page_index(ret), PageState::Allocated4k);
+            assert(self.page_array@[page_ptr2page_index(ret) as int].is_io_page == false);
+            proof{
+                self.allocated_pages_4k@ = self.allocated_pages_4k@.insert(ret);
+                self.container_map_4k@ = self.container_map_4k@.insert(ret,Set::empty());
+                self.container_map_2m@ = self.container_map_2m@.insert(ret,Set::empty());
+                self.container_map_1g@ = self.container_map_1g@.insert(ret,Set::empty());
+            }
+            let tracked mut ret_perm = self.page_perms_4k.borrow_mut().tracked_remove(ret);
+            assert(self.page_array_wf());
+            assert(self.free_pages_4k_wf());
+            assert(self.free_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.free_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.allocated_pages_4k_wf());
+            assert(self.allocated_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.allocated_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.mapped_pages_4k_wf()) ;
+            assert(self.mapped_pages_2m_wf()) by {page_ptr_2m_lemma();};
+            assert(self.mapped_pages_1g_wf()) by {page_ptr_1g_lemma();};
+            assert(self.merged_pages_wf()) by {
+                page_ptr_page_index_truncate_lemma();
+            };
+            assert(self.hugepages_wf()) by {
+                page_index_lemma();
+                page_ptr_2m_lemma();
+                page_ptr_1g_lemma();
+            };
+            assert(self.perm_wf());
+            return (ret, Tracked(ret_perm));
+        }
+
         pub fn free_page_4k(&mut self, target_ptr:PagePtr, Tracked(target_perm): Tracked<PagePerm4k>) 
             requires 
                 old(self).wf(),
                 old(self).allocated_pages_4k().contains(target_ptr),
                 target_ptr == target_perm.addr(),
                 target_perm.is_init(),
+                old(self).container_map_4k@.dom().contains(target_ptr) == false,
+                old(self).container_map_2m@.dom().contains(target_ptr) == false,
+                old(self).container_map_1g@.dom().contains(target_ptr) == false,
             ensures
                 self.wf(),
                 self.free_pages_4k() =~= old(self).free_pages_4k().insert(target_ptr),

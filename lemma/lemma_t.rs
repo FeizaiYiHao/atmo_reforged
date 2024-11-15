@@ -28,6 +28,10 @@ pub proof fn set_lemma<A>()
             s1 + (s2.insert(e)) == s2 + (s1.insert(e))
             &&
             (s1 + s2).insert(e) == s2 + (s1.insert(e))
+            &&
+            (!(s1 + s2).contains(e) <==> !s1.contains(e) && !s2.contains(e)),
+        // forall|s1:Set<A>, s2:Set<A>, s3:Set<A>, s4:Set<A>, e:A|
+        //     (!(s1 + s2 + s3 + s4).contains(e)) <==> (!s1.contains(e) && !s2.contains(e) && !s3.contains(e) && !s4.contains(e))
 {}
 
 //TODO: @Xiangdong prove this

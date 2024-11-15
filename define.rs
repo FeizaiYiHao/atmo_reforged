@@ -101,6 +101,7 @@ pub enum RetValueType{
     SuccessUsize{ value:usize },
     SuccessSeqUsize{ value:Ghost<Seq<usize>> },
     SuccessPairUsize{ value1:usize, value2:usize},
+    SuccessThreeUsize{ value1:usize, value2:usize, value3:usize},
     CpuIdle,
     Error,
     Else,
@@ -185,6 +186,13 @@ impl SyscallReturnStruct{
     {
         match self.error_code {
             RetValueType::SuccessPairUsize{value1:value1, value2:value2} => Some((value1, value2)),
+            _ => None,
+        }
+    }
+    pub open spec fn get_return_vaule_three_usize(&self) -> Option<(usize,usize,usize)>
+    {
+        match self.error_code {
+            RetValueType::SuccessThreeUsize{value1:value1, value2:value2, value3:value3} => Some((value1, value2, value3)),
             _ => None,
         }
     }

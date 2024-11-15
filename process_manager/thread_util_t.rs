@@ -39,7 +39,7 @@ pub fn page_to_thread(page_ptr: PagePtr, page_perm: Tracked<PagePerm4k>, pt_regs
         (*uptr).assume_init_mut().endpoint_rev_ptr = None;
         (*uptr).assume_init_mut().running_cpu = None;
         (*uptr).assume_init_mut().endpoint_descriptors.init2none();
-        (*uptr).assume_init_mut().ipc_payload = None;
+        (*uptr).assume_init_mut().ipc_payload = IPCPayLoad::Empty;
         (*uptr).assume_init_mut().error_code = None;
         (*uptr).assume_init_mut().trap_frame.set_self(pt_regs);
         (page_ptr, Tracked::assume_new())
@@ -80,10 +80,42 @@ pub fn page_to_thread_with_endpoint(page_ptr: PagePtr, page_perm: Tracked<PagePe
         (*uptr).assume_init_mut().running_cpu = None;
         (*uptr).assume_init_mut().endpoint_descriptors.init2none();
         (*uptr).assume_init_mut().endpoint_descriptors.set(0, Some(endpoint_ptr));
-        (*uptr).assume_init_mut().ipc_payload = None;
+        (*uptr).assume_init_mut().ipc_payload = IPCPayLoad::Empty;
         (*uptr).assume_init_mut().error_code = None;
         (*uptr).assume_init_mut().trap_frame.set_self(pt_regs);
         (page_ptr, Tracked::assume_new())
+    }
+}
+
+#[verifier(external_body)]
+pub fn thread_set_blocking_endpoint_endpoint_ref_scheduler_ref_state_and_ipc_payload(thread_ptr:ThreadPtr, thread_perm: &mut Tracked<PointsTo<Thread>>, blocking_endpoint_ptr: Option<EndpointPtr>, endpoint_rev_ptr: Option<SLLIndex>,scheduler_rev_ptr: Option<SLLIndex>, state:ThreadState, ipc_payload: IPCPayLoad) 
+    requires    
+        old(thread_perm)@.is_init(),
+        old(thread_perm)@.addr() == thread_ptr,
+    ensures
+        thread_perm@.is_init(),
+        thread_perm@.addr() == thread_ptr,
+        thread_perm@.value().owning_container == old(thread_perm)@.value().owning_container,
+        thread_perm@.value().owning_proc == old(thread_perm)@.value().owning_proc,
+        thread_perm@.value().state == state,
+        thread_perm@.value().proc_rev_ptr == old(thread_perm)@.value().proc_rev_ptr,
+        thread_perm@.value().scheduler_rev_ptr == scheduler_rev_ptr,
+        thread_perm@.value().blocking_endpoint_ptr == blocking_endpoint_ptr,
+        thread_perm@.value().endpoint_rev_ptr == endpoint_rev_ptr,
+        thread_perm@.value().running_cpu.is_None(),
+        thread_perm@.value().endpoint_descriptors == old(thread_perm)@.value().endpoint_descriptors,
+        thread_perm@.value().ipc_payload == ipc_payload,
+        thread_perm@.value().error_code == old(thread_perm)@.value().error_code,
+        thread_perm@.value().trap_frame == old(thread_perm)@.value().trap_frame,
+{
+    unsafe{
+        let uptr = thread_ptr as *mut MaybeUninit<Thread>;
+        let ret = (*uptr).assume_init_mut().state = state;
+        let ret = (*uptr).assume_init_mut().scheduler_rev_ptr = scheduler_rev_ptr;
+        let ret = (*uptr).assume_init_mut().blocking_endpoint_ptr = blocking_endpoint_ptr;
+        let ret = (*uptr).assume_init_mut().endpoint_rev_ptr = endpoint_rev_ptr;
+        let ret = (*uptr).assume_init_mut().ipc_payload = ipc_payload;
+        return ret;
     }
 }
 

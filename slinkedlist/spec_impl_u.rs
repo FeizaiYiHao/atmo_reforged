@@ -338,6 +338,15 @@ use crate::lemma::lemma_u::*;
             assert(self.wf());
         }
 
+        pub fn get_head(&self) -> (ret:T)
+            requires
+                self.wf(),
+                self.len() > 0,
+            ensures
+                ret == self@[0], 
+        {
+            self.get_value(self.value_list_head).unwrap()
+        }
 
         pub fn push(&mut self, new_value: &T) -> (free_node_index : SLLIndex)
             requires old(self).wf(),

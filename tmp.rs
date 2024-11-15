@@ -1,36 +1,77 @@
-assert(ret.l4_table@.dom() =~=  Set::<PageMapPtr>::empty().insert(ret.cr3));
-            assert(ret.cr3 == ret.l4_table@[ret.cr3].addr());
-            assert(ret.l4_table@[ret.cr3].is_init());
-            assert(ret.l4_table@[ret.cr3].value().wf());
-            //L4 table only maps to L3
-            assert(forall|i: L4Index, j: L4Index|
-                // #![trigger ret.l4_table@[ret.cr3].value()[i].perm.present, ret.l4_table@[ret.cr3].value()[j].perm.present]
-                #![trigger ret.l4_table@[ret.cr3].value()[i].perm.present, ret.l4_table@[ret.cr3].value()[j].perm.present, ret.l4_table@[ret.cr3].value()[i].addr, ret.l4_table@[ret.cr3].value()[j].addr]
-                i != j && 0 <= i < 512 && ret.l4_table@[ret.cr3].value()[i].perm.present && 0 <= j < 512 && ret.l4_table@[ret.cr3].value()[j].perm.present ==>
-                    ret.l4_table@[ret.cr3].value()[i].addr != ret.l4_table@[ret.cr3].value()[j].addr);
-            assert(forall|i: L4Index| 
-                // #![trigger ret.l4_table@[ret.cr3].value()[i].perm.present]
-                #![trigger ret.l2_tables@.dom().contains(ret.l4_table@[ret.cr3].value()[i].addr)]
-                #![trigger ret.l1_tables@.dom().contains(ret.l4_table@[ret.cr3].value()[i].addr)]
-                0 <= i < 512 && ret.l4_table@[ret.cr3].value()[i].perm.present ==> 
-                    ret.l2_tables@.dom().contains(ret.l4_table@[ret.cr3].value()[i].addr) == false
-                    &&
-                    ret.l1_tables@.dom().contains(ret.l4_table@[ret.cr3].value()[i].addr) == false
-                    &&
-                    ret.cr3 != ret.l4_table@[ret.cr3].value()[i].addr);
-            // no ret mapping        
-            assert(forall|i: L4Index| 
-                // #![trigger ret.l4_table@[ret.cr3].value()[i].perm.present]
-                #![trigger ret.l4_table@[ret.cr3].value()[i].addr]
-                0 <= i < 512 && ret.l4_table@[ret.cr3].value()[i].perm.present ==>
-                    ret.cr3 != ret.l4_table@[ret.cr3].value()[i].addr);
-            //all l4 points to valid l3 tables 
-            assert(forall|i: L4Index|
-                #![trigger ret.l3_tables@.dom().contains(ret.l4_table@[ret.cr3].value()[i].addr)]
-                0 <= i < 512 && ret.l4_table@[ret.cr3].value()[i].perm.present && !ret.l4_table@[ret.cr3].value()[i].perm.ps ==>
-                    ret.l3_tables@.dom().contains(ret.l4_table@[ret.cr3].value()[i].addr));
-            //no hugepage in L4 (hardware limit)        
-            assert(forall|i: L4Index| 
-                #![trigger ret.l4_table@[ret.cr3].value()[i].perm.ps]
-                0 <= i < 512 && ret.l4_table@[ret.cr3].value()[i].perm.present ==> 
-                    !ret.l4_table@[ret.cr3].value()[i].perm.ps );
+assert(self.container_map_4k@.dom().subset_of(self.allocated_pages_4k@));
+assert(self.container_map_2m@.dom().subset_of(self.allocated_pages_4k@));
+assert(self.container_map_1g@.dom().subset_of(self.allocated_pages_4k@));
+assert(forall|i:int|
+    #![trigger self.page_array@[i], self.page_array@[i].owning_container.is_Some()]
+    0<=i<NUM_PAGES 
+    &&
+    (
+        self.page_array@[i].state == PageState::Mapped4k
+        ||
+        self.page_array@[i].state == PageState::Mapped2m
+        ||
+        self.page_array@[i].state == PageState::Mapped1g
+    )
+    ==> 
+    self.page_array@[i].owning_container.is_Some());
+assert(forall|i:int|
+    #![trigger self.page_array@[i], self.page_array@[i].owning_container.is_Some()]
+    0<=i<NUM_PAGES 
+    &&
+    self.page_array@[i].owning_container.is_Some()
+    ==> 
+    (
+        self.page_array@[i].state == PageState::Mapped4k
+        ||
+        self.page_array@[i].state == PageState::Mapped2m
+        ||
+        self.page_array@[i].state == PageState::Mapped1g
+    ));
+assert(forall|i:usize|
+    #![trigger self.page_array@[i as int].state, self.page_array@[i as int].owning_container]
+    0<=i<NUM_PAGES && self.page_array@[i as int].state == PageState::Mapped4k
+    ==>
+    self.container_map_4k@.dom().contains(self.page_array@[i as int].owning_container.unwrap())
+    &&
+    self.container_map_4k@[self.page_array@[i as int].owning_container.unwrap()].contains(page_index2page_ptr(i)));
+assert(forall|i:usize|
+    #![trigger self.page_array@[i as int].state, self.page_array@[i as int].owning_container]
+    0<=i<NUM_PAGES && self.page_array@[i as int].state == PageState::Mapped2m
+    ==>
+    self.container_map_2m@.dom().contains(self.page_array@[i as int].owning_container.unwrap())
+    &&
+    self.container_map_2m@[self.page_array@[i as int].owning_container.unwrap()].contains(page_index2page_ptr(i)));
+assert(forall|i:usize|
+    #![trigger self.page_array@[i as int].state, self.page_array@[i as int].owning_container]
+    0<=i<NUM_PAGES && self.page_array@[i as int].state == PageState::Mapped1g
+    ==>
+    self.container_map_1g@.dom().contains(self.page_array@[i as int].owning_container.unwrap())
+    &&
+    self.container_map_1g@[self.page_array@[i as int].owning_container.unwrap()].contains(page_index2page_ptr(i)));
+assert(forall|c_ptr:ContainerPtr, page_ptr:PagePtr|
+    #![trigger self.container_map_4k@[c_ptr].contains(page_ptr)]
+    self.container_map_4k@.dom().contains(c_ptr) && self.container_map_4k@[c_ptr].contains(page_ptr)
+    ==>
+    page_ptr_valid(page_ptr)
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].state == PageState::Mapped4k
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].owning_container.unwrap() == c_ptr);
+assert(forall|c_ptr:ContainerPtr, page_ptr:PagePtr|
+    #![trigger self.container_map_2m@[c_ptr].contains(page_ptr)]
+    self.container_map_2m@.dom().contains(c_ptr) && self.container_map_2m@[c_ptr].contains(page_ptr)
+    ==>
+    page_ptr_2m_valid(page_ptr)
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].state == PageState::Mapped2m
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].owning_container.unwrap() == c_ptr);
+assert(forall|c_ptr:ContainerPtr, page_ptr:PagePtr|
+    #![trigger self.container_map_1g@[c_ptr].contains(page_ptr)]
+    self.container_map_1g@.dom().contains(c_ptr) && self.container_map_1g@[c_ptr].contains(page_ptr)
+    ==>
+    page_ptr_1g_valid(page_ptr)
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].state == PageState::Mapped1g
+    &&
+    self.page_array@[page_ptr2page_index(page_ptr) as int].owning_container.unwrap() == c_ptr);
