@@ -4,6 +4,7 @@ verus! {
 use crate::define::*;
 use crate::util::page_ptr_util_u::*;
 
+#[derive(Clone, Copy)]
 pub struct VaRange4K{
     pub start:VAddr,
     pub len:usize,

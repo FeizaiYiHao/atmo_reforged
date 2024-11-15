@@ -643,6 +643,8 @@ impl ProcessManager{
         self.thread_perms@[t_ptr].addr() == t_ptr
         &&
         self.thread_perms@[t_ptr].value().endpoint_descriptors.wf()
+        &&
+        (self.thread_perms@[t_ptr].value().ipc_payload.get_payload_as_va_range().is_Some() ==> self.thread_perms@[t_ptr].value().ipc_payload.get_payload_as_va_range().unwrap().wf())
     }
 
     pub closed spec fn threads_container_wf(&self) -> bool{
@@ -684,6 +686,8 @@ impl ProcessManager{
             self.endpoint_perms@[e_ptr].value().queue.wf()
             &&
             self.endpoint_perms@[e_ptr].value().queue.unique()
+            &&
+            self.endpoint_perms@[e_ptr].value().queue@.no_duplicates()
             &&
             self.endpoint_perms@[e_ptr].value().owning_threads@.finite()
             &&
@@ -733,7 +737,11 @@ impl ProcessManager{
             ==>
             self.thread_perms@.dom().contains(self.endpoint_perms@[e_ptr].value().queue@[i])
             &&
+            self.thread_perms@[self.endpoint_perms@[e_ptr].value().queue@[i]].value().blocking_endpoint_ptr == Some(e_ptr)
+            &&
             self.endpoint_perms@[e_ptr].value().owning_threads@.contains(self.endpoint_perms@[e_ptr].value().queue@[i])
+            &&
+            self.thread_perms@[self.endpoint_perms@[e_ptr].value().queue@[i]].value().state == ThreadState::BLOCKED
     }
 
     pub closed spec fn endpoints_container_wf(&self) -> bool{
@@ -776,11 +784,14 @@ impl ProcessManager{
         forall|c_ptr:ContainerPtr, t_ptr:ThreadPtr|
             #![trigger self.container_perms@[c_ptr].value().scheduler@.contains(t_ptr)]
             #![trigger self.container_perms@.dom().contains(c_ptr), self.thread_perms@[t_ptr].value().owning_container]
+            #![trigger self.container_perms@.dom().contains(c_ptr), self.thread_perms@[t_ptr].value().state ]
             self.container_perms@.dom().contains(c_ptr) &&  self.container_perms@[c_ptr].value().scheduler@.contains(t_ptr)
             ==>
             self.thread_perms@.dom().contains(t_ptr)
             &&
             self.thread_perms@[t_ptr].value().owning_container == c_ptr
+            &&
+            self.thread_perms@[t_ptr].value().state == ThreadState::SCHEDULED
     }
 
     pub closed spec fn pcid_ioid_wf(&self) -> bool{
@@ -1610,6 +1621,106 @@ impl ProcessManager{
         assert(self.endpoint_perms_wf());
         assert(self.threads_endpoint_descriptors_wf());
         assert(self.endpoints_queue_wf());
+        assert(self.endpoints_container_wf());
+        assert(self.schedulers_wf()) by {
+            seq_push_lemma::<ThreadPtr>();
+        };
+        assert(self.pcid_ioid_wf());
+        assert(self.threads_cpu_wf());
+        assert(self.threads_container_wf());
+
+    }
+
+    pub fn schedule_blocked_thread(&mut self, endpoint_ptr:EndpointPtr)
+        requires
+            old(self).wf(),
+            old(self).endpoint_dom().contains(endpoint_ptr),
+            old(self).get_endpoint(endpoint_ptr).queue.len() > 0,
+            old(self).get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).scheduler.len() < MAX_CONTAINER_SCHEDULER_LEN,
+        ensures
+            self.wf(),
+            self.page_closure() =~= old(self).page_closure(),
+            self.proc_dom() =~= old(self).proc_dom(),
+            self.endpoint_dom() == old(self).endpoint_dom(),
+            self.container_dom() == old(self).container_dom(),
+            self.thread_dom() == old(self).thread_dom(),
+            forall|p_ptr:ProcPtr|
+                #![trigger self.get_proc(p_ptr)]
+                old(self).proc_dom().contains(p_ptr)
+                ==> 
+                self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
+            forall|container_ptr:ContainerPtr|
+                #![trigger self.get_container(container_ptr)]
+                old(self).container_dom().contains(container_ptr) && container_ptr != old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container
+                ==> 
+                self.get_container(container_ptr) =~= old(self).get_container(container_ptr),
+            forall|t_ptr:ThreadPtr| 
+                #![trigger old(self).get_thread(t_ptr)]
+                old(self).thread_dom().contains(t_ptr) && t_ptr != old(self).get_endpoint(endpoint_ptr).queue@[0]
+                ==>
+                old(self).get_thread(t_ptr) =~= self.get_thread(t_ptr),
+            forall|e_ptr:EndpointPtr| 
+                #![trigger self.get_endpoint(e_ptr)]
+                self.endpoint_dom().contains(e_ptr) && e_ptr != endpoint_ptr
+                ==> 
+                old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
+            self.get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).endpoint_descriptors =~= old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).endpoint_descriptors,
+            self.get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_procs =~= old(self).get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_procs,
+            self.get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_threads =~= old(self).get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_threads,
+            self.get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).children =~= old(self).get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).children,
+            self.get_endpoint(endpoint_ptr).owning_threads == old(self).get_endpoint(endpoint_ptr).owning_threads,
+    {
+        let thread_ptr = self.get_endpoint(endpoint_ptr).queue.get_head();
+        let container_ptr = self.get_thread(thread_ptr).owning_container;
+
+
+        let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
+        let scheduler_node_ref = scheduler_push_thread(container_ptr,&mut container_perm, &thread_ptr);
+        proof {
+            self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
+        }
+
+        let mut endpoint_perm = Tracked(self.endpoint_perms.borrow_mut().tracked_remove(endpoint_ptr));
+        let (ret_thread_ptr, sll) = endpoint_pop_head(endpoint_ptr,&mut endpoint_perm);
+        assert(thread_ptr == ret_thread_ptr);
+        proof {
+            self.endpoint_perms.borrow_mut().tracked_insert(endpoint_ptr, endpoint_perm.get());
+        }
+
+        let mut thread_perm = Tracked(self.thread_perms.borrow_mut().tracked_remove(thread_ptr));
+        let scheduler_node_ref = thread_set_blocking_endpoint_endpoint_ref_scheduler_ref_state_and_ipc_payload(thread_ptr, &mut thread_perm, None, None, Some(scheduler_node_ref), ThreadState::SCHEDULED, IPCPayLoad::Empty);
+        proof {
+            self.thread_perms.borrow_mut().tracked_insert(thread_ptr, thread_perm.get());
+        }
+
+        assert(self.cpus_wf());
+        assert(self.container_cpu_wf());
+        assert(self.memory_disjoint()) by {
+        };
+        assert(self.container_perms_wf());
+        assert(self.container_root_wf());
+        assert(self.container_tree_wf()) by {
+            seq_push_lemma::<ContainerPtr>();
+        };
+        assert(self.containers_linkedlist_wf()) by {
+            seq_push_lemma::<ContainerPtr>();
+        };
+        assert(self.processes_container_wf()) by {
+            seq_push_lemma::<ProcPtr>();
+        };
+        assert(self.processes_wf());
+
+        assert(self.threads_process_wf()) by {
+            seq_push_lemma::<ThreadPtr>();
+        };
+        assert(self.threads_perms_wf());
+        assert(self.endpoint_perms_wf()) by {
+            seq_skip_lemma::<ThreadPtr>();
+        };
+        assert(self.threads_endpoint_descriptors_wf());
+        assert(self.endpoints_queue_wf()) by {
+            seq_skip_lemma::<ThreadPtr>();
+        };
         assert(self.endpoints_container_wf());
         assert(self.schedulers_wf()) by {
             seq_push_lemma::<ThreadPtr>();
