@@ -15,6 +15,7 @@ verus! {
     use crate::process_manager::container_util_t::*;
     use crate::process_manager::endpoint_util_t::*;
     use crate::lemma::lemma_u::*;
+    use crate::lemma::lemma_t::*;
     use crate::array_set::ArraySet;
 
 pub struct ProcessManager{
@@ -388,6 +389,36 @@ impl ProcessManager{
             Some(&self.get_endpoint(self.get_thread(thread_ptr).endpoint_descriptors.get(endpoint_index).unwrap()))
         } 
     }
+
+    pub closed spec fn spec_get_thread_owns_endpoint(&self, thread_ptr:ThreadPtr, endpoint_ptr:EndpointPtr) -> bool{
+        exists|i:int| 
+            #![trigger self.thread_perms@[thread_ptr].value().endpoint_descriptors@[i]]
+            0 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS 
+            &&
+            self.thread_perms@[thread_ptr].value().endpoint_descriptors@[i].is_Some() && self.thread_perms@[thread_ptr].value().endpoint_descriptors@[i].unwrap() == endpoint_ptr
+    }
+
+    pub fn get_thread_owns_endpoint(&self, thread_ptr:ThreadPtr, endpoint_ptr:EndpointPtr) -> (ret:bool)
+        requires
+            self.wf(),
+            self.thread_dom().contains(thread_ptr),
+        ensures
+            ret == self.spec_get_thread_owns_endpoint(thread_ptr, endpoint_ptr),
+    {
+        for index in 0..MAX_NUM_ENDPOINT_DESCRIPTORS
+            invariant
+                self.wf(),
+                self.thread_dom().contains(thread_ptr),
+                forall|i:int| #![trigger self.get_thread(thread_ptr).endpoint_descriptors@[i]] 0 <= i < index ==> self.get_thread(thread_ptr).endpoint_descriptors@[i].is_None() || self.get_thread(thread_ptr).endpoint_descriptors@[i].unwrap() != endpoint_ptr
+        {
+            if self.get_thread(thread_ptr).endpoint_descriptors.get(index).is_some(){
+                if self.get_thread(thread_ptr).endpoint_descriptors.get(index).unwrap() == endpoint_ptr{
+                    return true
+                }
+            }
+        }
+        return false
+    }
 }
 
 //specs
@@ -699,7 +730,7 @@ impl ProcessManager{
     pub closed spec fn threads_endpoint_descriptors_wf(&self) -> bool {
         &&&
         forall|t_ptr:ThreadPtr, i: usize|
-            #![auto]
+            #![trigger self.thread_perms@[t_ptr].value().endpoint_descriptors@[i as int]]
             self.thread_perms@.dom().contains(t_ptr) && 0 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS
             &&
             self.thread_perms@[t_ptr].value().endpoint_descriptors@[i as int].is_Some()
@@ -707,6 +738,24 @@ impl ProcessManager{
             self.endpoint_perms@.dom().contains(self.thread_perms@[t_ptr].value().endpoint_descriptors@[i as int].unwrap())
             &&
             self.endpoint_perms@[self.thread_perms@[t_ptr].value().endpoint_descriptors@[i as int].unwrap()].value().owning_threads@.contains(t_ptr)
+        &&&
+        forall|e_ptr:EndpointPtr, t_ptr:ThreadPtr| 
+            #![trigger self.endpoint_perms@[e_ptr].value().owning_threads@.contains(t_ptr)]
+            #![trigger self.spec_get_thread_owns_endpoint(t_ptr, e_ptr)]
+            self.endpoint_perms@.dom().contains(e_ptr) 
+            &&
+            self.endpoint_perms@[e_ptr].value().owning_threads@.contains(t_ptr)
+            ==>
+            self.thread_perms@.dom().contains(t_ptr)
+            &&
+            self.spec_get_thread_owns_endpoint(t_ptr, e_ptr)
+            // &&
+            // ( exists|i:int| 
+            //     #![trigger self.thread_perms@[t_ptr].value().endpoint_descriptors@[i]]
+            //     0 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS 
+            //     &&
+            //     self.thread_perms@[t_ptr].value().endpoint_descriptors@[i].is_Some() || self.thread_perms@[t_ptr].value().endpoint_descriptors@[i].unwrap() == e_ptr
+            // )
     }
     
     pub closed spec fn endpoints_queue_wf(&self) -> bool {
@@ -1195,9 +1244,9 @@ impl ProcessManager{
             self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
         }
 
-        let (thread_ptr, thread_perm) = page_to_thread_with_endpoint(page_ptr, page_perm, &pt_regs, container_ptr, proc_ptr, proc_node_ref, scheduler_node_ref, endpoint_ptr);
+        let (new_thread_ptr, new_thread_perm) = page_to_thread_with_endpoint(page_ptr, page_perm, &pt_regs, container_ptr, proc_ptr, proc_node_ref, scheduler_node_ref, endpoint_ptr);
         proof {
-            self.thread_perms.borrow_mut().tracked_insert(thread_ptr, thread_perm.get());
+            self.thread_perms.borrow_mut().tracked_insert(new_thread_ptr, new_thread_perm.get());
         }
 
         let mut endpoint_perm = Tracked(self.endpoint_perms.borrow_mut().tracked_remove(endpoint_ptr));
@@ -1262,7 +1311,11 @@ impl ProcessManager{
         };
         assert(self.threads_perms_wf());
         assert(self.endpoint_perms_wf());
-        assert(self.threads_endpoint_descriptors_wf());
+        assert(self.threads_endpoint_descriptors_wf()) by {
+            seq_update_lemma::<Option<EndpointPtr>>();
+            assert(forall|i:int| #![auto] 1 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS ==> self.thread_perms@[new_thread_ptr].value().endpoint_descriptors@[i].is_None());
+            assert(self.thread_perms@[new_thread_ptr].value().endpoint_descriptors@[0] =~= Some(endpoint_ptr));
+        };
         assert(self.endpoints_queue_wf());
         assert(self.endpoints_container_wf()) by {
             // assert(
@@ -1311,7 +1364,7 @@ impl ProcessManager{
                     self.thread_perms@[child_t_ptr].value().owning_container == container_ptr
             );
         };
-        thread_ptr
+        new_thread_ptr
     } 
 
 
@@ -1474,7 +1527,11 @@ impl ProcessManager{
         };
         assert(self.threads_perms_wf());
         assert(self.endpoint_perms_wf());
-        assert(self.threads_endpoint_descriptors_wf());
+        assert(self.threads_endpoint_descriptors_wf()) by {
+            seq_update_lemma::<Option<EndpointPtr>>();
+            assert(forall|i:int| #![auto] 1 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS ==> self.thread_perms@[new_thread_ptr].value().endpoint_descriptors@[i].is_None());
+            assert(self.thread_perms@[new_thread_ptr].value().endpoint_descriptors@[0] =~= Some(endpoint_ptr));
+        };
         assert(self.endpoints_queue_wf());
         assert(self.endpoints_container_wf());
         assert(self.schedulers_wf()) by {
@@ -1619,7 +1676,11 @@ impl ProcessManager{
         };
         assert(self.threads_perms_wf());
         assert(self.endpoint_perms_wf());
-        assert(self.threads_endpoint_descriptors_wf());
+        assert(self.threads_endpoint_descriptors_wf()) by {
+            seq_update_lemma::<Option<EndpointPtr>>();
+            assert(forall|i:int| #![auto] 1 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS ==> self.thread_perms@[new_thread_ptr].value().endpoint_descriptors@[i].is_None());
+            assert(self.thread_perms@[new_thread_ptr].value().endpoint_descriptors@[0] =~= Some(endpoint_ptr));
+        };
         assert(self.endpoints_queue_wf());
         assert(self.endpoints_container_wf());
         assert(self.schedulers_wf()) by {
@@ -1740,7 +1801,7 @@ impl ProcessManager{
             old(self).get_thread(thread_ptr).state == ThreadState::RUNNING,
             ipc_payload.get_payload_as_va_range().is_Some() ==> ipc_payload.get_payload_as_va_range().unwrap().wf(),
         ensures
-        self.wf(),
+            self.wf(),
             self.page_closure() =~= old(self).page_closure(),
             self.proc_dom() =~= old(self).proc_dom(),
             self.endpoint_dom() == old(self).endpoint_dom(),
@@ -1820,6 +1881,106 @@ impl ProcessManager{
 
     }
 
+    pub fn pass_endpoint(&mut self, src_thread_ptr:ThreadPtr, src_endpoint_index:EndpointIdx, dst_thread_ptr:ThreadPtr, dst_endpoint_index:EndpointIdx)
+        requires
+            old(self).wf(),
+            old(self).thread_dom().contains(src_thread_ptr),
+            old(self).thread_dom().contains(dst_thread_ptr),
+            src_thread_ptr != src_endpoint_index,
+            0 <= src_endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
+            0 <= dst_endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
+            old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].is_Some(),
+            old(self).get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).rf_counter != usize::MAX,
+            old(self).get_thread(dst_thread_ptr).endpoint_descriptors@[dst_endpoint_index as int].is_None(),
+        ensures
+            self.wf(),
+            self.page_closure() =~= old(self).page_closure(),
+            self.proc_dom() =~= old(self).proc_dom(),
+            self.endpoint_dom() == old(self).endpoint_dom(),
+            self.container_dom() == old(self).container_dom(),
+            self.thread_dom() == old(self).thread_dom(),
+            forall|p_ptr:ProcPtr|
+                #![trigger self.get_proc(p_ptr)]
+                old(self).proc_dom().contains(p_ptr)
+                ==> 
+                self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
+            forall|container_ptr:ContainerPtr|
+                #![trigger self.get_container(container_ptr)]
+                old(self).container_dom().contains(container_ptr)
+                ==> 
+                self.get_container(container_ptr) =~= old(self).get_container(container_ptr),
+            forall|t_ptr:ThreadPtr| 
+                #![trigger old(self).get_thread(t_ptr)]
+                old(self).thread_dom().contains(t_ptr) && t_ptr != dst_thread_ptr
+                ==>
+                old(self).get_thread(t_ptr) =~= self.get_thread(t_ptr),
+            forall|e_ptr:EndpointPtr| 
+                #![trigger self.get_endpoint(e_ptr)]
+                self.endpoint_dom().contains(e_ptr) && e_ptr != old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()
+                ==> 
+                old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
+            self.get_thread(dst_thread_ptr).endpoint_descriptors@ =~= old(self).get_thread(dst_thread_ptr).endpoint_descriptors@.update(dst_endpoint_index as int, Some(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap())),
+            self.get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).owning_threads@ == old(self).get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).owning_threads@.insert(dst_thread_ptr),
+            self.get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).queue@ == old(self).get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).queue@,
+    {
+        let src_endpoint_ptr = self.get_thread(src_thread_ptr).endpoint_descriptors.get(src_endpoint_index).unwrap();
+        let is_dst_thread_owns_src_endpoint = self.get_thread_owns_endpoint(dst_thread_ptr, src_endpoint_ptr);
+
+        let mut dst_thread_perm = Tracked(self.thread_perms.borrow_mut().tracked_remove(dst_thread_ptr));
+        thread_set_endpoint_descriptor(dst_thread_ptr, &mut dst_thread_perm, dst_endpoint_index, Some(src_endpoint_ptr));
+        proof {
+            self.thread_perms.borrow_mut().tracked_insert(dst_thread_ptr, dst_thread_perm.get());
+        }
+
+        if is_dst_thread_owns_src_endpoint == false {
+            let mut src_endpoint_perm = Tracked(self.endpoint_perms.borrow_mut().tracked_remove(src_endpoint_ptr));
+            endpoint_add_ref(src_endpoint_ptr,&mut src_endpoint_perm, dst_thread_ptr);
+            proof {
+                self.endpoint_perms.borrow_mut().tracked_insert(src_endpoint_ptr, src_endpoint_perm.get());
+            }
+        }else{
+            assert(self.get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).owning_threads@.contains(dst_thread_ptr));
+            assert(self.get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).owning_threads@.insert(dst_thread_ptr) == 
+                    self.get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).owning_threads@) by {
+                        set_insert_lemma::<ThreadPtr>();
+                    };
+        }
+        assert(self.cpus_wf());
+        assert(self.container_cpu_wf());
+        assert(self.memory_disjoint()) by {
+        };
+        assert(self.container_perms_wf());
+        assert(self.container_root_wf());
+        assert(self.container_tree_wf()) by {
+        };
+        assert(self.containers_linkedlist_wf()) by {
+        };
+        assert(self.processes_container_wf()) by {
+        };
+        assert(self.processes_wf());
+
+        assert(self.threads_process_wf()) by {
+        };
+        assert(self.threads_perms_wf());
+        assert(self.endpoint_perms_wf()) by {
+            seq_push_lemma::<ThreadPtr>();
+        };
+        assert(self.threads_endpoint_descriptors_wf()) by {
+            seq_update_lemma::<Option<EndpointPtr>>();
+            assert(forall|i:int| #![auto] 0 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS && i != dst_endpoint_index ==> self.thread_perms@[dst_thread_ptr].value().endpoint_descriptors@[i] == old(self).thread_perms@[dst_thread_ptr].value().endpoint_descriptors@[i]);
+            assert(self.thread_perms@[dst_thread_ptr].value().endpoint_descriptors@[dst_endpoint_index as int ] =~= Some(src_endpoint_ptr));
+        };
+        assert(self.endpoints_queue_wf()) by {
+            seq_push_lemma::<ThreadPtr>();
+        };
+        assert(self.endpoints_container_wf());
+        assert(self.schedulers_wf()) by {
+        };
+        assert(self.pcid_ioid_wf());
+        assert(self.threads_cpu_wf());
+        assert(self.threads_container_wf());
+        // assert(self.wf());
+    }
 }
 
 }

@@ -34,6 +34,15 @@ pub proof fn set_lemma<A>()
         //     (!(s1 + s2 + s3 + s4).contains(e)) <==> (!s1.contains(e) && !s2.contains(e) && !s3.contains(e) && !s4.contains(e))
 {}
 
+#[verifier(external_body)]
+pub proof fn set_insert_lemma<A>()
+    ensures
+        forall|s1:Set<A>, x:A, y:A|
+            x != y ==> ( s1.insert(x).contains(y) == s1.contains(y) ),
+        forall|s1:Set<A>, x:A|
+            s1.contains(x) ==> (s1.insert(x) == s1)
+{}
+
 //TODO: @Xiangdong prove this
 #[verifier(external_body)]
 pub proof fn page_ptr_lemma()

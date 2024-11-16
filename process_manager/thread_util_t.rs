@@ -119,4 +119,32 @@ pub fn thread_set_blocking_endpoint_endpoint_ref_scheduler_ref_state_and_ipc_pay
     }
 }
 
+#[verifier(external_body)]
+pub fn thread_set_endpoint_descriptor(thread_ptr:ThreadPtr, thread_perm: &mut Tracked<PointsTo<Thread>>, endpoint_index:EndpointIdx, endpoint_op:Option<EndpointPtr>) 
+    requires    
+        old(thread_perm)@.is_init(),
+        old(thread_perm)@.addr() == thread_ptr,
+        0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
+    ensures
+        thread_perm@.is_init(),
+        thread_perm@.addr() == thread_ptr,
+        thread_perm@.value().owning_container == old(thread_perm)@.value().owning_container,
+        thread_perm@.value().owning_proc == old(thread_perm)@.value().owning_proc,
+        thread_perm@.value().state == old(thread_perm)@.value().state,
+        thread_perm@.value().proc_rev_ptr == old(thread_perm)@.value().proc_rev_ptr,
+        thread_perm@.value().scheduler_rev_ptr == old(thread_perm)@.value().scheduler_rev_ptr,
+        thread_perm@.value().blocking_endpoint_ptr == old(thread_perm)@.value().blocking_endpoint_ptr,
+        thread_perm@.value().endpoint_rev_ptr == old(thread_perm)@.value().endpoint_rev_ptr,
+        thread_perm@.value().running_cpu == old(thread_perm)@.value().running_cpu,
+        thread_perm@.value().endpoint_descriptors@ == old(thread_perm)@.value().endpoint_descriptors@.update(endpoint_index as int, endpoint_op),
+        thread_perm@.value().ipc_payload == old(thread_perm)@.value().ipc_payload,
+        thread_perm@.value().error_code == old(thread_perm)@.value().error_code,
+        thread_perm@.value().trap_frame == old(thread_perm)@.value().trap_frame,
+{
+    unsafe{
+        let uptr = thread_ptr as *mut MaybeUninit<Thread>;
+        (*uptr).assume_init_mut().endpoint_descriptors.set(endpoint_index, endpoint_op);
+    }
+}
+
 }

@@ -77,7 +77,10 @@ pub proof fn seq_pop_unique_lemma<A>()
 pub proof fn seq_update_lemma<A>()
     ensures
         forall|s: Seq<A>, i:int, j: int, v:A|
-            0 <= i < s.len() && 0 <= j < s.len() && i != j ==>  s.update(j,v)[i] == s[i] &&  s.update(j,v)[j] == v
+            0 <= i < s.len() && 0 <= j < s.len() && i != j ==>  s.update(j,v)[i] == s[i] &&  s.update(j,v)[j] == v,
+        forall|s: Seq<A>, i:int, v:A|
+            #![trigger s.update(i,v)[i]]
+            0 <= i < s.len()  ==>  s.update(i,v)[i] == v 
 {
 }
 
