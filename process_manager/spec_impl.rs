@@ -964,7 +964,14 @@ impl ProcessManager{
                 #![trigger self.get_endpoint(e_ptr).queue.wf()]
                 self.endpoint_dom().contains(e_ptr)
                 ==>
-                self.get_endpoint(e_ptr).queue.wf()
+                self.get_endpoint(e_ptr).queue.wf(),
+            forall|e_ptr:EndpointPtr, i:int|
+                #![trigger self.get_endpoint(e_ptr).queue@[i]]
+                self.endpoint_dom().contains(e_ptr) && 0 <= i < self.get_endpoint(e_ptr).queue.len()
+                ==>
+                self.thread_dom().contains(self.get_endpoint(e_ptr).queue@[i])
+                &&
+                self.get_thread(self.get_endpoint(e_ptr).queue@[i]).state == ThreadState::BLOCKED,
     {}
     pub proof fn pcid_unique(&self, target_proc_ptr:ProcPtr)
         requires
@@ -1750,7 +1757,10 @@ impl ProcessManager{
             self.get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_procs =~= old(self).get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_procs,
             self.get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_threads =~= old(self).get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).owned_threads,
             self.get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).children =~= old(self).get_container(old(self).get_thread(old(self).get_endpoint(endpoint_ptr).queue@[0]).owning_container).children,
+            self.get_endpoint(endpoint_ptr).queue@ == old(self).get_endpoint(endpoint_ptr).queue@.skip(1),
             self.get_endpoint(endpoint_ptr).owning_threads == old(self).get_endpoint(endpoint_ptr).owning_threads,
+            self.get_endpoint(endpoint_ptr).rf_counter == old(self).get_endpoint(endpoint_ptr).rf_counter,
+            self.get_endpoint(endpoint_ptr).queue_state == old(self).get_endpoint(endpoint_ptr).queue_state,
     {
         let thread_ptr = self.get_endpoint(endpoint_ptr).queue.get_head();
         let container_ptr = self.get_thread(thread_ptr).owning_container;
@@ -2001,7 +2011,7 @@ impl ProcessManager{
             old(self).wf(),
             old(self).thread_dom().contains(src_thread_ptr),
             old(self).thread_dom().contains(dst_thread_ptr),
-            src_thread_ptr != src_endpoint_index,
+            src_thread_ptr != dst_thread_ptr,
             0 <= src_endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
             0 <= dst_endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
             old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].is_Some(),
@@ -2036,7 +2046,8 @@ impl ProcessManager{
                 old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
             self.get_thread(dst_thread_ptr).endpoint_descriptors@ =~= old(self).get_thread(dst_thread_ptr).endpoint_descriptors@.update(dst_endpoint_index as int, Some(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap())),
             self.get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).owning_threads@ == old(self).get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).owning_threads@.insert(dst_thread_ptr),
-            self.get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).queue@ == old(self).get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).queue@,
+            self.get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).queue == old(self).get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).queue,
+            self.get_endpoint(self.get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).queue_state == old(self).get_endpoint(old(self).get_thread(src_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap()).queue_state,
     {
         let src_endpoint_ptr = self.get_thread(src_thread_ptr).endpoint_descriptors.get(src_endpoint_index).unwrap();
         let is_dst_thread_owns_src_endpoint = self.get_thread_owns_endpoint(dst_thread_ptr, src_endpoint_ptr);

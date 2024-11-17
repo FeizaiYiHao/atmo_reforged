@@ -10,7 +10,7 @@ impl Kernel{
         &&&
         self.get_endpoint(src_endpoint_ptr).queue.len() < MAX_NUM_THREADS_PER_ENDPOINT
     }
-    pub open spec fn receiver_queue_full(&self, thread_ptr: ThreadPtr, endpoint_index: EndpointIdx) -> bool{
+    pub open spec fn sender_queue_full(&self, thread_ptr: ThreadPtr, endpoint_index: EndpointIdx) -> bool{
         let src_endpoint_ptr = self.get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap();
         &&&
         self.get_endpoint(src_endpoint_ptr).queue_state == EndpointState::SEND
@@ -24,7 +24,7 @@ impl Kernel{
         &&&
         self.get_endpoint(src_endpoint_ptr).queue.len() == 0
     }
-    pub open spec fn can_send_to_receiver(&self, thread_ptr: ThreadPtr, endpoint_index: EndpointIdx) -> bool{
+    pub open spec fn receiver_exist(&self, thread_ptr: ThreadPtr, endpoint_index: EndpointIdx) -> bool{
         let src_endpoint_ptr = self.get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap();
         &&&
         self.get_endpoint(src_endpoint_ptr).queue_state == EndpointState::RECEIVE
