@@ -2,13 +2,6 @@ use vstd::prelude::*;
 verus! {
 use crate::kernel::Kernel;
 use crate::define::*;
-use crate::process_manager::process::Process;
-use crate::process_manager::thread::Thread;
-use crate::process_manager::container::Container;
-use crate::process_manager::endpoint::Endpoint;
-use crate::process_manager::cpu::*;
-use crate::pagetable::entry::MapEntry;
-
 impl Kernel{
     pub open spec fn no_receiver(&self, thread_ptr: ThreadPtr, endpoint_index: EndpointIdx) -> bool{
         let src_endpoint_ptr = self.get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap();

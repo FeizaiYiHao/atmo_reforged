@@ -1,6 +1,5 @@
 use vstd::prelude::*;
 verus! {
-// use crate::define::*;
 use crate::util::page_ptr_util_u::*;
 
 #[verifier(external_body)]

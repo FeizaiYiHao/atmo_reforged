@@ -1,19 +1,14 @@
-use std::borrow::Borrow;
-use std::borrow::BorrowMut;
-
 use vstd::prelude::*;
 
 verus! {
 use crate::define::*;
-// use crate::array::*;
 use vstd::simple_pptr::*;
 use crate::util::page_ptr_util_u::*;
-// use crate::pagetable::pagetable_util::*;
 use crate::pagetable::pagemap_util_t::*;
 use crate::pagetable::entry::*;
 use crate::pagetable::pagemap::*;
 use crate::lemma::lemma_u::*;
-// use crate::array::Array;
+
 
 // pub closed spec fn map_entry_equals_to_page_entry_unwrapped(m:MapEntry, p:PageEntry) -> bool{
 //     &&&

@@ -12,9 +12,9 @@ use crate::define::*;
 // use crate::pagetable::pagemap_util_t::*;
 // use crate::pagetable::entry::*;
 use crate::kernel::Kernel;
-use crate::va_range::VaRange4K;
-use crate::trap::Registers;
-use crate::pagetable::pagemap_util_t::*;
+// use crate::va_range::VaRange4K;
+// use crate::trap::Registers;
+// use crate::pagetable::pagemap_util_t::*;
 use crate::process_manager::thread::IPCPayLoad;
 
 pub open spec fn syscall_send_endpoint_endpoint_exists(old:Kernel, target_thread_ptr: ThreadPtr, endpoint_index: EndpointIdx) -> bool{
@@ -211,11 +211,6 @@ pub fn syscall_send_endpoint(&mut self, target_thread_ptr: ThreadPtr, endpoint_i
     assert(self.can_send_to_receiver(target_thread_ptr, endpoint_index));
     // does stuff
     return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
-
-    
-
-    return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
-
 }
 
 }
