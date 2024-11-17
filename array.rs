@@ -29,10 +29,9 @@ impl<A, const N: usize> Array<A, N> {
     pub fn get(&self, i: usize) -> (out: &A)
         requires
             0 <= i < N,
-            self.seq@.len() == N,
+            self.wf(),
         ensures
             *out == self.seq@[i as int],
-            self.seq@.len() == N,
     {
         &self.ar[i]
     }

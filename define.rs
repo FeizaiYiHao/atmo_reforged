@@ -41,10 +41,32 @@ pub enum ThreadState {
     TRANSIT,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EndpointState {
     RECEIVE,
     SEND,
+}
+
+impl EndpointState{
+    pub fn is_send(&self) -> (ret:bool)
+        ensures
+            ret == (self == EndpointState::SEND),
+    {
+        match self{
+            EndpointState::SEND => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_receive(&self) -> (ret:bool)
+    ensures
+            ret == (self == EndpointState::RECEIVE),
+    {
+        match self{
+            EndpointState::RECEIVE => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -200,6 +200,15 @@ impl Kernel{
         self.proc_man.get_thread(t_ptr).endpoint_descriptors@
     }
 
+    pub open spec fn get_endpoint_exists(&self, t_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> bool
+        recommends
+            self.wf(),
+            self.thread_dom().contains(t_ptr),
+            0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
+    {
+        self.proc_man.get_thread(t_ptr).endpoint_descriptors@[endpoint_index as int].is_Some()
+    }
+
     pub open spec fn get_endpoint_ptr_by_endpoint_idx(&self, t_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> Option<EndpointPtr> 
     recommends
         self.wf(),
@@ -219,6 +228,34 @@ impl Kernel{
         self.get_endpoint_ptr_by_endpoint_idx(t_ptr, endpoint_index).is_Some()
         &&&
         self.get_endpoint(self.get_endpoint_ptr_by_endpoint_idx(t_ptr, endpoint_index).unwrap()).rf_counter != usize::MAX
+    }
+
+    pub open spec fn get_endpoint_has_receiver(&self, t_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> bool 
+        recommends
+            self.wf(),
+            self.thread_dom().contains(t_ptr),
+            0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
+    {
+        &&&
+        self.get_endpoint_ptr_by_endpoint_idx(t_ptr, endpoint_index).is_Some()
+        &&&
+        self.get_endpoint(self.get_endpoint_ptr_by_endpoint_idx(t_ptr, endpoint_index).unwrap()).queue_state == EndpointState::RECEIVE
+        &&&
+        self.get_endpoint(self.get_endpoint_ptr_by_endpoint_idx(t_ptr, endpoint_index).unwrap()).queue.len() != 0
+    }
+
+    pub open spec fn get_endpoint_has_sender(&self, t_ptr:ThreadPtr, endpoint_index:EndpointIdx) -> bool 
+        recommends
+            self.wf(),
+            self.thread_dom().contains(t_ptr),
+            0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
+    {
+        &&&
+        self.get_endpoint_ptr_by_endpoint_idx(t_ptr, endpoint_index).is_Some()
+        &&&
+        self.get_endpoint(self.get_endpoint_ptr_by_endpoint_idx(t_ptr, endpoint_index).unwrap()).queue_state == EndpointState::SEND
+        &&&
+        self.get_endpoint(self.get_endpoint_ptr_by_endpoint_idx(t_ptr, endpoint_index).unwrap()).queue.len() != 0
     }
 
     pub open spec fn get_physical_page_reference_counter(&self, page_ptr:PagePtr) -> nat
