@@ -22,7 +22,7 @@ impl Kernel{
         &&&
         self.get_endpoint(src_endpoint_ptr).queue_state == EndpointState::SEND
         &&&
-        self.get_endpoint(src_endpoint_ptr).queue.len() == MAX_NUM_THREADS_PER_ENDPOINT
+        self.get_endpoint(src_endpoint_ptr).queue.len() >= MAX_NUM_THREADS_PER_ENDPOINT
     }
     pub open spec fn receiver_queue_empty(&self, thread_ptr: ThreadPtr, endpoint_index: EndpointIdx) -> bool{
         let src_endpoint_ptr = self.get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap();

@@ -195,10 +195,11 @@ pub fn syscall_send_endpoint(&mut self, target_thread_ptr: ThreadPtr, endpoint_i
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    if self.proc_man.get_endpoint(target_endpoint_ptr).queue_state.is_send() && self.proc_man.get_endpoint(target_endpoint_ptr).queue.len() == MAX_NUM_THREADS_PER_ENDPOINT{
+    if self.proc_man.get_endpoint(target_endpoint_ptr).queue_state.is_send() && self.proc_man.get_endpoint(target_endpoint_ptr).queue.len() >= MAX_NUM_THREADS_PER_ENDPOINT{
         // return error
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
+
 
     if self.proc_man.get_endpoint(target_endpoint_ptr).queue_state.is_receive() && self.proc_man.get_endpoint(target_endpoint_ptr).queue.len() == 0{
         // change queue state and Block
@@ -207,10 +208,10 @@ pub fn syscall_send_endpoint(&mut self, target_thread_ptr: ThreadPtr, endpoint_i
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    if self.proc_man.get_endpoint(target_endpoint_ptr).queue_state.is_receive() && self.proc_man.get_endpoint(target_endpoint_ptr).queue.len() != 0{
-        // does stuff
-        return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
-    } 
+    assert(self.can_send_to_receiver(target_thread_ptr, endpoint_index));
+    // does stuff
+    return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
+
     
 
     return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
