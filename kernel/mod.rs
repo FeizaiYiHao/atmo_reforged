@@ -9,6 +9,7 @@ pub mod mem_util;
 pub mod create_and_map_pages;
 pub mod create_and_share_pages;
 pub mod syscall_send_endpoint;
+pub mod syscall_send_pages;
 pub mod send_receive_pre_spec;
 
 pub use spec::*;
@@ -19,6 +20,7 @@ pub use syscall_mmap::*;
 pub use syscall_new_proc::*;
 pub use syscall_new_container::*;
 pub use syscall_send_endpoint::*;
+pub use syscall_send_pages::*;
 // pub use mem_util::*;
 // pub use create_and_map_pages::*;
 // pub use create_and_share_pages::*;

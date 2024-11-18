@@ -253,6 +253,11 @@ impl Kernel{
             self.get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota as int =~= old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota - ret,
             self.get_address_space(target_proc_ptr).dom() =~= old(self).get_address_space(target_proc_ptr).dom().insert(target_va),
             self.get_address_space(target_proc_ptr) =~= old(self).get_address_space(target_proc_ptr).insert(target_va, old(self).get_address_space(src_proc_ptr)[src_va]),
+            forall|va:VAddr|
+                #![auto] 
+                va != target_va && old(self).get_address_space(target_proc_ptr).dom().contains(va)
+                ==>
+                self.get_address_space(target_proc_ptr)[va] == old(self).get_address_space(target_proc_ptr)[va],
             forall|p:PagePtr|
                 #![trigger self.page_alloc.page_is_mapped(p)] 
                 self.page_alloc.page_is_mapped(p) == old(self).page_alloc.page_is_mapped(p),
@@ -295,6 +300,7 @@ impl Kernel{
             old(self).address_space_range_free(target_proc_ptr, target_va_range),
             src_proc_ptr != target_proc_ptr, // just to make specs easier...
         ensures
+            self.wf(),
             self.proc_dom() == old(self).proc_dom(),
             self.thread_dom() == old(self).thread_dom(),
             self.endpoint_dom() == old(self).endpoint_dom(),
@@ -396,7 +402,12 @@ impl Kernel{
                 #![auto]
                 target_va_range@.contains(va) == false
                 ==>
-                self.get_address_space(target_proc_ptr).dom().contains(va) == old(self).get_address_space(target_proc_ptr).dom().contains(va)
+                self.get_address_space(target_proc_ptr).dom().contains(va) == old(self).get_address_space(target_proc_ptr).dom().contains(va),
+            forall|va:VAddr|
+                #![auto]
+                target_va_range@.contains(va) == false && old(self).get_address_space(target_proc_ptr).dom().contains(va)
+                ==>
+                self.get_address_space(target_proc_ptr)[va] == old(self).get_address_space(target_proc_ptr)[va]
     {
         let mut ret = 0;
         for index in 0..src_va_range.len    
@@ -471,6 +482,11 @@ impl Kernel{
                     self.get_address_space(target_proc_ptr).dom().contains(va) 
                     &&
                     self.get_address_space(target_proc_ptr)[va] =~= old(self).get_address_space(target_proc_ptr)[va],
+                forall|va:VAddr|
+                    #![auto]
+                    target_va_range@.contains(va) == false && old(self).get_address_space(target_proc_ptr).dom().contains(va)
+                    ==>
+                    self.get_address_space(target_proc_ptr)[va] == old(self).get_address_space(target_proc_ptr)[va],
                 forall|i:int|
                     #![auto]
                     0 <= i < index 
@@ -500,6 +516,7 @@ impl Kernel{
                     )
         {
             ret = ret + self.create_entry_and_share(src_proc_ptr, src_va_range.index(index), target_proc_ptr, target_va_range.index(index));
+            assert(self.wf());
         }
         ret
     }

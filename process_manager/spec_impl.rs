@@ -921,6 +921,8 @@ impl ProcessManager{
                 &&
                 self.get_thread(t_ptr).endpoint_descriptors.wf()
                 &&
+                (self.get_thread(t_ptr).ipc_payload.get_payload_as_va_range().is_Some() ==> self.get_thread(t_ptr).ipc_payload.get_payload_as_va_range().unwrap().wf())
+                &&
                 (
                     forall|i:int| #![auto] 
                         0 <= i < MAX_NUM_ENDPOINT_DESCRIPTORS && self.get_thread(t_ptr).endpoint_descriptors@[i].is_Some() 

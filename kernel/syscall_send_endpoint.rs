@@ -17,11 +17,6 @@ use crate::kernel::Kernel;
 // use crate::pagetable::pagemap_util_t::*;
 use crate::process_manager::thread::IPCPayLoad;
 
-pub open spec fn syscall_send_endpoint_endpoint_exists(old:Kernel, target_thread_ptr: ThreadPtr, endpoint_index: EndpointIdx) -> bool{
-    &&&
-    old.get_endpoint_exists(target_thread_ptr, endpoint_index)
-}
-
 pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, src_endpoint_index:EndpointIdx, ret: SyscallReturnStruct) -> bool {
     let target_endpoint_ptr = old.get_endpoint_ptr_by_endpoint_idx(target_thread_ptr, endpoint_index).unwrap();
     let src_container_ptr = old.get_thread(target_thread_ptr).owning_container;
