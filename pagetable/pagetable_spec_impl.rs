@@ -1612,7 +1612,6 @@ impl PageTable{
     /// Postcondition: 
     /// unmap will need to delete target entry mappings in mapping_4k (VA->PA), 
     /// PageMaps lx_tables should not change.
-    /// 
     pub fn unmap_4k_page(&mut self, target_l4i: L4Index, target_l3i: L3Index, target_l2i: L2Index, target_l1i: L2Index, target_l1_p:PageMapPtr)
         requires
             old(self).wf(),

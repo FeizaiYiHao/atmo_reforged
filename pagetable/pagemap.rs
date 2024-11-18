@@ -83,6 +83,14 @@ impl PageMap{
         self.spec_seq@[index as int]
     }
 
+
+    pub open spec fn is_empty(&self) -> bool
+        recommends
+            self.wf()
+    {
+        forall |x: u16| #![auto] 0 <= x < 512 ==> self.spec_seq@[x as int].perm.present == false
+    }
+
     pub fn set(&mut self, index:usize, value:PageEntry)
         requires
             old(self).wf(),
@@ -92,30 +100,30 @@ impl PageMap{
         ensures
             self.wf(),
             self@ =~= old(self)@.update(index as int,value),
-        {
-            if value.perm.present == false {
-                self.ar.set(index,0usize);
-                proof{
-                    zero_leads_is_empty_page_entry();
-                    self.spec_seq@ = self.spec_seq@.update(index as int, usize2page_entry(0usize));
-                }
-                return;
+    {
+        if value.perm.present == false {
+            self.ar.set(index,0usize);
+            proof{
+                zero_leads_is_empty_page_entry();
+                self.spec_seq@ = self.spec_seq@.update(index as int, usize2page_entry(0usize));
             }
-            else{
-                let u = page_entry2usize(&value);
-                self.ar.set(index,u);
-
-                assert(usize2present(u) == value.perm.present);
-                assert(usize2present(u) == true);
-                assert(u != 0) by (bit_vector) requires (u & 0x1u64 as usize) != 0 == true;
-
-                proof{
-                    self.spec_seq@ = self.spec_seq@.update(index as int,value);
-                }
-
-                return;
-            }
+            return;
         }
+        else{
+            let u = page_entry2usize(&value);
+            self.ar.set(index,u);
+
+            assert(usize2present(u) == value.perm.present);
+            assert(usize2present(u) == true);
+            assert(u != 0) by (bit_vector) requires (u & 0x1u64 as usize) != 0 == true;
+
+            proof{
+                self.spec_seq@ = self.spec_seq@.update(index as int,value);
+            }
+
+            return;
+        }
+    }
 
     pub fn index(&self, index:usize) -> (ret:PageEntry)
         requires
