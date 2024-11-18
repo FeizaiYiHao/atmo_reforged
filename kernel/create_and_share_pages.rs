@@ -14,6 +14,7 @@ use crate::pagetable::entry::*;
 use crate::kernel::Kernel;
 use crate::va_range::VaRange4K;
 
+
 impl Kernel{
     pub open spec fn address_space_range_exists(&self, target_proc_ptr:ProcPtr, va_range:&VaRange4K) -> bool{
         forall|j:int| #![auto] 0<=j<va_range.len ==> self.get_address_space(target_proc_ptr).dom().contains(va_range@[j])
@@ -188,7 +189,7 @@ impl Kernel{
         }
 
 
-        //we forbid share with the same vaddr
+    //we forbid share with the same vaddr
     pub fn create_entry_and_share(&mut self, src_proc_ptr:ProcPtr,src_va:VAddr, target_proc_ptr:ProcPtr, target_va:VAddr) -> (ret: usize)
         requires
             old(self).wf(),
