@@ -17,23 +17,23 @@ use crate::trap::Registers;
 use crate::pagetable::pagemap_util_t::*;
 use crate::lemma::lemma_t::set_lemma;
 
-pub open spec fn syscall_new_container_with_endpoint_requirement(old:Kernel, target_thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, pt_regs:Registers, va_range:VaRange4K, init_quota:usize) -> bool {
-    let src_proc_ptr = old.get_thread(target_thread_ptr).owning_proc;
-    let src_pcid = old.get_proc(src_proc_ptr).pcid;
-    let src_container_ptr = old.get_thread(target_thread_ptr).owning_container;
-    if old.get_is_process_thread_list_full(src_proc_ptr){
+pub open spec fn syscall_new_container_with_endpoint_requirement(old:Kernel, thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, pt_regs:Registers, va_range:VaRange4K, init_quota:usize) -> bool {
+    let proc_ptr = old.get_thread(thread_ptr).owning_proc;
+    let pcid = old.get_proc(proc_ptr).pcid;
+    let container_ptr = old.get_thread(thread_ptr).owning_container;
+    if old.get_is_process_thread_list_full(proc_ptr){
         false
-    }else if old.get_container_quota(src_container_ptr) < 4 + init_quota {
+    }else if old.get_container_quota(container_ptr) < 4 + init_quota {
         false
     }else if old.get_num_of_free_pages() < 4 + init_quota {
         false
     }else if old.get_is_pcid_exhausted(){
         false
-    }else if old.get_endpoint_shareable(target_thread_ptr, endpoint_index) == false{
+    }else if old.get_endpoint_shareable(thread_ptr, endpoint_index) == false{
         false
-    }else if old.address_space_range_shareable(src_proc_ptr, &va_range) == false{
+    }else if old.address_space_range_shareable(proc_ptr, &va_range) == false{
         false
-    }else if old.get_is_children_list_full(src_container_ptr){
+    }else if old.get_is_children_list_full(container_ptr){
         false
     }else if init_quota < 3 * va_range.len{
         false
@@ -42,17 +42,17 @@ pub open spec fn syscall_new_container_with_endpoint_requirement(old:Kernel, tar
     }
 }
 
-pub open spec fn syscall_new_container_with_endpoint_spec(old:Kernel, new:Kernel, target_thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, pt_regs:Registers, va_range:VaRange4K, init_quota:usize, ret: SyscallReturnStruct) -> bool {
-    let src_proc_ptr = old.get_thread(target_thread_ptr).owning_proc;
-    let src_pcid = old.get_proc(src_proc_ptr).pcid;
-    let src_container_ptr = old.get_thread(target_thread_ptr).owning_container;
-    let src_endpoint_ptr = old.get_endpoint_ptr_by_endpoint_idx(target_thread_ptr, endpoint_index).unwrap();
+pub open spec fn syscall_new_container_with_endpoint_spec(old:Kernel, new:Kernel, thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, pt_regs:Registers, va_range:VaRange4K, init_quota:usize, ret: SyscallReturnStruct) -> bool {
+    let proc_ptr = old.get_thread(thread_ptr).owning_proc;
+    let pcid = old.get_proc(proc_ptr).pcid;
+    let container_ptr = old.get_thread(thread_ptr).owning_container;
+    let endpoint_ptr = old.get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap();
     let (new_container_ptr, new_proc_ptr, new_thread_ptr) = ret.get_return_vaule_three_usize().unwrap();
 
     &&&
-    syscall_new_container_with_endpoint_requirement(old, target_thread_ptr, endpoint_index, pt_regs, va_range, init_quota) == false ==> old == new
+    syscall_new_container_with_endpoint_requirement(old, thread_ptr, endpoint_index, pt_regs, va_range, init_quota) == false ==> old == new
     &&&
-    syscall_new_container_with_endpoint_requirement(old, target_thread_ptr, endpoint_index, pt_regs, va_range, init_quota) ==>
+    syscall_new_container_with_endpoint_requirement(old, thread_ptr, endpoint_index, pt_regs, va_range, init_quota) ==>
         // things that did not change
         old.endpoint_dom() =~= new.endpoint_dom()
         &&
@@ -62,21 +62,21 @@ pub open spec fn syscall_new_container_with_endpoint_spec(old:Kernel, new:Kernel
             ==>
             new.get_thread(t_ptr) =~= old.get_thread(t_ptr)
         &&
-        forall|proc_ptr:ProcPtr| 
-            #![trigger new.get_proc(proc_ptr)]
-            old.proc_dom().contains(proc_ptr)
+        forall|p_ptr:ProcPtr| 
+            #![trigger new.get_proc(p_ptr)]
+            old.proc_dom().contains(p_ptr)
             ==>
-            new.get_proc(proc_ptr) =~= old.get_proc(proc_ptr)
+            new.get_proc(p_ptr) =~= old.get_proc(p_ptr)
         &&
         forall|c:ContainerPtr| 
             #![trigger new.get_container(c)]
-            old.container_dom().contains(c) && c != src_container_ptr
+            old.container_dom().contains(c) && c != container_ptr
             ==>
             old.get_container(c) =~= new.get_container(c)
         &&
         forall|e_ptr:EndpointPtr| 
             #![trigger new.get_endpoint(e_ptr)]
-            new.endpoint_dom().contains(e_ptr) && e_ptr != src_endpoint_ptr
+            new.endpoint_dom().contains(e_ptr) && e_ptr != endpoint_ptr
             ==> 
             old.get_endpoint(e_ptr) =~= new.get_endpoint(e_ptr)
         &&
@@ -85,19 +85,19 @@ pub open spec fn syscall_new_container_with_endpoint_spec(old:Kernel, new:Kernel
             old.container_dom().contains(c) ==> 
             old.get_container_owned_pages(c) =~= new.get_container_owned_pages(c)
         &&
-        forall|proc_ptr:ProcPtr| 
-            #![trigger new.get_address_space(proc_ptr)]
-            old.proc_dom().contains(proc_ptr)
+        forall|p_ptr:ProcPtr| 
+            #![trigger new.get_address_space(p_ptr)]
+            old.proc_dom().contains(p_ptr)
             ==>
-            new.get_address_space(proc_ptr) =~= old.get_address_space(proc_ptr)
+            new.get_address_space(p_ptr) =~= old.get_address_space(p_ptr)
         &&
-        new.get_container(src_container_ptr).owned_endpoints@ =~= old.get_container(src_container_ptr).owned_endpoints@
+        new.get_container(container_ptr).owned_endpoints@ =~= old.get_container(container_ptr).owned_endpoints@
         &&
         new.get_physical_page_mapping().dom() =~= old.get_physical_page_mapping().dom()
         &&
         forall|page_ptr:PagePtr|
             #![trigger new.get_physical_page_mapping()[page_ptr]]
-            old.get_physical_page_mapping().dom().contains(page_ptr) && (forall|i:int|#![auto] 0 <= i < va_range.len  ==> old.get_address_space(src_proc_ptr)[va_range@[i]].addr != page_ptr)
+            old.get_physical_page_mapping().dom().contains(page_ptr) && (forall|i:int|#![auto] 0 <= i < va_range.len  ==> old.get_address_space(proc_ptr)[va_range@[i]].addr != page_ptr)
             ==> 
             old.get_physical_page_mapping()[page_ptr] == new.get_physical_page_mapping()[page_ptr]
 
@@ -113,11 +113,11 @@ pub open spec fn syscall_new_container_with_endpoint_spec(old:Kernel, new:Kernel
         &&
         new.get_proc(new_proc_ptr).owning_container == new_container_ptr
         &&
-        new.get_container(src_container_ptr).owned_threads@ =~= old.get_container(src_container_ptr).owned_threads@
+        new.get_container(container_ptr).owned_threads@ =~= old.get_container(container_ptr).owned_threads@
         &&
-        new.get_container(src_container_ptr).owned_procs@ =~= old.get_container(src_container_ptr).owned_procs@
+        new.get_container(container_ptr).owned_procs@ =~= old.get_container(container_ptr).owned_procs@
         &&
-        new.get_container(src_container_ptr).children@ =~= old.get_container(src_container_ptr).children@.push(new_container_ptr)
+        new.get_container(container_ptr).children@ =~= old.get_container(container_ptr).children@.push(new_container_ptr)
         &&
         new.get_container(new_container_ptr).owned_threads@ == Set::<ThreadPtr>::empty().insert(new_thread_ptr)
         &&
@@ -127,9 +127,9 @@ pub open spec fn syscall_new_container_with_endpoint_spec(old:Kernel, new:Kernel
         &&
         new.get_thread(new_thread_ptr).owning_container == new_container_ptr
         &&
-        new.get_thread(new_thread_ptr).endpoint_descriptors@ =~= Seq::new(MAX_NUM_ENDPOINT_DESCRIPTORS as nat,|i: int| {None}).update(0, Some(src_endpoint_ptr))
+        new.get_thread(new_thread_ptr).endpoint_descriptors@ =~= Seq::new(MAX_NUM_ENDPOINT_DESCRIPTORS as nat,|i: int| {None}).update(0, Some(endpoint_ptr))
         &&
-        new.get_endpoint(src_endpoint_ptr).owning_threads@ =~= old.get_endpoint(src_endpoint_ptr).owning_threads@.insert(new_thread_ptr)
+        new.get_endpoint(endpoint_ptr).owning_threads@ =~= old.get_endpoint(endpoint_ptr).owning_threads@.insert(new_thread_ptr)
         &&
         new.get_container_owned_pages(new_container_ptr) == Set::<PagePtr>::empty()
         &&
@@ -138,11 +138,11 @@ pub open spec fn syscall_new_container_with_endpoint_spec(old:Kernel, new:Kernel
             old.get_physical_page_mapping().dom().contains(page_ptr) && new.get_physical_page_mapping()[page_ptr] != old.get_physical_page_mapping()[page_ptr]
             ==> 
             (
-                forall|p_ptr:Pcid,va:VAddr|
+                forall|pcid:Pcid,va:VAddr|
                     #![auto]
-                    new.get_physical_page_mapping()[page_ptr].contains((p_ptr,va)) && !old.get_physical_page_mapping()[page_ptr].contains((p_ptr,va))
+                    new.get_physical_page_mapping()[page_ptr].contains((pcid,va)) && !old.get_physical_page_mapping()[page_ptr].contains((pcid,va))
                     ==>
-                    p_ptr == new_proc_ptr
+                    pcid == new_proc_ptr
                     &&
                     va_range@.contains(va)
             )
@@ -154,7 +154,7 @@ pub open spec fn syscall_new_container_with_endpoint_spec(old:Kernel, new:Kernel
             ==>
             new.get_address_space(new_proc_ptr).dom().contains(va_range@[i])
             &&
-            new.get_address_space(new_proc_ptr)[va_range@[i]] == old.get_address_space(src_proc_ptr)[va_range@[i]]
+            new.get_address_space(new_proc_ptr)[va_range@[i]] == old.get_address_space(proc_ptr)[va_range@[i]]
         &&
         forall|va:VAddr|
             #![auto]
@@ -165,31 +165,31 @@ pub open spec fn syscall_new_container_with_endpoint_spec(old:Kernel, new:Kernel
 
 impl Kernel{
 
-pub fn syscall_new_container_with_endpoint(&mut self, target_thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, pt_regs:Registers, va_range:VaRange4K, init_quota: usize) ->  (ret: SyscallReturnStruct)
+pub fn syscall_new_container_with_endpoint(&mut self, thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, pt_regs:Registers, va_range:VaRange4K, init_quota: usize) ->  (ret: SyscallReturnStruct)
     requires
         old(self).wf(),
-        old(self).thread_dom().contains(target_thread_ptr),
+        old(self).thread_dom().contains(thread_ptr),
         va_range.wf(),
         va_range.len * 3 < usize::MAX,
         4 + init_quota < usize::MAX,
         0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS
     ensures
-        syscall_new_container_with_endpoint_requirement(*old(self), target_thread_ptr, endpoint_index, pt_regs, va_range, init_quota) == false <==> ret.is_error(),
-        syscall_new_container_with_endpoint_spec(*old(self), *self, target_thread_ptr, endpoint_index, pt_regs, va_range, init_quota, ret),
+        syscall_new_container_with_endpoint_requirement(*old(self), thread_ptr, endpoint_index, pt_regs, va_range, init_quota) == false <==> ret.is_error(),
+        syscall_new_container_with_endpoint_spec(*old(self), *self, thread_ptr, endpoint_index, pt_regs, va_range, init_quota, ret),
 {
-    let src_proc_ptr = self.proc_man.get_thread(target_thread_ptr).owning_proc;
-    let src_pcid = self.proc_man.get_proc(src_proc_ptr).pcid;
-    let src_container_ptr = self.proc_man.get_thread(target_thread_ptr).owning_container;
+    let proc_ptr = self.proc_man.get_thread(thread_ptr).owning_proc;
+    let pcid = self.proc_man.get_proc(proc_ptr).pcid;
+    let container_ptr = self.proc_man.get_thread(thread_ptr).owning_container;
 
     proof{
         self.proc_man.thread_inv();
-        assert(self.proc_man.get_proc(src_proc_ptr).owning_container == src_container_ptr);
+        assert(self.proc_man.get_proc(proc_ptr).owning_container == container_ptr);
     }
 
-    if self.proc_man.get_proc(src_proc_ptr).owned_threads.len() >= MAX_NUM_THREADS_PER_PROC{
+    if self.proc_man.get_proc(proc_ptr).owned_threads.len() >= MAX_NUM_THREADS_PER_PROC{
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
-    if self.proc_man.get_container(src_container_ptr).mem_quota < 4 + init_quota{
+    if self.proc_man.get_container(container_ptr).mem_quota < 4 + init_quota{
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
     if self.page_alloc.free_pages_4k.len() < 4 + init_quota{
@@ -199,7 +199,7 @@ pub fn syscall_new_container_with_endpoint(&mut self, target_thread_ptr: ThreadP
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
     
-    let endpoint_ptr_op = self.proc_man.get_endpoint_ptr_by_endpoint_idx(target_thread_ptr, endpoint_index);
+    let endpoint_ptr_op = self.proc_man.get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index);
     if endpoint_ptr_op.is_none(){
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
@@ -208,11 +208,11 @@ pub fn syscall_new_container_with_endpoint(&mut self, target_thread_ptr: ThreadP
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    if self.check_address_space_va_range_shareable(src_proc_ptr, &va_range) == false{
+    if self.check_address_space_va_range_shareable(proc_ptr, &va_range) == false{
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
     
-    if self.proc_man.get_container(src_container_ptr).children.len() >= CONTAINER_CHILD_LIST_LEN{
+    if self.proc_man.get_container(container_ptr).children.len() >= CONTAINER_CHILD_LIST_LEN{
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
@@ -228,7 +228,7 @@ pub fn syscall_new_container_with_endpoint(&mut self, target_thread_ptr: ThreadP
     let (page_map_ptr, mut page_map_perm) = page_perm_to_page_map(page_ptr_1,page_perm_1);
     let new_pcid = self.mem_man.new_page_table(page_ptr_3, page_map_ptr, page_map_perm);
     assert(self.proc_man == old(self).proc_man);
-    self.proc_man.new_container_with_endpoint(target_thread_ptr, endpoint_index, pt_regs, new_pcid, init_quota, page_ptr_2, page_perm_2, page_ptr_3, page_perm_3, page_ptr_4, page_perm_4);
+    self.proc_man.new_container_with_endpoint(thread_ptr, endpoint_index, pt_regs, new_pcid, init_quota, page_ptr_2, page_perm_2, page_ptr_3, page_perm_3, page_ptr_4, page_perm_4);
 
     assert(self.mem_man.wf());
     assert(self.page_alloc.wf());
@@ -253,7 +253,7 @@ pub fn syscall_new_container_with_endpoint(&mut self, target_thread_ptr: ThreadP
     assert(old(self).page_alloc.allocated_pages_4k().contains(page_ptr_2) == false);
     assert(old(self).proc_man.page_closure().contains(page_ptr_2) == false);
     assert(old(self).container_dom().contains(page_ptr_2) == false);
-    self.range_create_and_share_mapping(src_proc_ptr, &va_range, page_ptr_3, &va_range);
+    self.range_create_and_share_mapping(proc_ptr, &va_range, page_ptr_3, &va_range);
 
     return SyscallReturnStruct::NoSwitchNew(RetValueType::SuccessThreeUsize{value1:page_ptr_2, value2:page_ptr_3, value3:page_ptr_4});
 }

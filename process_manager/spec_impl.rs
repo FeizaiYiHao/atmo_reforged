@@ -975,12 +975,12 @@ impl ProcessManager{
                 &&
                 self.get_thread(self.get_endpoint(e_ptr).queue@[i]).state == ThreadState::BLOCKED,
     {}
-    pub proof fn pcid_unique(&self, target_proc_ptr:ProcPtr)
+    pub proof fn pcid_unique(&self, proc_ptr:ProcPtr)
         requires
             self.wf(),
-            self.proc_dom().contains(target_proc_ptr) 
+            self.proc_dom().contains(proc_ptr) 
         ensures
-            forall|p_ptr:ProcPtr| #![auto] self.proc_dom().contains(p_ptr) && target_proc_ptr != p_ptr ==> self.get_proc(p_ptr).pcid != self.get_proc(target_proc_ptr).pcid,
+            forall|p_ptr:ProcPtr| #![auto] self.proc_dom().contains(p_ptr) && proc_ptr != p_ptr ==> self.get_proc(p_ptr).pcid != self.get_proc(proc_ptr).pcid,
     {}
 
     pub proof fn wf_imply_proc_to_unique_pcid(&self) 
@@ -1074,14 +1074,14 @@ impl ProcessManager{
         }
     }
 
-    pub fn new_thread(&mut self, target_proc_ptr:ProcPtr, pt_regs:Registers, page_ptr: PagePtr, page_perm: Tracked<PagePerm4k>) -> (ret:ThreadPtr)
+    pub fn new_thread(&mut self, proc_ptr:ProcPtr, pt_regs:Registers, page_ptr: PagePtr, page_perm: Tracked<PagePerm4k>) -> (ret:ThreadPtr)
         requires
             old(self).wf(),
-            old(self).proc_dom().contains(target_proc_ptr),
+            old(self).proc_dom().contains(proc_ptr),
             old(self).page_closure().contains(page_ptr) == false,
-            old(self).get_proc(target_proc_ptr).owned_threads.len() < MAX_NUM_THREADS_PER_PROC,
-            old(self).get_container_by_proc_ptr(target_proc_ptr).mem_quota > 0,
-            old(self).get_container_by_proc_ptr(target_proc_ptr).scheduler.len() < MAX_CONTAINER_SCHEDULER_LEN,
+            old(self).get_proc(proc_ptr).owned_threads.len() < MAX_NUM_THREADS_PER_PROC,
+            old(self).get_container_by_proc_ptr(proc_ptr).mem_quota > 0,
+            old(self).get_container_by_proc_ptr(proc_ptr).scheduler.len() < MAX_CONTAINER_SCHEDULER_LEN,
             page_perm@.is_init(),
             page_perm@.addr() == page_ptr,
         ensures
@@ -1091,28 +1091,28 @@ impl ProcessManager{
             self.endpoint_dom() == old(self).endpoint_dom(),
             self.container_dom() == old(self).container_dom(),
             self.thread_dom() == old(self).thread_dom().insert(ret),
-            old(self).get_container(old(self).get_proc(target_proc_ptr).owning_container).mem_quota - 1 == self.get_container(self.get_proc(target_proc_ptr).owning_container).mem_quota,
-            old(self).get_proc(target_proc_ptr).pcid =~= self.get_proc(target_proc_ptr).pcid,
-            old(self).get_proc(target_proc_ptr).ioid =~= self.get_proc(target_proc_ptr).ioid,
-            forall|proc_ptr:ProcPtr|
-                #![trigger self.get_proc(proc_ptr)]
-                self.proc_dom().contains(proc_ptr) && proc_ptr != target_proc_ptr
+            old(self).get_container(old(self).get_proc(proc_ptr).owning_container).mem_quota - 1 == self.get_container(self.get_proc(proc_ptr).owning_container).mem_quota,
+            old(self).get_proc(proc_ptr).pcid =~= self.get_proc(proc_ptr).pcid,
+            old(self).get_proc(proc_ptr).ioid =~= self.get_proc(proc_ptr).ioid,
+            forall|p_ptr:ProcPtr|
+                #![trigger self.get_proc(p_ptr)]
+                self.proc_dom().contains(p_ptr) && p_ptr != proc_ptr
                 ==> 
-                self.get_proc(proc_ptr) =~= old(self).get_proc(proc_ptr),
+                self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
             forall|container_ptr:ContainerPtr|
                 #![trigger self.get_container(container_ptr).owned_procs]
-                self.container_dom().contains(container_ptr) && container_ptr != self.get_proc(target_proc_ptr).owning_container
+                self.container_dom().contains(container_ptr) && container_ptr != self.get_proc(proc_ptr).owning_container
                 ==> 
                 self.get_container(container_ptr).owned_procs =~= old(self).get_container(container_ptr).owned_procs,
     {
         proof{seq_push_lemma::<ThreadPtr>();}
-        let container_ptr = self.get_proc(target_proc_ptr).owning_container;
+        let container_ptr = self.get_proc(proc_ptr).owning_container;
         let old_mem_quota =  self.get_container(container_ptr).mem_quota;
         let old_owned_threads = self.get_container(container_ptr).owned_threads;
-        let mut proc_perm = Tracked(self.process_perms.borrow_mut().tracked_remove(target_proc_ptr));
-        let proc_node_ref = proc_push_thread(target_proc_ptr,&mut proc_perm, &page_ptr);
+        let mut proc_perm = Tracked(self.process_perms.borrow_mut().tracked_remove(proc_ptr));
+        let proc_node_ref = proc_push_thread(proc_ptr,&mut proc_perm, &page_ptr);
         proof {
-            self.process_perms.borrow_mut().tracked_insert(target_proc_ptr, proc_perm.get());
+            self.process_perms.borrow_mut().tracked_insert(proc_ptr, proc_perm.get());
         }
 
         let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
@@ -1123,7 +1123,7 @@ impl ProcessManager{
             self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
         }
 
-        let (thread_ptr, thread_perm) = page_to_thread(page_ptr, page_perm, &pt_regs, container_ptr, target_proc_ptr, proc_node_ref, scheduler_node_ref);
+        let (thread_ptr, thread_perm) = page_to_thread(page_ptr, page_perm, &pt_regs, container_ptr, proc_ptr, proc_node_ref, scheduler_node_ref);
         
         proof {
             self.thread_perms.borrow_mut().tracked_insert(thread_ptr, thread_perm.get());
@@ -1139,14 +1139,14 @@ impl ProcessManager{
         assert(self.processes_wf());
 
         assert(self.threads_process_wf()) by {
-            assert(self.process_perms@[target_proc_ptr].value().owned_threads@ =~= old(self).process_perms@[target_proc_ptr].value().owned_threads@.push(page_ptr));
+            assert(self.process_perms@[proc_ptr].value().owned_threads@ =~= old(self).process_perms@[proc_ptr].value().owned_threads@.push(page_ptr));
             assert(
                 forall|child_t_ptr:ThreadPtr| 
                 #![auto]
-                old(self).process_perms@[target_proc_ptr].value().owned_threads@.contains(child_t_ptr)
+                old(self).process_perms@[proc_ptr].value().owned_threads@.contains(child_t_ptr)
                 ==> self.thread_perms@.dom().contains(child_t_ptr)
                     &&
-                    self.thread_perms@[child_t_ptr].value().owning_proc == target_proc_ptr
+                    self.thread_perms@[child_t_ptr].value().owning_proc == proc_ptr
             );
         };
         assert(self.threads_perms_wf());

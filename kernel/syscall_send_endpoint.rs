@@ -17,23 +17,23 @@ use crate::kernel::Kernel;
 // use crate::pagetable::pagemap_util_t::*;
 use crate::process_manager::thread::IPCPayLoad;
 
-pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, src_endpoint_index:EndpointIdx, ret: SyscallReturnStruct) -> bool {
-    let target_endpoint_ptr = old.get_endpoint_ptr_by_endpoint_idx(target_thread_ptr, endpoint_index).unwrap();
-    let src_container_ptr = old.get_thread(target_thread_ptr).owning_container;
-    let src_endpoint_ptr_op = old.get_thread(target_thread_ptr).endpoint_descriptors@[src_endpoint_index as int];
-    let src_endpoint_ptr = old.get_thread(target_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap();
-    let dst_thread_ptr = old.get_endpoint(target_endpoint_ptr).queue@[0];
-    let dst_container_ptr = old.get_thread(dst_thread_ptr).owning_container;
-    let endpoint_payload_op = old.get_thread(dst_thread_ptr).ipc_payload.get_payload_as_endpoint();
-    let endpoint_payload = old.get_thread(dst_thread_ptr).ipc_payload.get_payload_as_endpoint().unwrap();
+pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, sender_thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, sender_endpoint_payload:EndpointIdx, ret: SyscallReturnStruct) -> bool {
+    let blocking_endpoint_ptr = old.get_endpoint_ptr_by_endpoint_idx(sender_thread_ptr, endpoint_index).unwrap();
+    let sender_container_ptr = old.get_thread(sender_thread_ptr).owning_container;
+    let sender_endpoint_ptr_op = old.get_thread(sender_thread_ptr).endpoint_descriptors@[sender_endpoint_payload as int];
+    let sender_endpoint_ptr = old.get_thread(sender_thread_ptr).endpoint_descriptors@[sender_endpoint_payload as int].unwrap();
+    let receiver_thread_ptr = old.get_endpoint(blocking_endpoint_ptr).queue@[0];
+    let receiver_container_ptr = old.get_thread(receiver_thread_ptr).owning_container;
+    let receiver_endpoint_payload_op = old.get_thread(receiver_thread_ptr).ipc_payload.get_payload_as_endpoint();
+    let receiver_endpoint_payload = old.get_thread(receiver_thread_ptr).ipc_payload.get_payload_as_endpoint().unwrap();
 
-    if old.get_endpoint_exists(target_thread_ptr, endpoint_index) == false{
+    if old.get_endpoint_exists(sender_thread_ptr, endpoint_index) == false{
         old =~= new  
     }
-    else if old.get_endpoint_exists(target_thread_ptr, endpoint_index) && old.sender_queue_full(target_thread_ptr, endpoint_index){
+    else if old.get_endpoint_exists(sender_thread_ptr, endpoint_index) && old.sender_queue_full(sender_thread_ptr, endpoint_index){
         old =~= new
     }
-    else if old.get_endpoint_exists(target_thread_ptr, endpoint_index) && old.no_receiver(target_thread_ptr, endpoint_index){
+    else if old.get_endpoint_exists(sender_thread_ptr, endpoint_index) && old.no_receiver(sender_thread_ptr, endpoint_index){
             // basically nothing changed 
             old.thread_dom() =~= new.thread_dom()
             &&
@@ -45,7 +45,7 @@ pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_threa
             &&
             forall|t_ptr:ThreadPtr| 
                 #![trigger new.get_thread(t_ptr)]
-                old.thread_dom().contains(t_ptr) && t_ptr != target_thread_ptr
+                old.thread_dom().contains(t_ptr) && t_ptr != sender_thread_ptr
                 ==>
                 new.get_thread(t_ptr) =~= old.get_thread(t_ptr)
             &&
@@ -57,13 +57,13 @@ pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_threa
             &&
             forall|c:ContainerPtr| 
                 #![trigger new.get_container_owned_pages(c)]
-                new.container_dom().contains(c) && c != src_container_ptr
+                new.container_dom().contains(c) && c != sender_container_ptr
                 ==>
                 old.get_container(c) =~= new.get_container(c)
             &&
             forall|e_ptr:EndpointPtr| 
                 #![trigger new.get_endpoint(e_ptr)]
-                new.endpoint_dom().contains(e_ptr) && e_ptr != target_endpoint_ptr
+                new.endpoint_dom().contains(e_ptr) && e_ptr != blocking_endpoint_ptr
                 ==> 
                 old.get_endpoint(e_ptr) =~= new.get_endpoint(e_ptr)
             &&
@@ -86,17 +86,17 @@ pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_threa
                 old.get_physical_page_mapping()[page_ptr] == new.get_physical_page_mapping()[page_ptr]
             // Things changed
             &&
-            new.get_thread(target_thread_ptr).endpoint_descriptors@ =~= old.get_thread(target_thread_ptr).endpoint_descriptors@
+            new.get_thread(sender_thread_ptr).endpoint_descriptors@ =~= old.get_thread(sender_thread_ptr).endpoint_descriptors@
             &&
-            new.get_endpoint(target_endpoint_ptr).queue@ =~= old.get_endpoint(target_endpoint_ptr).queue@.push(target_thread_ptr)
+            new.get_endpoint(blocking_endpoint_ptr).queue@ =~= old.get_endpoint(blocking_endpoint_ptr).queue@.push(sender_thread_ptr)
             &&
-            new.get_endpoint(target_endpoint_ptr).owning_threads@ =~= old.get_endpoint(target_endpoint_ptr).owning_threads@
+            new.get_endpoint(blocking_endpoint_ptr).owning_threads@ =~= old.get_endpoint(blocking_endpoint_ptr).owning_threads@
             &&
-            new.get_thread(target_thread_ptr).ipc_payload.get_payload_as_endpoint() == Some(src_endpoint_index)
+            new.get_thread(sender_thread_ptr).ipc_payload.get_payload_as_endpoint() == Some(sender_endpoint_payload)
             &&
-            new.get_endpoint(target_endpoint_ptr).queue_state =~= old.get_endpoint(target_endpoint_ptr).queue_state
+            new.get_endpoint(blocking_endpoint_ptr).queue_state =~= old.get_endpoint(blocking_endpoint_ptr).queue_state
     }
-    else if old.get_endpoint_exists(target_thread_ptr, endpoint_index) && old.receiver_queue_empty(target_thread_ptr, endpoint_index){
+    else if old.get_endpoint_exists(sender_thread_ptr, endpoint_index) && old.receiver_queue_empty(sender_thread_ptr, endpoint_index){
             // basically nothing changed 
             old.thread_dom() =~= new.thread_dom()
             &&
@@ -108,7 +108,7 @@ pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_threa
             &&
             forall|t_ptr:ThreadPtr| 
                 #![trigger new.get_thread(t_ptr)]
-                old.thread_dom().contains(t_ptr) && t_ptr != target_thread_ptr
+                old.thread_dom().contains(t_ptr) && t_ptr != sender_thread_ptr
                 ==>
                 new.get_thread(t_ptr) =~= old.get_thread(t_ptr)
             &&
@@ -120,13 +120,13 @@ pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_threa
             &&
             forall|c:ContainerPtr| 
                 #![trigger new.get_container_owned_pages(c)]
-                new.container_dom().contains(c) && c != src_container_ptr
+                new.container_dom().contains(c) && c != sender_container_ptr
                 ==>
                 old.get_container(c) =~= new.get_container(c)
             &&
             forall|e_ptr:EndpointPtr| 
                 #![trigger new.get_endpoint(e_ptr)]
-                new.endpoint_dom().contains(e_ptr) && e_ptr != target_endpoint_ptr
+                new.endpoint_dom().contains(e_ptr) && e_ptr != blocking_endpoint_ptr
                 ==> 
                 old.get_endpoint(e_ptr) =~= new.get_endpoint(e_ptr)
             &&
@@ -149,32 +149,32 @@ pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_threa
                 old.get_physical_page_mapping()[page_ptr] == new.get_physical_page_mapping()[page_ptr]
             // Things changed
             &&
-            new.get_thread(target_thread_ptr).endpoint_descriptors@ =~= old.get_thread(target_thread_ptr).endpoint_descriptors@
+            new.get_thread(sender_thread_ptr).endpoint_descriptors@ =~= old.get_thread(sender_thread_ptr).endpoint_descriptors@
             &&
-            new.get_endpoint(target_endpoint_ptr).queue@ =~= old.get_endpoint(target_endpoint_ptr).queue@.push(target_thread_ptr)
+            new.get_endpoint(blocking_endpoint_ptr).queue@ =~= old.get_endpoint(blocking_endpoint_ptr).queue@.push(sender_thread_ptr)
             &&
-            new.get_endpoint(target_endpoint_ptr).owning_threads@ =~= old.get_endpoint(target_endpoint_ptr).owning_threads@
+            new.get_endpoint(blocking_endpoint_ptr).owning_threads@ =~= old.get_endpoint(blocking_endpoint_ptr).owning_threads@
             &&
-            new.get_thread(target_thread_ptr).ipc_payload.get_payload_as_endpoint() == Some(src_endpoint_index)
+            new.get_thread(sender_thread_ptr).ipc_payload.get_payload_as_endpoint() == Some(sender_endpoint_payload)
             &&
-            new.get_endpoint(target_endpoint_ptr).queue_state =~= EndpointState::SEND
+            new.get_endpoint(blocking_endpoint_ptr).queue_state =~= EndpointState::SEND
     }
-    else if endpoint_payload_op.is_None(){
+    else if receiver_endpoint_payload_op.is_None(){
         old =~= new
     }
-    else if src_endpoint_ptr_op.is_None(){
+    else if sender_endpoint_ptr_op.is_None(){
         old =~= new
     }
-    else if old.get_endpoint(src_endpoint_ptr).rf_counter == usize::MAX{
+    else if old.get_endpoint(sender_endpoint_ptr).rf_counter == usize::MAX{
         old =~= new
     }
-    else if endpoint_payload >= MAX_NUM_ENDPOINT_DESCRIPTORS{
+    else if receiver_endpoint_payload >= MAX_NUM_ENDPOINT_DESCRIPTORS{
         old =~= new
     }
-    else if old.get_thread(dst_thread_ptr).endpoint_descriptors@[endpoint_payload as int].is_Some() {
+    else if old.get_thread(receiver_thread_ptr).endpoint_descriptors@[receiver_endpoint_payload as int].is_Some() {
         old =~= new
     }
-    else if old.get_is_scheduler_full(dst_container_ptr){
+    else if old.get_is_scheduler_full(receiver_container_ptr){
         old =~= new
     }
     else{
@@ -188,7 +188,7 @@ pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_threa
             &&
             forall|t_ptr:ThreadPtr| 
                 #![trigger new.get_thread(t_ptr)]
-                old.thread_dom().contains(t_ptr) && t_ptr != dst_thread_ptr
+                old.thread_dom().contains(t_ptr) && t_ptr != receiver_thread_ptr
                 ==>
                 new.get_thread(t_ptr) =~= old.get_thread(t_ptr)
             &&
@@ -200,13 +200,13 @@ pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_threa
             &&
             forall|c:ContainerPtr| 
                 #![trigger new.get_container_owned_pages(c)]
-                new.container_dom().contains(c) && c != dst_container_ptr
+                new.container_dom().contains(c) && c != receiver_container_ptr
                 ==>
                 old.get_container(c) =~= new.get_container(c)
             &&
             forall|e_ptr:EndpointPtr| 
                 #![trigger new.get_endpoint(e_ptr)]
-                new.endpoint_dom().contains(e_ptr) && e_ptr != target_endpoint_ptr && e_ptr != src_endpoint_ptr
+                new.endpoint_dom().contains(e_ptr) && e_ptr != blocking_endpoint_ptr && e_ptr != sender_endpoint_ptr
                 ==> 
                 old.get_endpoint(e_ptr) =~= new.get_endpoint(e_ptr)
             &&
@@ -229,108 +229,108 @@ pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, target_threa
                 old.get_physical_page_mapping()[page_ptr] == new.get_physical_page_mapping()[page_ptr]
             // Things changed
             &&
-            new.get_thread(target_thread_ptr).endpoint_descriptors@ =~= old.get_thread(target_thread_ptr).endpoint_descriptors@
+            new.get_thread(sender_thread_ptr).endpoint_descriptors@ =~= old.get_thread(sender_thread_ptr).endpoint_descriptors@
             &&
-            new.get_thread(dst_thread_ptr).endpoint_descriptors@ =~= old.get_thread(dst_thread_ptr).endpoint_descriptors@.update(endpoint_payload as int, Some(src_endpoint_ptr))
+            new.get_thread(receiver_thread_ptr).endpoint_descriptors@ =~= old.get_thread(receiver_thread_ptr).endpoint_descriptors@.update(receiver_endpoint_payload as int, Some(sender_endpoint_ptr))
             &&
-            new.get_endpoint(target_endpoint_ptr).queue@ =~= old.get_endpoint(target_endpoint_ptr).queue@.skip(1)
+            new.get_endpoint(blocking_endpoint_ptr).queue@ =~= old.get_endpoint(blocking_endpoint_ptr).queue@.skip(1)
             &&
-            (target_endpoint_ptr != src_endpoint_ptr ==> new.get_endpoint(target_endpoint_ptr).owning_threads@ =~= old.get_endpoint(target_endpoint_ptr).owning_threads@)
+            (blocking_endpoint_ptr != sender_endpoint_ptr ==> new.get_endpoint(blocking_endpoint_ptr).owning_threads@ =~= old.get_endpoint(blocking_endpoint_ptr).owning_threads@)
             &&
-            new.get_endpoint(target_endpoint_ptr).queue_state =~= old.get_endpoint(target_endpoint_ptr).queue_state
+            new.get_endpoint(blocking_endpoint_ptr).queue_state =~= old.get_endpoint(blocking_endpoint_ptr).queue_state
             &&
-            (target_endpoint_ptr != src_endpoint_ptr ==> new.get_endpoint(src_endpoint_ptr).queue =~= old.get_endpoint(src_endpoint_ptr).queue)
+            (blocking_endpoint_ptr != sender_endpoint_ptr ==> new.get_endpoint(sender_endpoint_ptr).queue =~= old.get_endpoint(sender_endpoint_ptr).queue)
             &&
-            new.get_endpoint(src_endpoint_ptr).owning_threads@ =~= old.get_endpoint(src_endpoint_ptr).owning_threads@.insert(dst_thread_ptr)
+            new.get_endpoint(sender_endpoint_ptr).owning_threads@ =~= old.get_endpoint(sender_endpoint_ptr).owning_threads@.insert(receiver_thread_ptr)
             && 
-            new.get_endpoint(src_endpoint_ptr).queue_state =~= old.get_endpoint(src_endpoint_ptr).queue_state
+            new.get_endpoint(sender_endpoint_ptr).queue_state =~= old.get_endpoint(sender_endpoint_ptr).queue_state
     }
 }
 
 impl Kernel{
 
 
-pub fn syscall_send_endpoint(&mut self, target_thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, src_endpoint_index:EndpointIdx) ->  (ret: SyscallReturnStruct)
+pub fn syscall_send_endpoint(&mut self, sender_thread_ptr: ThreadPtr, endpoint_index: EndpointIdx, sender_endpoint_payload:EndpointIdx) ->  (ret: SyscallReturnStruct)
     requires
         old(self).wf(),
-        old(self).thread_dom().contains(target_thread_ptr),
+        old(self).thread_dom().contains(sender_thread_ptr),
         0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
-        old(self).get_thread(target_thread_ptr).state == ThreadState::RUNNING,
-        0 <= src_endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS
+        old(self).get_thread(sender_thread_ptr).state == ThreadState::RUNNING,
+        0 <= sender_endpoint_payload < MAX_NUM_ENDPOINT_DESCRIPTORS
     ensures
-        syscall_send_endpoint_spec(*old(self), *self, target_thread_ptr, endpoint_index, src_endpoint_index, ret),
+        syscall_send_endpoint_spec(*old(self), *self, sender_thread_ptr, endpoint_index, sender_endpoint_payload, ret),
 {
     proof{
         self.proc_man.thread_inv();
         self.proc_man.endpoint_inv();
     }
 
-    let sender_container_ptr = self.proc_man.get_thread(target_thread_ptr).owning_container;
-    let target_endpoint_ptr_op = self.proc_man.get_thread(target_thread_ptr).endpoint_descriptors.get(endpoint_index);
-    let src_endpoint_ptr_op = self.proc_man.get_thread(target_thread_ptr).endpoint_descriptors.get(src_endpoint_index);
+    let sender_container_ptr = self.proc_man.get_thread(sender_thread_ptr).owning_container;
+    let blocking_endpoint_ptr_op = self.proc_man.get_thread(sender_thread_ptr).endpoint_descriptors.get(endpoint_index);
+    let sender_endpoint_ptr_op = self.proc_man.get_thread(sender_thread_ptr).endpoint_descriptors.get(sender_endpoint_payload);
 
-    if target_endpoint_ptr_op.is_none(){
+    if blocking_endpoint_ptr_op.is_none(){
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);  
     }
-    let target_endpoint_ptr = target_endpoint_ptr_op.unwrap();
-    if self.proc_man.get_endpoint(target_endpoint_ptr).queue_state.is_send() && self.proc_man.get_endpoint(target_endpoint_ptr).queue.len() < MAX_NUM_THREADS_PER_ENDPOINT{
+    let blocking_endpoint_ptr = blocking_endpoint_ptr_op.unwrap();
+    if self.proc_man.get_endpoint(blocking_endpoint_ptr).queue_state.is_send() && self.proc_man.get_endpoint(blocking_endpoint_ptr).queue.len() < MAX_NUM_THREADS_PER_ENDPOINT{
         // Block
-        self.proc_man.block_running_thread(target_thread_ptr, endpoint_index, IPCPayLoad::Endpoint{endpoint_index:src_endpoint_index});
+        self.proc_man.block_running_thread(sender_thread_ptr, endpoint_index, IPCPayLoad::Endpoint{endpoint_index:sender_endpoint_payload});
         assert(self.wf());
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    if self.proc_man.get_endpoint(target_endpoint_ptr).queue_state.is_send() && self.proc_man.get_endpoint(target_endpoint_ptr).queue.len() >= MAX_NUM_THREADS_PER_ENDPOINT{
+    if self.proc_man.get_endpoint(blocking_endpoint_ptr).queue_state.is_send() && self.proc_man.get_endpoint(blocking_endpoint_ptr).queue.len() >= MAX_NUM_THREADS_PER_ENDPOINT{
         // return error
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    if self.proc_man.get_endpoint(target_endpoint_ptr).queue_state.is_receive() && self.proc_man.get_endpoint(target_endpoint_ptr).queue.len() == 0{
+    if self.proc_man.get_endpoint(blocking_endpoint_ptr).queue_state.is_receive() && self.proc_man.get_endpoint(blocking_endpoint_ptr).queue.len() == 0{
         // change queue state and Block
-        self.proc_man.block_running_thread_and_change_queue_state(target_thread_ptr, endpoint_index, IPCPayLoad::Endpoint{endpoint_index:src_endpoint_index}, EndpointState::SEND);
+        self.proc_man.block_running_thread_and_change_queue_state(sender_thread_ptr, endpoint_index, IPCPayLoad::Endpoint{endpoint_index:sender_endpoint_payload}, EndpointState::SEND);
         assert(self.wf());
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    assert(self.receiver_exist(target_thread_ptr, endpoint_index));
+    assert(self.receiver_exist(sender_thread_ptr, endpoint_index));
     
-    let dst_thread_ptr = self.proc_man.get_endpoint(target_endpoint_ptr).queue.get_head();
-    let dst_container_ptr = self.proc_man.get_thread(dst_thread_ptr).owning_container;
-    let endpoint_payload_op = self.proc_man.get_thread(dst_thread_ptr).ipc_payload.get_payload_as_endpoint();
+    let receiver_thread_ptr = self.proc_man.get_endpoint(blocking_endpoint_ptr).queue.get_head();
+    let receiver_container_ptr = self.proc_man.get_thread(receiver_thread_ptr).owning_container;
+    let receiver_endpoint_payload_op = self.proc_man.get_thread(receiver_thread_ptr).ipc_payload.get_payload_as_endpoint();
 
-    if endpoint_payload_op.is_none(){
+    if receiver_endpoint_payload_op.is_none(){
         // receiver not receiving endpoint
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    let endpoint_payload = endpoint_payload_op.unwrap();
+    let receiver_endpoint_payload = receiver_endpoint_payload_op.unwrap();
 
-    if src_endpoint_ptr_op.is_none(){
+    if sender_endpoint_ptr_op.is_none(){
         // passing nothing
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
     
-    let src_endpoint_ptr = src_endpoint_ptr_op.unwrap();
+    let sender_endpoint_ptr = sender_endpoint_ptr_op.unwrap();
 
-    if self.proc_man.get_endpoint(src_endpoint_ptr).rf_counter == usize::MAX{
+    if self.proc_man.get_endpoint(sender_endpoint_ptr).rf_counter == usize::MAX{
         // src endpoint cannot be shared anymore (impossible)
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    if endpoint_payload >= MAX_NUM_ENDPOINT_DESCRIPTORS || self.proc_man.get_thread(dst_thread_ptr).endpoint_descriptors.get(endpoint_payload).is_some(){
+    if receiver_endpoint_payload >= MAX_NUM_ENDPOINT_DESCRIPTORS || self.proc_man.get_thread(receiver_thread_ptr).endpoint_descriptors.get(receiver_endpoint_payload).is_some(){
         // payload is broken or receiver has no space
         //@Xiangdong schedule the reciever 
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
 
-    if self.proc_man.get_container(dst_container_ptr).scheduler.len() >= MAX_CONTAINER_SCHEDULER_LEN{
+    if self.proc_man.get_container(receiver_container_ptr).scheduler.len() >= MAX_CONTAINER_SCHEDULER_LEN{
         // cannot schedule the receiver
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
     // does stuff
-    self.proc_man.schedule_blocked_thread(target_endpoint_ptr);
+    self.proc_man.schedule_blocked_thread(blocking_endpoint_ptr);
     assert(
     forall|t_ptr:ThreadPtr| 
         #![trigger old(self).get_thread(t_ptr)]
@@ -345,11 +345,11 @@ pub fn syscall_send_endpoint(&mut self, target_thread_ptr: ThreadPtr, endpoint_i
         ==> 
         old(self).get_endpoint(e_ptr).queue_state =~= self.get_endpoint(e_ptr).queue_state
     );
-    assert(target_endpoint_ptr != src_endpoint_ptr ==> self.get_endpoint(src_endpoint_ptr).queue =~= old(self).get_endpoint(src_endpoint_ptr).queue);
-    self.proc_man.pass_endpoint(target_thread_ptr, src_endpoint_index, dst_thread_ptr, endpoint_payload);
-    assert(old(self).get_thread(target_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap() == src_endpoint_ptr);
-    assert(self.get_thread(target_thread_ptr).endpoint_descriptors@[src_endpoint_index as int].unwrap() == src_endpoint_ptr);
-    assert(self.get_endpoint(src_endpoint_ptr).queue_state == old(self).get_endpoint(src_endpoint_ptr).queue_state);
+    assert(blocking_endpoint_ptr != sender_endpoint_ptr ==> self.get_endpoint(sender_endpoint_ptr).queue =~= old(self).get_endpoint(sender_endpoint_ptr).queue);
+    self.proc_man.pass_endpoint(sender_thread_ptr, sender_endpoint_payload, receiver_thread_ptr, receiver_endpoint_payload);
+    assert(old(self).get_thread(sender_thread_ptr).endpoint_descriptors@[sender_endpoint_payload as int].unwrap() == sender_endpoint_ptr);
+    assert(self.get_thread(sender_thread_ptr).endpoint_descriptors@[sender_endpoint_payload as int].unwrap() == sender_endpoint_ptr);
+    assert(self.get_endpoint(sender_endpoint_ptr).queue_state == old(self).get_endpoint(sender_endpoint_ptr).queue_state);
     return SyscallReturnStruct::NoSwitchNew(RetValueType::Else);
 }
 
