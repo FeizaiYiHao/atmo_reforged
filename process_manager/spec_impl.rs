@@ -1404,7 +1404,7 @@ impl ProcessManager{
             old(self).thread_dom().contains(thread_ptr),
             old(self).page_closure().contains(page_ptr_1) == false,
             old(self).page_closure().contains(page_ptr_2) == false,
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota >= 3,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota >= 2,
             old(self).get_container(old(self).get_thread(thread_ptr).owning_container).owned_procs.len() < CONTAINER_PROC_LIST_LEN,
             old(self).get_container(old(self).get_thread(thread_ptr).owning_container).scheduler.len() < MAX_CONTAINER_SCHEDULER_LEN,
             0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
@@ -1427,7 +1427,7 @@ impl ProcessManager{
             self.endpoint_dom() == old(self).endpoint_dom(),
             self.container_dom() == old(self).container_dom(),
             self.thread_dom() == old(self).thread_dom().insert(page_ptr_2),
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota - 3 == self.get_container(self.get_thread(thread_ptr).owning_container).mem_quota,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota - 2 == self.get_container(self.get_thread(thread_ptr).owning_container).mem_quota,
             forall|p_ptr:ProcPtr|
                 #![trigger self.get_proc(p_ptr)]
                 old(self).proc_dom().contains(p_ptr)
@@ -1468,7 +1468,7 @@ impl ProcessManager{
         let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
         let proc_list_node_ref = container_push_proc(container_ptr,&mut container_perm, page_ptr_1);
         let scheduler_node_ref = scheduler_push_thread(container_ptr,&mut container_perm, &page_ptr_2);
-        container_set_mem_quota(container_ptr,&mut container_perm, old_mem_quota - 3);
+        container_set_mem_quota(container_ptr,&mut container_perm, old_mem_quota - 2);
         container_set_owned_threads(container_ptr,&mut container_perm, Ghost(old_owned_threads@.insert(page_ptr_2)));
         proof {
             self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
@@ -1588,7 +1588,7 @@ impl ProcessManager{
             old(self).page_closure().contains(page_ptr_1) == false,
             old(self).page_closure().contains(page_ptr_2) == false,
             old(self).page_closure().contains(page_ptr_3) == false,
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota >= 4 + new_quota,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota >= 3 + new_quota,
             old(self).get_container(old(self).get_thread(thread_ptr).owning_container).children.len() < CONTAINER_CHILD_LIST_LEN,
             0 <= endpoint_index < MAX_NUM_ENDPOINT_DESCRIPTORS,
             old(self).get_endpoint_by_endpoint_idx(thread_ptr, endpoint_index).is_Some() || old(self).get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).is_Some(),
@@ -1614,7 +1614,7 @@ impl ProcessManager{
             self.endpoint_dom() == old(self).endpoint_dom(),
             self.container_dom() == old(self).container_dom().insert(page_ptr_1),
             self.thread_dom() == old(self).thread_dom().insert(page_ptr_3),
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota -4 - new_quota == self.get_container(self.get_thread(thread_ptr).owning_container).mem_quota,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota - 3 - new_quota == self.get_container(self.get_thread(thread_ptr).owning_container).mem_quota,
             forall|p_ptr:ProcPtr|
                 #![trigger self.get_proc(p_ptr)]
                 old(self).proc_dom().contains(p_ptr)
@@ -1658,7 +1658,7 @@ impl ProcessManager{
 
         let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
         let child_list_node_ref = container_push_child(container_ptr,&mut container_perm, page_ptr_1);
-        container_set_mem_quota(container_ptr,&mut container_perm, old_mem_quota - 4 - new_quota);
+        container_set_mem_quota(container_ptr,&mut container_perm, old_mem_quota - 3 - new_quota);
         proof {
             self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
         }

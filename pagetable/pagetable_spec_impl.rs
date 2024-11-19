@@ -81,6 +81,7 @@ impl PageTable{
             ret.mapping_2m() == Map::<VAddr,MapEntry>::empty(),
             ret.mapping_1g() == Map::<VAddr,MapEntry>::empty(),
             ret.kernel_entries =~= kernel_entries_ghost,
+            ret.is_empty(),
     {
         assert(
             forall|i:usize|
@@ -144,34 +145,24 @@ impl PageTable{
         ret
     }
 
-    // pub fn init(&mut self)
-    //     requires
-    //         old(self).l4_table@ =~= Map::empty(),
-    //         old(self).l3_tables@ =~= Map::empty(),
-    //         old(self).l2_tables@ =~= Map::empty(),
-    //         old(self).l1_tables@ =~= Map::empty(),
-    //     ensures
-    //         self.wf_mapping(),
-    //         self.get_pagetable_page_closure() =~= Set::empty(),
-    //         self.l4_table@ =~= Map::empty(),
-    //         self.l3_tables@ =~= Map::empty(),
-    //         self.l2_tables@ =~= Map::empty(),
-    //         self.l1_tables@ =~= Map::empty(),
-    //         forall|va:VAddr|#![auto] spec_va_valid(va) ==> self.mapping@.dom().contains(va),
-    //         forall|va:VAddr|#![auto] spec_va_valid(va) ==> self.mapping@[va].is_None(),
-    //     {
-    //         self.cr3 = 0;
-    //         proof{
-    //             pagetable_virtual_mem_lemma();
-    //             self.mapping@ = Map::<VAddr,Option<PageEntry>>::new(
-    //                 |va: VAddr| { spec_va_valid(va)
-    //                 },
-    //                 |va: VAddr| {
-    //                     None
-    //                 }
-    //             );
-    //         }
-    //     }
+    pub open spec fn is_empty(&self) -> bool{
+        &&&
+        forall|i: L4Index| 
+            #![trigger self.l4_table@[self.cr3].value()[i].perm.present]
+            self.kernel_l4_end <= i < 512 ==> self.l4_table@[self.cr3].value()[i].is_empty()
+        &&&
+        self.l3_tables@.dom() == Set::<PageMapPtr>::empty()        
+        &&&
+        self.l2_tables@.dom() == Set::<PageMapPtr>::empty()        
+        &&&
+        self.l1_tables@.dom() == Set::<PageMapPtr>::empty()
+        &&&
+        self.mapping_4k() == Map::<VAddr,MapEntry>::empty()
+        &&&
+        self.mapping_2m() == Map::<VAddr,MapEntry>::empty()
+        &&&
+        self.mapping_1g() == Map::<VAddr,MapEntry>::empty()
+    }
 
     pub closed spec fn page_closure(&self) -> Set<PagePtr>{
             self.l3_tables@.dom() + self.l2_tables@.dom() + self.l1_tables@.dom() + self.l4_table@.dom()
