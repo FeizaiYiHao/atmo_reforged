@@ -25,5 +25,10 @@ verus! {
         pub scheduler: StaticLinkedList<ThreadPtr,MAX_CONTAINER_SCHEDULER_LEN>,
 
         pub owned_threads: Ghost<Set<ThreadPtr>>,
+
+        pub depth:usize,
+        
+        pub uppertree_seq: Ghost<Seq<ContainerPtr>>,
+        pub subtree_set: Ghost<Set<ContainerPtr>>,
     }
 }
