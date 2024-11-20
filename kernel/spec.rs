@@ -167,4 +167,17 @@ impl Kernel {
     }
 }
 
+impl Kernel{
+    pub fn new() -> (ret:Self)
+    {
+        Kernel{
+            page_alloc: PageAllocator::new(),
+            mem_man: MemoryManager::new(),
+            proc_man: ProcessManager::new(),
+        
+            page_mapping: Ghost(Map::<PagePtr, Set<(ProcPtr,VAddr)>>::empty()),
+        }
+    }
+}
+
 }

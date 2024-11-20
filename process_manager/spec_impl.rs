@@ -1024,6 +1024,21 @@ impl ProcessManager{
 
 //exec
 impl ProcessManager{
+
+    pub fn new() -> (ret:Self)
+    {
+        ProcessManager{
+            root_container: 0,
+        
+            container_perms: Tracked(Map::tracked_empty()),
+            process_perms: Tracked(Map::tracked_empty()),
+            thread_perms: Tracked(Map::tracked_empty()),
+            endpoint_perms: Tracked(Map::tracked_empty()),
+        
+            cpu_list: Array::<Cpu, NUM_CPUS>::new(),
+        }
+    }
+
     pub fn set_container_mem_quota(&mut self, container_ptr:ContainerPtr, new_quota:usize)
         requires
             old(self).wf(),
