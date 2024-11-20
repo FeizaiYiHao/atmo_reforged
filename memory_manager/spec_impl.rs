@@ -361,6 +361,30 @@ impl MemoryManager{
         self.pcid_to_proc_wf()
     }
 
+    #[verifier(external_body)]
+    pub fn new() -> (ret:Self)
+    {
+        Self{
+        kernel_entries: Array::<usize,KERNEL_MEM_END_L4INDEX>::new(),
+        kernel_entries_ghost: Ghost(Seq::<PageEntry>::empty()),
+    
+        free_pcids: ArrayVec::<Pcid,PCID_MAX>::new(),
+        pcid_to_proc_ptr: Array::<Option<ProcPtr>,PCID_MAX>::new(),
+        page_tables: Array::<Option<PageTable>,PCID_MAX>::new(),
+        page_table_pages: Ghost(Set::<PagePtr>::empty()),
+    
+        free_ioids: ArrayVec::<IOid,IOID_MAX>::new(), //actual owners are procs
+        iommu_tables:  Array::<Option<PageTable>,IOID_MAX>::new(),
+        iommu_table_pages: Ghost(Set::<PagePtr>::empty()),
+    
+        root_table:RootTable::new(),
+        root_table_cache: Ghost(Seq::<Seq<Seq<Option<(IOid,usize)>>>>::empty()),
+        // pub device_table:MarsArray<MarsArray<Option<(u8,u8,u8)>,256>,IOID_MAX>,
+        // pub ioid_device_table: Ghost<Seq<Set<(u8,u8,u8)>>>,
+    
+        pci_bitmap: PCIBitMap::new(),
+        }
+    }
 
     pub fn get_pagetable_l4_entry(&self, pcid:Pcid, l4i: L4Index) -> (ret: Option<PageEntry>)
         requires
