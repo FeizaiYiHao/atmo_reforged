@@ -10,7 +10,7 @@ use core::mem::MaybeUninit;
         #[verifier(external_body)]
         pub fn new() -> (ret: Self)
             ensures
-                ret.arr_seq@.len() == N,
+                ret.array_wf(),
         {
             unsafe{
                 let ret = Self {

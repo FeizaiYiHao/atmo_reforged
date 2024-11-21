@@ -179,11 +179,20 @@ pub const MAX_CONTAINER_SCHEDULER_LEN:usize = 10;
 // -------------------- End of Const --------------------
 
 // -------------------- Begin of Structs --------------------
+#[derive(Clone, Copy, Debug)]
+pub enum SwitchDecision{
+    NoSwitch,
+    NoThread,
+    SwitchThread,
+    SwitchProc,
+}
+
 #[derive(Clone, Copy)]
 pub struct SyscallReturnStruct{
     pub error_code: RetValueType,
     pub pcid: Option<Pcid>,
     pub cr3: Option<usize>,
+    pub switch_decision: SwitchDecision,
 }
 
 impl SyscallReturnStruct{
@@ -241,11 +250,13 @@ impl SyscallReturnStruct{
             ret.error_code == error_code,
             ret.pcid.is_None(),
             ret.cr3.is_None(),
+            ret.switch_decision == SwitchDecision::NoSwitch,
     {
         return Self{
             error_code:error_code,
             pcid:None,
             cr3:None,
+            switch_decision: SwitchDecision::NoSwitch,
         };
     }
 }

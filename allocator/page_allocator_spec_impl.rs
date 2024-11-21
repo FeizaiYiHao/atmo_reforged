@@ -36,6 +36,38 @@ verus! {
     }
 
     impl PageAllocator{
+
+        #[verifier(external_body)]
+        pub fn new() -> (ret: Self)
+        {
+            let ret = Self {
+                page_array: Array::<Page,NUM_PAGES>::new(),
+
+                free_pages_4k: StaticLinkedList::<PagePtr, NUM_PAGES>::new(),
+                free_pages_2m: StaticLinkedList::<PagePtr, NUM_PAGES>::new(),
+                free_pages_1g: StaticLinkedList::<PagePtr, NUM_PAGES>::new(),
+            
+                allocated_pages_4k: Ghost(Set::empty()),
+                allocated_pages_2m: Ghost(Set::empty()),
+                allocated_pages_1g: Ghost(Set::empty()),
+        
+                mapped_pages_4k: Ghost(Set::empty()),
+                mapped_pages_2m: Ghost(Set::empty()),
+                mapped_pages_1g: Ghost(Set::empty()),
+            
+            
+                page_perms_4k: Tracked(Map::tracked_empty()),
+                page_perms_2m: Tracked(Map::tracked_empty()),
+                page_perms_1g: Tracked(Map::tracked_empty()),
+            
+                container_map_4k: Ghost(Map::empty()),
+                container_map_2m: Ghost(Map::empty()),
+                container_map_1g: Ghost(Map::empty()),
+            };
+    
+            ret
+        }
+
         pub open spec fn page_is_mapped(&self, p:PagePtr) -> bool 
         {
             |||
