@@ -142,5 +142,14 @@ pub proof fn seq_remove_lemma_2<A>()
 {
 
 }
+#[verifier(external_body)]
+pub proof fn seq_index_lemma<A>()
+    ensures       
+        forall|s: Seq<A>, i:int|
+            #![trigger s[i]]
+            s.no_duplicates() ==> s.index_of(s[i]) == i,   
+{
+
+}
 
 }
