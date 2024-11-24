@@ -15,6 +15,8 @@ use crate::pagetable::pagemap_util_t::*;
 use crate::lemma::lemma_u::*;
 use crate::lemma::lemma_t::*;
 
+use crate::allocator::page_allocator_spec_impl::PageAllocator;
+
 pub struct MemoryManager{
     pub kernel_entries: Array<usize,KERNEL_MEM_END_L4INDEX>,
     pub kernel_entries_ghost: Ghost<Seq<PageEntry>>,
@@ -1148,6 +1150,34 @@ impl MemoryManager{
         //    );
         };
         new_pcid
+    }
+
+    #[verifier(external_body)]
+    pub fn init(&mut self, dom0_page_map_ptr:PageMapPtr, kernel_entry:PageMapPtr, new_proc_ptr:ProcPtr, page_alloc:&mut PageAllocator, dom0_page_map_perm: Tracked<PointsTo<PageMap>>){
+        self.kernel_entries.set(0, kernel_entry);
+        for i in 1..PCID_MAX{
+            self.free_pcids.push(PCID_MAX - i);
+            self.pcid_to_proc_ptr.set(PCID_MAX - i, None);
+        }
+
+        for i in 1..PCID_MAX{
+            let (new_page_ptr, new_page_perm) = page_alloc.alloc_page_4k();
+            let (page_map_ptr, page_map_perm) = page_perm_to_page_map(new_page_ptr, new_page_perm);
+            self.page_tables.set(i, Some(PageTable::new(i, self.kernel_entries_ghost, page_map_ptr, page_map_perm)));
+        }
+
+        for i in 0..IOID_MAX{
+            self.free_ioids.push(IOID_MAX - i);
+        }
+
+        for i in 0..IOID_MAX{
+            let (new_page_ptr, new_page_perm) = page_alloc.alloc_page_4k();
+            let (page_map_ptr, page_map_perm) = page_perm_to_page_map(new_page_ptr, new_page_perm);
+            self.iommu_tables.set(i, Some(PageTable::new(i, Ghost(Seq::<PageEntry>::empty()), page_map_ptr, page_map_perm)));
+        }
+
+        self.pcid_to_proc_ptr.set(0, Some(new_proc_ptr));
+        self.page_tables.set(0, Some(PageTable::new(0, self.kernel_entries_ghost, dom0_page_map_ptr, dom0_page_map_perm)));
     }
 }
 }
