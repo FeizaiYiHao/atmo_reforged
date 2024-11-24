@@ -21,47 +21,81 @@ verus! {
             &&&
             forall|c_ptr:ContainerPtr| 
                 #![trigger self.container_perms@[c_ptr].is_init()]
-                #![trigger self.container_perms@[c_ptr].addr()]
-                #![trigger self.container_perms@[c_ptr].value().children.wf()]
-                #![trigger self.container_perms@[c_ptr].value().children.unique()]
-                #![trigger self.container_perms@[c_ptr].value().owned_cpus.wf()]
-                #![trigger self.container_perms@[c_ptr].value().scheduler.wf() ]
-                #![trigger self.container_perms@[c_ptr].value().scheduler.unique()]
-                #![trigger self.container_perms@[c_ptr].value().owned_procs.wf()]
-                #![trigger self.container_perms@[c_ptr].value().owned_procs.unique()]
-                #![trigger self.container_perms@[c_ptr].value().uppertree_seq@.no_duplicates()]
                 self.container_perms@.dom().contains(c_ptr)
                 ==> 
                 self.container_perms@[c_ptr].is_init()
-                &&            
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].addr()]
+                self.container_perms@.dom().contains(c_ptr)
+                ==>        
                 self.container_perms@[c_ptr].addr() == c_ptr
-                &&
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().children.wf()]
+                self.container_perms@.dom().contains(c_ptr)
+                ==> 
                 self.container_perms@[c_ptr].value().children.wf()
-                &&
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().children.unique()]
+                self.container_perms@.dom().contains(c_ptr)
+                ==> 
                 self.container_perms@[c_ptr].value().children.unique()
-                &&
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().owned_cpus.wf()]
+                self.container_perms@.dom().contains(c_ptr)
+                ==> 
                 self.container_perms@[c_ptr].value().owned_cpus.wf()
-                &&
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().scheduler.wf() ]
+                self.container_perms@.dom().contains(c_ptr)
+                ==> 
                 self.container_perms@[c_ptr].value().scheduler.wf() 
-                &&
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().scheduler.unique()]
+                self.container_perms@.dom().contains(c_ptr)
+                ==> 
                 self.container_perms@[c_ptr].value().scheduler.unique() 
-                &&
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().owned_procs.wf()]
+                self.container_perms@.dom().contains(c_ptr)
+                ==> 
                 self.container_perms@[c_ptr].value().owned_procs.wf()
-                &&
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().owned_procs.unique()]
+                self.container_perms@.dom().contains(c_ptr)
+                ==> 
                 self.container_perms@[c_ptr].value().owned_procs.unique()
-                &&
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().uppertree_seq@.no_duplicates()]
+                self.container_perms@.dom().contains(c_ptr)
+                ==> 
                 self.container_perms@[c_ptr].value().uppertree_seq@.no_duplicates()
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@.dom().contains(c_ptr), self.container_perms@[c_ptr].value().children@.contains(c_ptr)]
+                self.container_perms@.dom().contains(c_ptr)
+                ==>
+                self.container_perms@[c_ptr].value().children@.contains(c_ptr) == false
+                &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().subtree_set@.finite()]
+                self.container_perms@.dom().contains(c_ptr)
+                ==>
+                self.container_perms@[c_ptr].value().subtree_set@.finite()
             &&&
             forall|c_ptr:ContainerPtr| 
                 #![trigger self.container_perms@[c_ptr].value().uppertree_seq@.len(), self.container_perms@[c_ptr].value().depth]
                 self.container_perms@.dom().contains(c_ptr)
                 ==>
-                self.container_perms@[c_ptr].value().children@.contains(c_ptr) == false
-                &&
-                self.container_perms@[c_ptr].value().subtree_set@.finite()
-                &&
-                self.container_perms@[c_ptr].value().uppertree_seq@.len() == self.container_perms@[c_ptr].value().depth
-                
+                self.container_perms@[c_ptr].value().uppertree_seq@.len() == self.container_perms@[c_ptr].value().depth    
         }
     
         pub closed spec fn container_root_wf(&self) -> bool{
@@ -71,12 +105,20 @@ verus! {
             self.container_perms@[self.root_container].value().depth == 0
             &&&
             forall|c_ptr:ContainerPtr| 
-                #![trigger self.container_perms@[c_ptr].value().parent.is_Some()]
+                #![trigger self.container_perms@.dom().contains(c_ptr), self.container_perms@[c_ptr].value().depth ]
                 self.container_perms@.dom().contains(c_ptr) 
                 &&
-                self.container_perms@[c_ptr].value().parent.is_Some()   
-                ==> 
                 c_ptr != self.root_container 
+                ==>
+                self.container_perms@[c_ptr].value().depth != 0
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().parent.is_Some() ]
+                self.container_perms@.dom().contains(c_ptr) 
+                &&
+                c_ptr != self.root_container 
+                ==>
+                self.container_perms@[c_ptr].value().parent.is_Some()  
         }
     
         pub closed spec fn container_childern_list_wf(&self) -> bool{
@@ -99,21 +141,20 @@ verus! {
         pub closed spec fn containers_linkedlist_wf(&self) -> bool{  
             &&&
             forall|c_ptr:ContainerPtr| 
-                #![trigger self.container_perms@[c_ptr].value().parent.is_Some()]
                 #![trigger self.container_perms@.dom().contains(self.container_perms@[c_ptr].value().parent.unwrap())]
+                self.container_perms@.dom().contains(c_ptr) && c_ptr != self.root_container 
+                ==> 
+                self.container_perms@.dom().contains(self.container_perms@[c_ptr].value().parent.unwrap())
+            &&&
+            forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().parent_rev_ptr.is_Some()]
                 #![trigger self.container_perms@[self.container_perms@[c_ptr].value().parent.unwrap()].value().children@.contains(c_ptr)]
                 #![trigger self.container_perms@[self.container_perms@[c_ptr].value().parent.unwrap()].value().children.node_ref_valid(self.container_perms@[c_ptr].value().parent_rev_ptr.unwrap())]
                 #![trigger self.container_perms@[self.container_perms@[c_ptr].value().parent.unwrap()].value().children.node_ref_resolve(self.container_perms@[c_ptr].value().parent_rev_ptr.unwrap())]
                 self.container_perms@.dom().contains(c_ptr) && c_ptr != self.root_container 
                 ==> 
-                self.container_perms@[c_ptr].value().parent.is_Some()   
-                &&
-                self.container_perms@[c_ptr].value().depth != 0
-                &&
-                self.container_perms@.dom().contains(self.container_perms@[c_ptr].value().parent.unwrap())
-                &&
                 self.container_perms@[c_ptr].value().parent_rev_ptr.is_Some()
-                && 
+                &&
                 self.container_perms@[self.container_perms@[c_ptr].value().parent.unwrap()].value().children@.contains(c_ptr)
                 && 
                 self.container_perms@[self.container_perms@[c_ptr].value().parent.unwrap()].value().children.node_ref_valid(self.container_perms@[c_ptr].value().parent_rev_ptr.unwrap())
@@ -179,6 +220,31 @@ verus! {
                 )
         }
 
+        pub open spec fn tree_wf(&self) -> bool{
+            &&&
+            self.container_subtree_set_wf()
+            &&&
+            self.container_uppertree_seq_wf()
+        }
+
+        pub open spec fn linked_list_wf(&self) -> bool{
+            &&&
+            self.container_childern_list_wf()
+            &&&
+            self.containers_linkedlist_wf()
+        }
+        
+        pub open spec fn rest_specs(&self) -> bool{
+            &&&
+            self.container_perms_wf()
+            &&&
+            self.container_root_wf()
+            &&&
+            self.container_childern_depth_wf()
+            &&&
+            self.container_subtree_set_exclusive()
+        }
+
         pub open spec fn wf(&self) -> bool{
             &&&
             self.container_perms_wf()
@@ -222,63 +288,30 @@ verus! {
             ensures
                 self.container_perms@[c_ptr].value().subtree_set@ =~= Set::empty(),
         {
-            assert(forall|s_ptr:ContainerPtr|
-                #![auto]
-                self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr)
-                ==>
-                self.container_perms@[s_ptr].value().uppertree_seq@.contains(c_ptr)
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@.subrange(0,self.container_perms@[c_ptr].value().depth as int) == self.container_perms@[c_ptr].value().uppertree_seq@
-                &&
-                s_ptr != self.root_container
-                &&
-                self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false
-                &&
-                self.container_perms@[s_ptr].value().parent.unwrap() != c_ptr
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[s_ptr].value().depth - 1] != c_ptr
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth as int] == c_ptr
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@.len() > self.container_perms@[c_ptr].value().depth
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@.len() != self.container_perms@[c_ptr].value().depth + 1
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@.contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1])
-                &&
-                self.container_perms@.dom().contains(s_ptr)
-            );
-            assert(forall|s_ptr:ContainerPtr|
-                #![auto]
-                self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr)
-                ==>
-                self.container_perms@.dom().contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1])
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@.contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1])
-            );
-            assert(forall|s_ptr:ContainerPtr|
-                #![auto]
-                self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr)
-                ==>
-                self.container_perms@[s_ptr].value().uppertree_seq@.subrange(0,self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth as int) 
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@.contains(c_ptr));
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@.subrange(0,self.container_perms@[c_ptr].value().depth as int) == self.container_perms@[c_ptr].value().uppertree_seq@);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> s_ptr != self.root_container);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().parent.unwrap() != c_ptr);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[s_ptr].value().depth - 1] != c_ptr);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth as int] == c_ptr);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@.len() > self.container_perms@[c_ptr].value().depth);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@.len() != self.container_perms@[c_ptr].value().depth + 1);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@.contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]));
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@.dom().contains(s_ptr));
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@.dom().contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]));
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@.contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]));
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@.subrange(0,self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth as int) 
                     =~= 
-                    self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@.no_duplicates()
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@.index_of(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]) == self.container_perms@[c_ptr].value().depth + 1
-                &&
-                self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth == self.container_perms@[c_ptr].value().depth + 1
-                &&
-                self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth as int] == c_ptr
-                &&
-                self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@[
-                    self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth - 1] == c_ptr
-                &&
-                self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().parent.unwrap() == c_ptr
-                &&
-                self.container_perms@[c_ptr].value().children@.contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1])
-            );
+                    self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@.no_duplicates());
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[s_ptr].value().uppertree_seq@.index_of(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]) == self.container_perms@[c_ptr].value().depth + 1);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth == self.container_perms@[c_ptr].value().depth + 1);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth as int] == c_ptr);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@[
+                    self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth - 1] == c_ptr);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().parent.unwrap() == c_ptr);
+            assert(forall|s_ptr:ContainerPtr| #![auto] self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr) ==> self.container_perms@[c_ptr].value().children@.contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]));
         }
 
         pub proof fn in_child_impy_in_subtree(&self, c_ptr:ContainerPtr, child_ptr:ContainerPtr, s_ptr:ContainerPtr)
@@ -290,22 +323,13 @@ verus! {
             ensures
                 self.container_perms@[c_ptr].value().subtree_set@.contains(s_ptr),
         {
-            assert(
-                self.container_perms@[child_ptr].value().parent.unwrap() == c_ptr
-                &&
-                self.container_perms@[child_ptr].value().depth == self.container_perms@[c_ptr].value().depth + 1
-                &&
-                self.container_perms@[child_ptr].value().uppertree_seq@.len() == self.container_perms@[child_ptr].value().depth
-                &&
-                self.container_perms@[c_ptr].value().uppertree_seq@.len() == self.container_perms@[c_ptr].value().depth
-                &&
-                self.container_perms@[child_ptr].value().uppertree_seq@[self.container_perms@[child_ptr].value().depth - 1] == c_ptr
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@.subrange(0, self.container_perms@[child_ptr].value().depth as int) == self.container_perms@[child_ptr].value().uppertree_seq@
-                &&
-                self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth as int] == c_ptr
-            );
-
+            assert(self.container_perms@[child_ptr].value().parent.unwrap() == c_ptr);
+            assert(self.container_perms@[child_ptr].value().depth == self.container_perms@[c_ptr].value().depth + 1);
+            assert(self.container_perms@[child_ptr].value().uppertree_seq@.len() == self.container_perms@[child_ptr].value().depth);
+            assert(self.container_perms@[c_ptr].value().uppertree_seq@.len() == self.container_perms@[c_ptr].value().depth);
+            assert(self.container_perms@[child_ptr].value().uppertree_seq@[self.container_perms@[child_ptr].value().depth - 1] == c_ptr);
+            assert(self.container_perms@[s_ptr].value().uppertree_seq@.subrange(0, self.container_perms@[child_ptr].value().depth as int) == self.container_perms@[child_ptr].value().uppertree_seq@);
+            assert(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth as int] == c_ptr);
             assert(self.container_perms@[s_ptr].value().uppertree_seq@.contains(c_ptr));
         }
 
@@ -321,71 +345,91 @@ verus! {
                     #![auto]
                     self.container_perms@[c_ptr].value().children@.contains(child_ptr) && self.container_perms@[child_ptr].value().subtree_set@.contains(s_ptr)),
         {
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
+                    self.container_perms@[s_ptr].value().uppertree_seq@.subrange(0,self.container_perms@[c_ptr].value().depth as int) == self.container_perms@[c_ptr].value().uppertree_seq@
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
+                    s_ptr != self.root_container
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
+                    self.container_perms@[s_ptr].value().parent.unwrap() != c_ptr
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
+                    self.container_perms@[s_ptr].value().uppertree_seq@.len() > self.container_perms@[c_ptr].value().depth
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
+                    self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[s_ptr].value().depth - 1] != c_ptr
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
+                    self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth as int] == c_ptr
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
+                    self.container_perms@[s_ptr].value().uppertree_seq@.len() > self.container_perms@[c_ptr].value().depth
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
+                    self.container_perms@[s_ptr].value().uppertree_seq@.len() != self.container_perms@[c_ptr].value().depth + 1
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
+                    self.container_perms@[s_ptr].value().uppertree_seq@.len() > self.container_perms@[c_ptr].value().depth + 1
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[s_ptr].value().uppertree_seq@.contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]));
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@.dom().contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1])
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[s_ptr].value().uppertree_seq@.subrange(0,self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth as int) 
+                    =~= self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[s_ptr].value().uppertree_seq@.no_duplicates()
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[s_ptr].value().uppertree_seq@.index_of(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]) == self.container_perms@[c_ptr].value().depth + 1
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth == self.container_perms@[c_ptr].value().depth + 1
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@.len() == self.container_perms@[c_ptr].value().depth + 1
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth as int] == c_ptr
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@[
+                    self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth - 1] == c_ptr
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().parent.unwrap() == c_ptr
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[c_ptr].value().children@.contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1])
+            );
+            assert(self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==> 
+                self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().subtree_set@.contains(s_ptr)
+            );
             assert(                
                 self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
                 (exists|child_ptr:ContainerPtr| 
                 #![auto]
                 self.container_perms@[c_ptr].value().children@.contains(child_ptr) && self.container_perms@[child_ptr].value().subtree_set@.contains(s_ptr)
                 )
-            ) by {
+            );
+        }
 
-                assert(
-                    self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
-                    (
-                        // self.container_perms@.dom().contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1])
-                        // &&
-                        self.container_perms@[s_ptr].value().uppertree_seq@.contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1])
-                        &&
-                        self.container_perms@.dom().contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1])
-                        &&
-                        self.container_perms@[s_ptr].value().uppertree_seq@.subrange(0,self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth as int) 
-                            =~= self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@
-                        &&
-                        self.container_perms@[s_ptr].value().uppertree_seq@.no_duplicates()
-                        &&
-                        self.container_perms@[s_ptr].value().uppertree_seq@.index_of(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]) == self.container_perms@[c_ptr].value().depth + 1
-                        &&
-                        self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth == self.container_perms@[c_ptr].value().depth + 1
-                        &&
-                        self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@.len() == self.container_perms@[c_ptr].value().depth + 1
-                        &&
-                        self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth as int] == c_ptr
-                        &&
-                        self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().uppertree_seq@[
-                            self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().depth - 1] == c_ptr
-                        &&
-                        self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().parent.unwrap() == c_ptr
-                        &&
-                        self.container_perms@[c_ptr].value().children@.contains(self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1])
-                        &&
-                        self.container_perms@[self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth + 1]].value().subtree_set@.contains(s_ptr)
-                    )
-                ) by {
-                    assert(
-                        self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false ==>
-                        (
-                            self.container_perms@[s_ptr].value().uppertree_seq@.subrange(0,self.container_perms@[c_ptr].value().depth as int) == self.container_perms@[c_ptr].value().uppertree_seq@
-                            &&
-                            s_ptr != self.root_container
-                            &&
-                            self.container_perms@[s_ptr].value().parent.unwrap() != c_ptr
-                            &&
-                            self.container_perms@[s_ptr].value().uppertree_seq@.len() > self.container_perms@[c_ptr].value().depth
-                            &&
-                            self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[s_ptr].value().depth - 1] != c_ptr
-                            &&
-                            self.container_perms@[s_ptr].value().uppertree_seq@[self.container_perms@[c_ptr].value().depth as int] == c_ptr
-                            &&
-                            self.container_perms@[s_ptr].value().uppertree_seq@.len() > self.container_perms@[c_ptr].value().depth
-                            &&
-                            self.container_perms@[s_ptr].value().uppertree_seq@.len() != self.container_perms@[c_ptr].value().depth + 1
-                            &&
-                            self.container_perms@[s_ptr].value().uppertree_seq@.len() > self.container_perms@[c_ptr].value().depth + 1
-                        )
-                    );
-                };
-            }
-
+        pub proof fn not_in_dom_imply_not_in_any_children_set(&self, s_ptr:ContainerPtr)
+            requires
+                self.wf(),
+                self.container_perms@.dom().contains(s_ptr) == false,
+        {
+            assert(
+                forall|c_ptr:ContainerPtr|
+                    #![auto]
+                    self.container_perms@.dom().contains(c_ptr)
+                    ==>
+                    self.container_perms@[c_ptr].value().children@.contains(s_ptr) == false
+            );
         }
                 
     }
@@ -406,6 +450,7 @@ verus! {
             proof{
                 seq_push_lemma::<ContainerPtr>();
             }
+            assert(self.container_perms@[child_ptr].value().parent.is_Some());
             let tracked child_perm = self.container_perms.borrow().tracked_borrow(child_ptr);
             let child : &Container = PPtr::<Container>::from_usize(child_ptr).borrow(Tracked(child_perm));
             let mut current_parent_ptr = child.parent.unwrap();
@@ -439,6 +484,7 @@ verus! {
                 assert(self.container_perms@[child_ptr].value().uppertree_seq@.no_duplicates());
                 assert(self.container_perms@[child_ptr].value().uppertree_seq@.index_of(current_parent_ptr) == depth - 1);
                 assert(self.container_perms@[current_parent_ptr].value().depth == depth - 1);
+                assert(self.container_perms@[current_parent_ptr].value().parent.is_Some());
                 let tracked current_parent_perm = self.container_perms.borrow().tracked_borrow(current_parent_ptr);
                 assert(current_parent_perm.addr() == current_parent_ptr);
                 let current_parent : &Container = PPtr::<Container>::from_usize(current_parent_ptr).borrow(Tracked(current_parent_perm));
@@ -464,42 +510,84 @@ verus! {
                 self.root_container == old(self).root_container,
                 old(self).container_perms@.dom() == self.container_perms@.dom(),
                 forall|c_ptr:ContainerPtr| 
-                    #![trigger self.container_perms@[c_ptr], old(self).container_perms@[c_ptr]] 
+                    #![trigger self.container_perms@[c_ptr]] 
                     self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) == false 
                     ==> 
                     self.container_perms@[c_ptr] =~= old(self).container_perms@[c_ptr],
                 forall|c_ptr:ContainerPtr| 
-                    #![trigger self.container_perms@[c_ptr], old(self).container_perms@[c_ptr]]
+                    #![trigger self.container_perms@[c_ptr].is_init()] 
                     self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
                     ==>
-                    self.container_perms@[c_ptr].is_init()
-                    &&            
-                    self.container_perms@[c_ptr].addr() == old(self).container_perms@[c_ptr].addr()
-                    &&
-                    self.container_perms@[c_ptr].value().owned_procs =~= old(self).container_perms@[c_ptr].value().owned_procs
-                    &&
-                    self.container_perms@[c_ptr].value().parent =~= old(self).container_perms@[c_ptr].value().parent
-                    &&
-                    self.container_perms@[c_ptr].value().parent_rev_ptr =~= old(self).container_perms@[c_ptr].value().parent_rev_ptr
-                    &&
-                    self.container_perms@[c_ptr].value().children =~= old(self).container_perms@[c_ptr].value().children
-                    &&
-                    self.container_perms@[c_ptr].value().owned_endpoints =~= old(self).container_perms@[c_ptr].value().owned_endpoints
-                    &&
-                    self.container_perms@[c_ptr].value().mem_quota =~= old(self).container_perms@[c_ptr].value().mem_quota
-                    &&
-                    self.container_perms@[c_ptr].value().mem_used =~= old(self).container_perms@[c_ptr].value().mem_used
-                    &&
-                    self.container_perms@[c_ptr].value().owned_cpus =~= old(self).container_perms@[c_ptr].value().owned_cpus
-                    &&
-                    self.container_perms@[c_ptr].value().scheduler =~= old(self).container_perms@[c_ptr].value().scheduler
-                    &&
-                    self.container_perms@[c_ptr].value().owned_threads =~= old(self).container_perms@[c_ptr].value().owned_threads
-                    &&
-                    self.container_perms@[c_ptr].value().depth =~= old(self).container_perms@[c_ptr].value().depth
-                    &&
-                    self.container_perms@[c_ptr].value().uppertree_seq =~= old(self).container_perms@[c_ptr].value().uppertree_seq
-                    &&
+                    self.container_perms@[c_ptr].is_init(),
+                forall|c_ptr:ContainerPtr| 
+                    #![trigger self.container_perms@[c_ptr].addr()] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>           
+                    self.container_perms@[c_ptr].addr() == old(self).container_perms@[c_ptr].addr(),
+                forall|c_ptr:ContainerPtr| 
+                    #![trigger self.container_perms@[c_ptr].value().owned_procs] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().owned_procs =~= old(self).container_perms@[c_ptr].value().owned_procs,
+                forall|c_ptr:ContainerPtr| 
+                    #![trigger self.container_perms@[c_ptr].value().parent] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().parent =~= old(self).container_perms@[c_ptr].value().parent,
+                forall|c_ptr:ContainerPtr| 
+                    #![trigger self.container_perms@[c_ptr].value().parent_rev_ptr] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().parent_rev_ptr =~= old(self).container_perms@[c_ptr].value().parent_rev_ptr,
+                forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@.dom().contains(c_ptr), self.container_perms@[c_ptr].value().children] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().children =~= old(self).container_perms@[c_ptr].value().children,
+                forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().owned_endpoints] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().owned_endpoints =~= old(self).container_perms@[c_ptr].value().owned_endpoints,
+                forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().mem_quota] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().mem_quota =~= old(self).container_perms@[c_ptr].value().mem_quota,
+                forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().mem_used] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().mem_used =~= old(self).container_perms@[c_ptr].value().mem_used,
+                forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().owned_cpus] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().owned_cpus =~= old(self).container_perms@[c_ptr].value().owned_cpus,
+                forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@.dom().contains(c_ptr), self.container_perms@[c_ptr].value().scheduler] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().scheduler =~= old(self).container_perms@[c_ptr].value().scheduler,
+                forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().owned_threads] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().owned_threads =~= old(self).container_perms@[c_ptr].value().owned_threads,
+                forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().depth] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().depth =~= old(self).container_perms@[c_ptr].value().depth,
+                forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().uppertree_seq] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
+                    self.container_perms@[c_ptr].value().uppertree_seq =~= old(self).container_perms@[c_ptr].value().uppertree_seq,
+                forall|c_ptr:ContainerPtr| 
+                #![trigger self.container_perms@[c_ptr].value().subtree_set@] 
+                    self.container_perms@.dom().contains(c_ptr) && seq@.contains(c_ptr) 
+                    ==>
                     self.container_perms@[c_ptr].value().subtree_set@ =~= old(self).container_perms@[c_ptr].value().subtree_set@.insert(subchild_ptr),
         {}
 
@@ -513,7 +601,7 @@ verus! {
                 page_perm_1@.is_init(),
                 page_perm_1@.addr() == page_ptr_1,
             ensures
-                // self.wf(),   
+                self.wf(),   
         {
             let tracked container_perm = self.container_perms.borrow().tracked_borrow(container_ptr);
             let container : &Container = PPtr::<Container>::from_usize(container_ptr).borrow(Tracked(container_perm));
@@ -555,6 +643,7 @@ verus! {
                 seq_push_lemma::<ContainerPtr>();
             };
 
+
             self.upper_tree_add_container(Ghost(uppertree_seq@.push(container_ptr)), new_container_ptr);
             // self.upper_tree_add_container(uppertree_seq, new_container_ptr);
             
@@ -566,70 +655,63 @@ verus! {
                 assert(uppertree_seq@.push(container_ptr).contains(new_container_ptr) == false) by {
                     seq_push_lemma::<ContainerPtr>();
                 }
-            //     assert( 
-            //         forall|c_ptr:ContainerPtr| 
-            //         #![trigger old(self).container_perms@.dom().contains(c_ptr), self.container_perms@[c_ptr] ] 
-            //         self.container_perms@.dom().contains(c_ptr) && uppertree_seq@.push(container_ptr).contains(c_ptr) == false && c_ptr != new_container_ptr 
-            //         ==> 
-            //         self.container_perms@[c_ptr] =~= old(self).container_perms@[c_ptr]
-            //     );
-            //     assert( 
-            //     forall|c_ptr:ContainerPtr| 
-            //         #![auto]
-            //         self.container_perms@.dom().contains(c_ptr) && uppertree_seq@.contains(c_ptr) 
-            //         ==>
-            //         self.container_perms@[c_ptr].is_init()
-            //         &&            
-            //         self.container_perms@[c_ptr].addr() == old(self).container_perms@[c_ptr].addr()
-            //         &&
-            //         self.container_perms@[c_ptr].value().owned_procs =~= old(self).container_perms@[c_ptr].value().owned_procs
-            //         &&
-            //         self.container_perms@[c_ptr].value().parent =~= old(self).container_perms@[c_ptr].value().parent
-            //         &&
-            //         self.container_perms@[c_ptr].value().parent_rev_ptr =~= old(self).container_perms@[c_ptr].value().parent_rev_ptr
-            //         &&
-            //         self.container_perms@[c_ptr].value().children =~= old(self).container_perms@[c_ptr].value().children
-            //         &&
-            //         self.container_perms@[c_ptr].value().owned_endpoints =~= old(self).container_perms@[c_ptr].value().owned_endpoints
-            //         &&
-            //         self.container_perms@[c_ptr].value().mem_quota =~= old(self).container_perms@[c_ptr].value().mem_quota
-            //         &&
-            //         self.container_perms@[c_ptr].value().mem_used =~= old(self).container_perms@[c_ptr].value().mem_used
-            //         &&
-            //         self.container_perms@[c_ptr].value().owned_cpus =~= old(self).container_perms@[c_ptr].value().owned_cpus
-            //         &&
-            //         self.container_perms@[c_ptr].value().scheduler =~= old(self).container_perms@[c_ptr].value().scheduler
-            //         &&
-            //         self.container_perms@[c_ptr].value().owned_threads =~= old(self).container_perms@[c_ptr].value().owned_threads
-            //         &&
-            //         self.container_perms@[c_ptr].value().depth =~= old(self).container_perms@[c_ptr].value().depth
-            //         &&
-            //         self.container_perms@[c_ptr].value().uppertree_seq =~= old(self).container_perms@[c_ptr].value().uppertree_seq
-            //         &&
-            //         self.container_perms@[c_ptr].value().subtree_set@ =~= old(self).container_perms@[c_ptr].value().subtree_set@.insert(new_container_ptr)
-            //     ) by {
-            //         seq_push_lemma::<ContainerPtr>();
-            //     };
-            // assert(self.container_perms_wf()) by {
-            // };
-            // assert(self.container_root_wf()) by {
-            // };
-            // assert(self.container_childern_list_wf()) by {
-            //     seq_push_lemma::<ContainerPtr>();
-            // };
-            // assert(self.containers_linkedlist_wf()) by {
-            //     seq_push_lemma::<ContainerPtr>();
-            // };
-            // assert(self.container_childern_depth_wf()) by {
-            //     seq_push_lemma::<ContainerPtr>();
-            //     // assert(self.container_perms@[container_ptr].value().depth + 1 == self.container_perms@[new_container_ptr].value().depth);
-            // };
-            // assert(self.container_subtree_set_wf()) by {
-            // };
-            // assert(self.container_uppertree_seq_wf()) by {
-            //     seq_push_lemma::<ContainerPtr>();
-            // };
-            // assert(self.container_subtree_set_exclusive());
+                assert(uppertree_seq@.push(container_ptr).no_duplicates()) by {
+                    seq_push_lemma::<ContainerPtr>();
+                    seq_push_unique_lemma::<ContainerPtr>();
+                }
+
+            assert(self.rest_specs()) by {
+                assert(self.container_perms_wf()) by {
+                    seq_push_unique_lemma::<ContainerPtr>();
+                    seq_push_lemma::<ContainerPtr>();
+                    assert(forall|c_ptr:ContainerPtr| 
+                        #![trigger self.container_perms@[c_ptr].value().uppertree_seq]
+                        self.container_perms@.dom().contains(c_ptr) && c_ptr != new_container_ptr
+                        ==> 
+                        self.container_perms@[c_ptr].value().uppertree_seq@ =~= old(self).container_perms@[c_ptr].value().uppertree_seq@);
+                };
+                assert(self.container_root_wf()) by {
+                };
+                assert(self.container_childern_depth_wf()) by {
+                    seq_push_lemma::<ContainerPtr>();
+                    
+                    assert(forall|c_ptr:ContainerPtr| 
+                        #![trigger self.container_perms@[c_ptr].value().uppertree_seq@]
+                        #![trigger self.container_perms@[c_ptr].value().parent]
+                        #![trigger self.container_perms@[c_ptr].value().depth]
+                        self.container_perms@.dom().contains(c_ptr) && c_ptr != self.root_container && c_ptr != new_container_ptr
+                        ==>
+                        self.container_perms@[c_ptr].value().uppertree_seq@ =~= old(self).container_perms@[c_ptr].value().uppertree_seq@
+                        &&
+                        self.container_perms@[c_ptr].value().parent == old(self).container_perms@[c_ptr].value().parent
+                        &&
+                        self.container_perms@[c_ptr].value().depth == old(self).container_perms@[c_ptr].value().depth
+                    );
+                };
+                assert(self.container_subtree_set_exclusive())by {
+                    seq_push_lemma::<ContainerPtr>();
+                    seq_push_unique_lemma::<ContainerPtr>();
+                };
+            }
+            assert(self.tree_wf()) by {
+                assert(self.container_subtree_set_wf()) by {
+                    seq_push_lemma::<ContainerPtr>();
+                    seq_push_unique_lemma::<ContainerPtr>();
+                };
+                assert(self.container_uppertree_seq_wf()) by {
+                    seq_push_lemma::<ContainerPtr>();
+                    seq_push_unique_lemma::<ContainerPtr>();
+                };
+            }
+
+            assert(self.linked_list_wf()) by {
+                assert(self.container_childern_list_wf()) by {
+                    seq_push_lemma::<ContainerPtr>();
+                };
+                assert(self.containers_linkedlist_wf()) by {
+                    seq_push_lemma::<ContainerPtr>();
+                };
+            }
         }
     }
 }
