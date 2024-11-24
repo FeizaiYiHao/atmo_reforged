@@ -8,6 +8,7 @@ verus! {
     // use vstd::simple_pptr::*;
     use crate::lemma::lemma_u::*;
     use vstd::set_lib::*;
+    use crate::array_vec::ArrayVec;
 
     pub struct PageAllocator{
         pub page_array: Array<Page,NUM_PAGES>,
@@ -66,6 +67,273 @@ verus! {
             };
     
             ret
+        }
+
+        #[verifier(external_body)]
+        pub fn init(&mut self, boot_pages:&mut ArrayVec::<(PageState, usize), NUM_PAGES>, container_ptr:ContainerPtr)
+        {
+            for index in 0..NUM_PAGES{
+                match boot_pages.get(index).0{
+                    PageState::Unavailable4k =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Unavailable4k ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+                    PageState::Unavailable2m =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Unavailable2m ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+                    
+                    PageState::Unavailable1g =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Unavailable1g ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+
+                    PageState::Pagetable =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Pagetable ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+
+                    PageState::Allocated4k =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Allocated4k ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+
+                    PageState::Allocated2m =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Allocated2m ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+
+                    PageState::Allocated1g =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Allocated1g ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+
+                    
+                    PageState::Free4k =>{
+                        let node_ref = self.free_pages_4k.push(&page_index2page_ptr(index));
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Free4k ,
+                                is_io_page: false,
+                                rev_pointer: node_ref,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+
+                    PageState::Free2m =>{
+                        let node_ref = self.free_pages_2m.push(&page_index2page_ptr(index));
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Free2m ,
+                                is_io_page: false,
+                                rev_pointer: node_ref,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+
+                    PageState::Free1g =>{
+                        let node_ref = self.free_pages_1g.push(&page_index2page_ptr(index));
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Free1g ,
+                                is_io_page: false,
+                                rev_pointer: node_ref,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+
+                    PageState::Mapped4k =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Mapped4k ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 1,
+                                owning_container: Some(container_ptr),
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+
+                    PageState::Mapped2m =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Mapped2m ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 1,
+                                owning_container: Some(container_ptr),
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+
+                    PageState::Mapped1g =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Mapped1g ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 1,
+                                owning_container: Some(container_ptr),
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+               
+                    PageState::Merged2m =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Merged2m ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+               
+                    PageState::Merged1g =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Merged1g ,
+                                is_io_page: false,
+                                rev_pointer: 0,
+                                ref_count: 0,
+                                owning_container: None,
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+               
+                    PageState::Io =>{
+                        self.page_array.set(index,
+                            Page{
+                                addr: page_index2page_ptr(index),
+                                state: PageState::Io ,
+                                is_io_page: true,
+                                rev_pointer: 0,
+                                ref_count: 1,
+                                owning_container: Some(container_ptr),
+                        
+                                mappings: Ghost(Set::<(Pcid,VAddr)>::empty()),
+                                io_mappings: Ghost(Set::<(IOid,VAddr)>::empty()),
+                            }
+                        );
+                    },
+                }
+            }
         }
 
         pub open spec fn page_is_mapped(&self, p:PagePtr) -> bool 
