@@ -17,6 +17,7 @@ verus! {
     use crate::lemma::lemma_u::*;
     use crate::lemma::lemma_t::*;
     use crate::array_set::ArraySet;
+    use core::mem::MaybeUninit;
 
 pub struct ProcessManager{
     pub root_container: ContainerPtr,
@@ -1036,6 +1037,69 @@ impl ProcessManager{
             endpoint_perms: Tracked(Map::tracked_empty()),
         
             cpu_list: Array::<Cpu, NUM_CPUS>::new(),
+        }
+    }
+    
+    #[verifier(external_body)]
+    pub fn init(&mut self, dom_0_container_ptr:ContainerPtr, dom_0_proc_ptr:ProcPtr, dom_0_thread_ptr:ThreadPtr, init_quota:usize, page_perm_0: Tracked<PagePerm4k>, page_perm_1: Tracked<PagePerm4k>, page_perm_2: Tracked<PagePerm4k>)
+    {
+        unsafe{
+            self.root_container = dom_0_container_ptr;
+            let root_container_ptr = dom_0_container_ptr as *mut MaybeUninit<Container>;
+            (*root_container_ptr).assume_init_mut().owned_procs.init();
+
+            let sll1 = (*root_container_ptr).assume_init_mut().owned_procs.push(&dom_0_proc_ptr);
+            (*root_container_ptr).assume_init_mut().parent = None;
+            (*root_container_ptr).assume_init_mut().parent_rev_ptr = None;
+            (*root_container_ptr).assume_init_mut().children.init();
+            (*root_container_ptr).assume_init_mut().owned_endpoints.init();
+            (*root_container_ptr).assume_init_mut().mem_quota = init_quota;
+            (*root_container_ptr).assume_init_mut().mem_used = 0;
+            (*root_container_ptr).assume_init_mut().owned_cpus.init();
+            (*root_container_ptr).assume_init_mut().scheduler.init();
+            let sll2 = (*root_container_ptr).assume_init_mut().scheduler.push(&dom_0_thread_ptr);
+
+            let root_proc_ptr = dom_0_proc_ptr as *mut MaybeUninit<Process>;
+            (*root_proc_ptr).assume_init_mut().owning_container = dom_0_container_ptr;
+            (*root_proc_ptr).assume_init_mut().rev_ptr = sll2;
+            (*root_proc_ptr).assume_init_mut().pcid = 0;
+            (*root_proc_ptr).assume_init_mut().ioid = None;
+            (*root_proc_ptr).assume_init_mut().owned_threads.init(); 
+            let sll3 = (*root_proc_ptr).assume_init_mut().owned_threads.push(&dom_0_thread_ptr);
+            
+            let root_thread_ptr = dom_0_thread_ptr as *mut MaybeUninit<Thread>;
+            (*root_thread_ptr).assume_init_mut().owning_container = dom_0_container_ptr;
+            (*root_thread_ptr).assume_init_mut().owning_proc = dom_0_proc_ptr;
+            (*root_thread_ptr).assume_init_mut().state = ThreadState::SCHEDULED;
+            (*root_thread_ptr).assume_init_mut().proc_rev_ptr = sll3;
+            (*root_thread_ptr).assume_init_mut().scheduler_rev_ptr = Some(sll2);
+            (*root_thread_ptr).assume_init_mut().blocking_endpoint_ptr = None;
+            (*root_thread_ptr).assume_init_mut().endpoint_rev_ptr = None;
+            (*root_thread_ptr).assume_init_mut().running_cpu = None;
+            (*root_thread_ptr).assume_init_mut().endpoint_descriptors.init2none();
+            (*root_thread_ptr).assume_init_mut().ipc_payload = IPCPayLoad::Empty;
+            (*root_thread_ptr).assume_init_mut().error_code = None;
+
+            for i in 0..2{
+                (*root_container_ptr).assume_init_mut().owned_cpus.insert(i);
+                self.cpu_list.set(i,
+                    Cpu{
+                        owning_container: dom_0_container_ptr,
+                        active: true,
+                        current_thread: None,
+                    }
+                );
+            }
+            for i in 2..NUM_CPUS{
+                (*root_container_ptr).assume_init_mut().owned_cpus.insert(i);
+                self.cpu_list.set(i,
+                    Cpu{
+                        owning_container: dom_0_container_ptr,
+                        active: false,
+                        current_thread: None,
+                    }
+                );
+            }
         }
     }
 

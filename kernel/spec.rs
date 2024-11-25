@@ -4,6 +4,9 @@ use crate::allocator::page_allocator_spec_impl::*;
 use crate::memory_manager::spec_impl::*;
 use crate::process_manager::spec_impl::*;
 use crate::util::page_ptr_util_u::*;
+use vstd::simple_pptr::PointsTo;
+use crate::pagetable::pagemap::PageMap;
+use crate::array_vec::ArrayVec;
 use crate::define::*;
 
 pub struct Kernel{
@@ -177,6 +180,18 @@ impl Kernel{
         
             page_mapping: Ghost(Map::<PagePtr, Set<(ProcPtr,VAddr)>>::empty()),
         }
+    }
+
+    #[verifier(external_body)]
+    pub fn kernel_init(&mut self, dom_0_container_ptr:ContainerPtr, dom_0_proc_ptr:ProcPtr, dom_0_thread_ptr:ThreadPtr, init_quota:usize, 
+        boot_pages:&mut ArrayVec::<(PageState, usize), NUM_PAGES>, container_ptr:ContainerPtr,
+        dom0_page_map_ptr:PageMapPtr, kernel_entry:PageMapPtr,
+        page_perm_0: Tracked<PagePerm4k>, page_perm_1: Tracked<PagePerm4k>, page_perm_2: Tracked<PagePerm4k>, dom0_page_map_perm: Tracked<PointsTo<PageMap>>
+    )
+    {
+        self.page_alloc.init(boot_pages, dom_0_container_ptr);
+        self.mem_man.init(dom0_page_map_ptr, kernel_entry, dom_0_proc_ptr, &mut self.page_alloc, dom0_page_map_perm);
+        self.proc_man.init(dom_0_container_ptr, dom_0_proc_ptr, dom_0_thread_ptr, init_quota, page_perm_0, page_perm_1, page_perm_2);
     }
 }
 
