@@ -102,6 +102,8 @@ pub open spec fn syscall_mmap_spec(old:Kernel, new:Kernel, thread_id: ThreadPtr,
         new.get_container(container_ptr).owned_endpoints@ =~= old.get_container(container_ptr).owned_endpoints@
         //Things that changed
         &&
+        mmapped_physcial_pages_seq@.contains(page_ptr) ==> old.get_physical_page_mapping().dom().contains(page_ptr) == false
+        &&
         new.get_physical_page_mapping().dom() =~= old.get_physical_page_mapping().dom() + mmapped_physcial_pages_seq.to_set()
         &&
         forall|i:usize| #![auto] 0<=i<va_range.len ==>
@@ -148,6 +150,8 @@ pub fn syscall_mmap(&mut self, thread_ptr: ThreadPtr, va_range: VaRange4K) ->  (
 
     let (num_page, seq_pages) = self.range_alloc_and_map(proc_ptr, &va_range);
     
+    assert(forall|j:usize| #![auto] 0<=j<seq_pages@.len() ==> old(self).page_alloc.mapped_pages_4k().contains(seq_pages@[j as int]) == false);
+    assert(forall|page_ptr:PagePtr| #![auto] seq_pages@.contains(page_ptr) ==> old(self).get_physical_page_mapping().dom().contains(page_ptr) == false);
     return SyscallReturnStruct::NoSwitchNew(RetValueType::SuccessSeqUsize{value: seq_pages});
 }
 

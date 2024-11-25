@@ -289,6 +289,7 @@ impl Kernel{
                 ret.1@.contains(p) == false
                 ==> 
                 self.page_alloc.page_is_mapped(p) == old(self).page_alloc.page_is_mapped(p),
+            va_range.len == ret.1@.len(),
             forall|j:usize| #![auto] 0<=j<va_range.len ==> old(self).page_alloc.page_is_mapped(ret.1@[j as int]) == false,
             forall|j:usize| #![auto] 0<=j<va_range.len ==> self.page_alloc.page_is_mapped(ret.1@[j as int]) == true,
             self.get_num_of_free_pages() == old(self).get_num_of_free_pages() - ret.0,
