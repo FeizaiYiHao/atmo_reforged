@@ -102,7 +102,7 @@ pub open spec fn syscall_mmap_spec(old:Kernel, new:Kernel, thread_id: ThreadPtr,
         new.get_container(container_ptr).owned_endpoints@ =~= old.get_container(container_ptr).owned_endpoints@
         //Things that changed
         &&
-        mmapped_physcial_pages_seq@.contains(page_ptr) ==> old.get_physical_page_mapping().dom().contains(page_ptr) == false
+        mmapped_physcial_pages_seq.contains(page_ptr) ==> old.get_physical_page_mapping().dom().contains(page_ptr) == false
         &&
         new.get_physical_page_mapping().dom() =~= old.get_physical_page_mapping().dom() + mmapped_physcial_pages_seq.to_set()
         &&
