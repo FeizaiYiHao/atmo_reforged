@@ -1,5 +1,3 @@
-use std::thread::Thread;
-
 use vstd::prelude::*;
 verus! {
 use crate::define::*;
