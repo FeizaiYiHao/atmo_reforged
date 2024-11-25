@@ -152,6 +152,19 @@ impl Kernel{
         &&&
         self.page_mapping_wf()
     }
+
+    pub open spec fn total_quota_wf(&self) -> bool{
+        &&&
+        self.get_num_of_free_pages() ==
+            self.container_dom().fold(0, |e:int, a:ContainerPtr| e + self.get_container(a).mem_quota)
+    }
+
+    pub open spec fn total_wf(&self) -> bool{
+        &&&
+        self.wf()
+        &&&
+        self.total_quota_wf()
+    }
 }
 
 impl Kernel {
@@ -168,7 +181,36 @@ impl Kernel {
     {
         self.proc_man.process_inv();
     }
+    
+    // @TODO: prove this
+    #[verifier(external_body)]
+    pub proof fn fold_change_lemma(&self, old:Kernel, mod_c_ptr:ContainerPtr)
+        requires
+            self.container_dom() == old.container_dom(),
+            self.container_dom().contains(mod_c_ptr),
+            forall|c_ptr:ContainerPtr|
+                #![auto]
+                self.container_dom().contains(c_ptr) && c_ptr != mod_c_ptr
+                ==>
+                self.get_container(c_ptr).mem_quota == old.get_container(c_ptr).mem_quota
+        ensures
+            self.container_dom().fold(0, |e:int, a:ContainerPtr| e + self.get_container(a).mem_quota)
+            ==
+            old.container_dom().fold(0, |e:int, a:ContainerPtr| e + old.get_container(a).mem_quota) - old.get_container(mod_c_ptr).mem_quota + self.get_container(mod_c_ptr).mem_quota
+    {}
+
+    // @TODO: prove this
+    #[verifier(external_body)]
+    pub proof fn fold_lemma(&self)
+        ensures
+            forall|c_ptr:ContainerPtr|
+            #![auto]
+            self.container_dom().contains(c_ptr)
+            ==>
+            self.container_dom().fold(0, |e:int, a:ContainerPtr| e + self.get_container(a).mem_quota) >= self.get_container(c_ptr).mem_quota 
+    {}
 }
+
 
 impl Kernel{
     pub fn new() -> (ret:Self)
