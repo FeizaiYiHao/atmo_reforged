@@ -67,6 +67,10 @@ impl EndpointState{
             _ => false,
         }
     }
+
+    // pub open spec fn is_receive_spec(&self) -> bool {
+    //     self matches EndpointState { foo } &&  foo == EndpointState::SEND
+    // }
 }
 
 #[derive(Clone, Copy, Debug)]

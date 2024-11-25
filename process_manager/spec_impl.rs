@@ -1838,7 +1838,11 @@ impl ProcessManager{
         assert(self.threads_cpu_wf());
         assert(self.threads_container_wf());
     }
-
+    
+    /// Overview:
+    /// yield the given thread 
+    /// save the payload onto given thread
+    /// push given thread onto endpoint queue 
     pub fn block_running_thread(&mut self, thread_ptr:ThreadPtr, endpoint_index:EndpointIdx, ipc_payload:IPCPayLoad)
         requires
             old(self).wf(),

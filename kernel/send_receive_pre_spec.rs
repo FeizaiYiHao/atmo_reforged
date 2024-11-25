@@ -3,6 +3,8 @@ verus! {
 use crate::kernel::Kernel;
 use crate::define::*;
 impl Kernel{
+
+    /// This is actually checking the endpoint queue state is SEND.
     pub open spec fn no_receiver(&self, thread_ptr: ThreadPtr, endpoint_index: EndpointIdx) -> bool{
         let endpoint_ptr = self.get_endpoint_ptr_by_endpoint_idx(thread_ptr, endpoint_index).unwrap();
         &&&

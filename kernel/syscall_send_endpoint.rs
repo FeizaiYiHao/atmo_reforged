@@ -249,7 +249,19 @@ pub open spec fn syscall_send_endpoint_spec(old:Kernel, new:Kernel, sender_threa
 
 impl Kernel{
 
-
+///
+/// pass payload only below are satisified
+/// &&& endpoint must be well formed
+/// &&& sender payload must be well formed
+/// &&& receiver payload must be well formed
+/// &&& endpoint state is correct with respect to send.
+/// 
+/// endpoint state 
+/// | queue state | queue len | action |
+/// | send        | >= 0      | block  |
+/// | receive     | == 0      | block + changed queue state |
+/// | receive     | > 0       | success |
+/// 
 pub fn syscall_send_endpoint(&mut self, sender_thread_ptr: ThreadPtr, blocking_endpoint_index: EndpointIdx, sender_endpoint_payload:EndpointIdx) ->  (ret: SyscallReturnStruct)
     requires
         old(self).wf(),
@@ -259,12 +271,12 @@ pub fn syscall_send_endpoint(&mut self, sender_thread_ptr: ThreadPtr, blocking_e
         0 <= sender_endpoint_payload < MAX_NUM_ENDPOINT_DESCRIPTORS
     ensures
         syscall_send_endpoint_spec(*old(self), *self, sender_thread_ptr, blocking_endpoint_index, sender_endpoint_payload, ret),
+        self.wf()
 {
     proof{
         self.proc_man.thread_inv();
         self.proc_man.endpoint_inv();
     }
-
     let sender_container_ptr = self.proc_man.get_thread(sender_thread_ptr).owning_container;
     let blocking_endpoint_ptr_op = self.proc_man.get_thread(sender_thread_ptr).endpoint_descriptors.get(blocking_endpoint_index);
     let sender_endpoint_ptr_op = self.proc_man.get_thread(sender_thread_ptr).endpoint_descriptors.get(sender_endpoint_payload);
@@ -311,7 +323,6 @@ pub fn syscall_send_endpoint(&mut self, sender_thread_ptr: ThreadPtr, blocking_e
     }
     
     let sender_endpoint_ptr = sender_endpoint_ptr_op.unwrap();
-
     if self.proc_man.get_endpoint(sender_endpoint_ptr).rf_counter == usize::MAX{
         // src endpoint cannot be shared anymore (impossible)
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
@@ -329,7 +340,6 @@ pub fn syscall_send_endpoint(&mut self, sender_thread_ptr: ThreadPtr, blocking_e
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    // does stuff
     self.proc_man.schedule_blocked_thread(blocking_endpoint_ptr);
     assert(
     forall|t_ptr:ThreadPtr| 

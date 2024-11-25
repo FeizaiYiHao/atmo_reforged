@@ -62,7 +62,6 @@ impl Kernel{
         self.proc_man.get_container(c_ptr).mem_quota
     }
 
-
     pub open spec fn get_endpoint(&self, e_ptr:EndpointPtr) -> &Endpoint
         recommends
             self.wf(),
