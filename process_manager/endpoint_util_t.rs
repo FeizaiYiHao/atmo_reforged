@@ -32,6 +32,50 @@ pub fn endpoint_add_ref(endpoint_ptr:EndpointPtr, endpoint_perm: &mut Tracked<Po
 }
 
 #[verifier(external_body)]
+pub fn endpoint_set_sll_index(endpoint_ptr:EndpointPtr, endpoint_perm: &mut Tracked<PointsTo<Endpoint>>, sll_index: SLLIndex)
+    requires    
+        old(endpoint_perm)@.is_init(),
+        old(endpoint_perm)@.addr() == endpoint_ptr,
+    ensures
+        endpoint_perm@.is_init(),
+        endpoint_perm@.addr() == endpoint_ptr, 
+        endpoint_perm@.value().queue == old(endpoint_perm)@.value().queue,
+        endpoint_perm@.value().queue_state == old(endpoint_perm)@.value().queue_state,
+        endpoint_perm@.value().rf_counter == old(endpoint_perm)@.value().rf_counter,
+        endpoint_perm@.value().owning_threads == old(endpoint_perm)@.value().owning_threads,
+        endpoint_perm@.value().owning_container == old(endpoint_perm)@.value().owning_container,
+        endpoint_perm@.value().container_rev_ptr == sll_index,
+        endpoint_perm@.value().rf_counter == old(endpoint_perm)@.value().rf_counter,
+{
+    unsafe{
+        let uptr = endpoint_ptr as *mut MaybeUninit<Endpoint>;
+        let ret = (*uptr).assume_init_mut().container_rev_ptr = sll_index;
+    }
+}
+
+#[verifier(external_body)]
+pub fn endpoint_set_owning_container(endpoint_ptr:EndpointPtr, endpoint_perm: &mut Tracked<PointsTo<Endpoint>>, owning_container: ContainerPtr)
+    requires    
+        old(endpoint_perm)@.is_init(),
+        old(endpoint_perm)@.addr() == endpoint_ptr,
+    ensures
+        endpoint_perm@.is_init(),
+        endpoint_perm@.addr() == endpoint_ptr, 
+        endpoint_perm@.value().queue == old(endpoint_perm)@.value().queue,
+        endpoint_perm@.value().queue_state == old(endpoint_perm)@.value().queue_state,
+        endpoint_perm@.value().rf_counter == old(endpoint_perm)@.value().rf_counter,
+        endpoint_perm@.value().owning_threads == old(endpoint_perm)@.value().owning_threads,
+        endpoint_perm@.value().owning_container == owning_container,
+        endpoint_perm@.value().container_rev_ptr == old(endpoint_perm)@.value().container_rev_ptr,
+        endpoint_perm@.value().rf_counter == old(endpoint_perm)@.value().rf_counter,
+{
+    unsafe{
+        let uptr = endpoint_ptr as *mut MaybeUninit<Endpoint>;
+        let ret = (*uptr).assume_init_mut().owning_container = owning_container;
+    }
+}
+
+#[verifier(external_body)]
 pub fn endpoint_pop_head(endpoint_ptr:EndpointPtr, endpoint_perm: &mut Tracked<PointsTo<Endpoint>>) -> (ret:(ThreadPtr,SLLIndex))
     requires    
         old(endpoint_perm)@.is_init(),
@@ -171,5 +215,60 @@ pub fn endpoint_push_and_set_state(endpoint_ptr:EndpointPtr, endpoint_perm: &mut
         ret
     }
 }
+
+#[verifier(external_body)]
+pub fn page_to_endpoint(page_ptr: PagePtr, page_perm: Tracked<PagePerm4k>) -> (ret:(EndpointPtr,Tracked<PointsTo<Endpoint>>))
+    requires    
+        page_perm@.is_init(),
+        page_perm@.addr() == page_ptr,
+    ensures
+        ret.0 == page_ptr,
+        ret.1@.is_init(),
+        ret.1@.addr() == ret.0,
+        ret.1@.value().queue.wf(),
+        ret.1@.value().queue.unique(),
+        ret.1@.value().queue@ =~= Seq::<ThreadPtr>::empty(),
+        ret.1@.value().queue_state =~= EndpointState::SEND,
+        ret.1@.value().rf_counter =~= 0,
+        ret.1@.value().owning_threads@ =~= Set::<ThreadPtr>::empty(),
+        ret.1@.value().owning_container == 0,
+        ret.1@.value().container_rev_ptr == 0,
+{
+    unsafe{
+        let uptr = page_ptr as *mut MaybeUninit<Endpoint>;
+        (*uptr).assume_init_mut().queue.init();
+        (*uptr).assume_init_mut().queue_state = EndpointState::SEND;
+        (*uptr).assume_init_mut().rf_counter = 0;
+        (*uptr).assume_init_mut().owning_container = 0;
+        (*uptr).assume_init_mut().container_rev_ptr = 0;
+        (page_ptr, Tracked::assume_new())
+    }
+}
+
+
+pub fn page_to_endpoint_with_thread_and_container(owning_container:ContainerPtr, owning_thread:ThreadPtr, sll:SLLIndex, page_ptr: PagePtr, page_perm: Tracked<PagePerm4k>) -> (ret:(EndpointPtr,Tracked<PointsTo<Endpoint>>))
+    requires    
+        page_perm@.is_init(),
+        page_perm@.addr() == page_ptr,
+    ensures
+        ret.0 == page_ptr,
+        ret.1@.is_init(),
+        ret.1@.addr() == ret.0,
+        ret.1@.value().queue.wf(),
+        ret.1@.value().queue.unique(),
+        ret.1@.value().queue@ =~= Seq::<ThreadPtr>::empty(),
+        ret.1@.value().queue_state =~= EndpointState::SEND,
+        ret.1@.value().rf_counter =~= 1,
+        ret.1@.value().owning_threads@ =~= Set::<ThreadPtr>::empty().insert(owning_thread),
+        ret.1@.value().owning_container == owning_container,
+        ret.1@.value().container_rev_ptr == sll,
+{
+    let (mut endpoint_ptr, mut endpoint_perm) = page_to_endpoint(page_ptr, page_perm);
+    endpoint_add_ref(endpoint_ptr, &mut endpoint_perm, owning_thread);
+    endpoint_set_owning_container(endpoint_ptr, &mut endpoint_perm, owning_container);
+    endpoint_set_sll_index(endpoint_ptr, &mut endpoint_perm, sll);
+    (endpoint_ptr, endpoint_perm)
+}
+
 
 }
