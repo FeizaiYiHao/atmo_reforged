@@ -273,13 +273,13 @@ pub fn syscall_receive_endpoint(&mut self, receiver_thread_ptr: ThreadPtr, block
         return SyscallReturnStruct::NoSwitchNew(RetValueType::Error);
     }
 
-    self.proc_man.schedule_blocked_thread(blocking_endpoint_ptr); // change sender status to schedule
+    self.proc_man.schedule_blocked_thread(blocking_endpoint_ptr);
     assert(
-    forall|t_ptr:ThreadPtr| 
-        #![trigger old(self).get_thread(t_ptr)]
-        old(self).thread_dom().contains(t_ptr) 
-        ==>
-        old(self).get_thread(t_ptr).endpoint_descriptors =~= self.get_thread(t_ptr).endpoint_descriptors
+        forall|t_ptr:ThreadPtr| 
+            #![trigger old(self).get_thread(t_ptr)]
+            old(self).thread_dom().contains(t_ptr) 
+            ==>
+            old(self).get_thread(t_ptr).endpoint_descriptors =~= self.get_thread(t_ptr).endpoint_descriptors
     );
     assert(
         forall|e_ptr:EndpointPtr| 
@@ -288,7 +288,9 @@ pub fn syscall_receive_endpoint(&mut self, receiver_thread_ptr: ThreadPtr, block
         ==> 
         old(self).get_endpoint(e_ptr).queue_state =~= self.get_endpoint(e_ptr).queue_state
     );
+
     self.proc_man.pass_endpoint(sender_thread_ptr, sender_endpoint_payload, receiver_thread_ptr, receiver_endpoint_payload);
+    
     return SyscallReturnStruct::NoSwitchNew(RetValueType::Else);
 }
 

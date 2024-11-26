@@ -342,21 +342,23 @@ pub fn syscall_send_endpoint(&mut self, sender_thread_ptr: ThreadPtr, blocking_e
 
     self.proc_man.schedule_blocked_thread(blocking_endpoint_ptr);
     assert(
-    forall|t_ptr:ThreadPtr| 
-        #![trigger old(self).get_thread(t_ptr)]
-        old(self).thread_dom().contains(t_ptr) 
-        ==>
-        old(self).get_thread(t_ptr).endpoint_descriptors =~= self.get_thread(t_ptr).endpoint_descriptors
-    );
+        forall|t_ptr:ThreadPtr| 
+            #![trigger old(self).get_thread(t_ptr)]
+            old(self).thread_dom().contains(t_ptr) 
+            ==>
+            old(self).get_thread(t_ptr).endpoint_descriptors =~= self.get_thread(t_ptr).endpoint_descriptors
+        );
     assert(
-        forall|e_ptr:EndpointPtr| 
-        #![trigger self.get_endpoint(e_ptr)]
-        self.endpoint_dom().contains(e_ptr)
-        ==> 
-        old(self).get_endpoint(e_ptr).queue_state =~= self.get_endpoint(e_ptr).queue_state
+            forall|e_ptr:EndpointPtr| 
+            #![trigger self.get_endpoint(e_ptr)]
+            self.endpoint_dom().contains(e_ptr)
+            ==> 
+            old(self).get_endpoint(e_ptr).queue_state =~= self.get_endpoint(e_ptr).queue_state
     );
     assert(blocking_endpoint_ptr != sender_endpoint_ptr ==> self.get_endpoint(sender_endpoint_ptr).queue =~= old(self).get_endpoint(sender_endpoint_ptr).queue);
+    
     self.proc_man.pass_endpoint(sender_thread_ptr, sender_endpoint_payload, receiver_thread_ptr, receiver_endpoint_payload);
+
     assert(old(self).get_thread(sender_thread_ptr).endpoint_descriptors@[sender_endpoint_payload as int].unwrap() == sender_endpoint_ptr);
     assert(self.get_thread(sender_thread_ptr).endpoint_descriptors@[sender_endpoint_payload as int].unwrap() == sender_endpoint_ptr);
     assert(self.get_endpoint(sender_endpoint_ptr).queue_state == old(self).get_endpoint(sender_endpoint_ptr).queue_state);
