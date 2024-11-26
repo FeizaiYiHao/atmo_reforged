@@ -956,11 +956,14 @@ impl ProcessManager{
                 #![trigger self.container_dom().contains(c_ptr)]
                 #![trigger self.get_container(c_ptr).owned_cpus.wf()]
                 #![trigger self.get_container(c_ptr).scheduler.wf()]
+                #![trigger self.get_container(c_ptr).owned_endpoints.wf()]
                 self.container_dom().contains(c_ptr)
                 ==>
                 self.get_container(c_ptr).owned_cpus.wf()
                 &&
                 self.get_container(c_ptr).scheduler.wf()
+                &&
+                self.get_container(c_ptr).owned_endpoints.wf()
     {}
     pub proof fn endpoint_inv(&self)
         requires 
@@ -2224,7 +2227,7 @@ impl ProcessManager{
                 self.get_proc(p_ptr) =~= old(self).get_proc(p_ptr),
             forall|container_ptr:ContainerPtr|
                 #![trigger self.get_container(container_ptr)]
-                self.container_dom().contains(container_ptr) && container_ptr != self.get_thread(thread_ptr).owning_container
+                self.container_dom().contains(container_ptr) && container_ptr != old(self).get_thread(thread_ptr).owning_container
                 ==> 
                 self.get_container(container_ptr) =~= old(self).get_container(container_ptr),
             forall|t_ptr:ThreadPtr| 
@@ -2237,12 +2240,12 @@ impl ProcessManager{
                 old(self).endpoint_dom().contains(e_ptr)
                 ==> 
                 old(self).get_endpoint(e_ptr) =~= self.get_endpoint(e_ptr),
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota - 1 == self.get_container(self.get_thread(thread_ptr).owning_container).mem_quota,
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).owned_cpus == self.get_container(self.get_thread(thread_ptr).owning_container).owned_cpus,
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).owned_threads == self.get_container(self.get_thread(thread_ptr).owning_container).owned_threads,
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).scheduler == self.get_container(self.get_thread(thread_ptr).owning_container).scheduler,
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).owned_endpoints@.push(page_ptr_1) == self.get_container(self.get_thread(thread_ptr).owning_container).owned_endpoints@,
-            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).children == self.get_container(self.get_thread(thread_ptr).owning_container).children,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota - 1 == self.get_container(old(self).get_thread(thread_ptr).owning_container).mem_quota,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).owned_cpus == self.get_container(old(self).get_thread(thread_ptr).owning_container).owned_cpus,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).owned_threads == self.get_container(old(self).get_thread(thread_ptr).owning_container).owned_threads,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).scheduler == self.get_container(old(self).get_thread(thread_ptr).owning_container).scheduler,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).owned_endpoints@.push(page_ptr_1) == self.get_container(old(self).get_thread(thread_ptr).owning_container).owned_endpoints@,
+            old(self).get_container(old(self).get_thread(thread_ptr).owning_container).children == self.get_container(old(self).get_thread(thread_ptr).owning_container).children,
             old(self).get_thread(thread_ptr).ipc_payload =~= self.get_thread(thread_ptr).ipc_payload,
             old(self).get_thread(thread_ptr).state =~= self.get_thread(thread_ptr).state, 
             self.get_thread(thread_ptr).endpoint_descriptors@ =~= old(self).get_thread(thread_ptr).endpoint_descriptors@.update(endpoint_index as int, Some(page_ptr_1)),

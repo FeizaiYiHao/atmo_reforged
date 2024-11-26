@@ -12,6 +12,7 @@ pub mod syscall_send_endpoint;
 pub mod syscall_receive_endpoint;
 pub mod syscall_send_pages;
 pub mod send_receive_pre_spec;
+pub mod syscall_new_endpoint;
 
 pub use spec::*;
 // pub use spec_util::*;
