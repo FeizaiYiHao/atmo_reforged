@@ -95,7 +95,7 @@ pub proof fn map_insert_lemma<A,B>()
 pub proof fn seq_skip_lemma<A>()
     ensures
         forall|s: Seq<A>, v: A|
-            s.contains(v) && s[0] != v && s.no_duplicates() ==> s.skip(1).contains(v),
+            s[0] != v && s.no_duplicates() ==> (s.skip(1).contains(v) == s.contains(v)) ,
         forall|s: Seq<A>|
             #![trigger s[0]]
             s.len() > 0 ==> s.contains(s[0]) ,

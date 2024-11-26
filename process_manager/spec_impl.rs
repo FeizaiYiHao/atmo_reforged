@@ -436,30 +436,23 @@ impl ProcessManager{
     }
     pub closed spec fn container_cpu_wf(&self) -> bool{
         &&&
-        forall|c_ptr:ContainerPtr| 
-        #![trigger self.container_perms@.dom().contains(c_ptr)]
-            self.container_perms@.dom().contains(c_ptr)
-            ==>
-            self.container_perms@[c_ptr].value().owned_cpus.wf()
-        &&&
-        forall|c_ptr_i:ContainerPtr, c_ptr_j:ContainerPtr| 
-        #![trigger self.container_perms@[c_ptr_i].value().owned_cpus, self.container_perms@[c_ptr_j].value().owned_cpus]
-            self.container_perms@.dom().contains(c_ptr_i) && self.container_perms@.dom().contains(c_ptr_j)
-            &&
-            c_ptr_i != c_ptr_j
-            ==>
-            self.container_perms@[c_ptr_i].value().owned_cpus@.disjoint(self.container_perms@[c_ptr_j].value().owned_cpus@)
+        forall|cpu_i:CpuId|
+            #![trigger self.cpu_list@[cpu_i as int]]
+            0 <= cpu_i < NUM_CPUS 
+            ==> 
+            self.container_perms@.dom().contains(self.cpu_list@[cpu_i as int].owning_container)
         &&&
         forall|cpu_i:CpuId|
-        #![trigger self.cpu_list@[cpu_i as int].owning_container]
-        #![trigger self.cpu_list@[cpu_i as int].active]
-        0 <= cpu_i < NUM_CPUS 
-        ==> 
-        self.container_perms@.dom().contains(self.cpu_list@[cpu_i as int].owning_container)
-        &&
-        self.container_perms@[self.cpu_list@[cpu_i as int].owning_container].value().owned_cpus@.contains(cpu_i)
-        &&
-        self.cpu_list@[cpu_i as int].active == false ==> self.cpu_list@[cpu_i as int].current_thread.is_None()
+            #![trigger self.cpu_list@[cpu_i as int]]
+            0 <= cpu_i < NUM_CPUS 
+            ==> 
+            self.container_perms@[self.cpu_list@[cpu_i as int].owning_container].value().owned_cpus@.contains(cpu_i)
+        &&&
+        forall|cpu_i:CpuId|
+            #![trigger self.cpu_list@[cpu_i as int]]
+            0 <= cpu_i < NUM_CPUS 
+            ==> 
+            self.cpu_list@[cpu_i as int].active == false ==> self.cpu_list@[cpu_i as int].current_thread.is_None()
     }
 
     pub closed spec fn threads_cpu_wf(&self) -> bool {
@@ -724,8 +717,6 @@ impl ProcessManager{
             &&
             self.endpoint_perms@[e_ptr].value().queue.unique()
             &&
-            self.endpoint_perms@[e_ptr].value().queue@.no_duplicates()
-            &&
             self.endpoint_perms@[e_ptr].value().owning_threads@.finite()
             &&
             self.endpoint_perms@[e_ptr].value().rf_counter == self.endpoint_perms@[e_ptr].value().owning_threads@.len()
@@ -825,13 +816,15 @@ impl ProcessManager{
         &&&
         forall|t_ptr:ThreadPtr|
             #![trigger self.thread_perms@[t_ptr].value().state]
-            #![trigger self.thread_perms@[t_ptr].value().owning_container]
+            #![trigger self.thread_perms@[t_ptr].value().scheduler_rev_ptr]
             self.thread_perms@.dom().contains(t_ptr)
             &&
             self.thread_perms@[t_ptr].value().state == ThreadState::SCHEDULED
             ==>
             self.container_perms@[self.thread_perms@[t_ptr].value().owning_container].value().scheduler@.contains(t_ptr)
-            && 
+            &&
+            self.thread_perms@[t_ptr].value().scheduler_rev_ptr.is_Some() 
+            &&
             self.container_perms@[self.thread_perms@[t_ptr].value().owning_container].value().scheduler.node_ref_valid(self.thread_perms@[t_ptr].value().scheduler_rev_ptr.unwrap())
             && 
             self.container_perms@[self.thread_perms@[t_ptr].value().owning_container].value().scheduler.node_ref_resolve(self.thread_perms@[t_ptr].value().scheduler_rev_ptr.unwrap()) == t_ptr
@@ -839,7 +832,7 @@ impl ProcessManager{
         forall|c_ptr:ContainerPtr, t_ptr:ThreadPtr|
             #![trigger self.container_perms@[c_ptr].value().scheduler@.contains(t_ptr)]
             #![trigger self.container_perms@.dom().contains(c_ptr), self.thread_perms@[t_ptr].value().owning_container]
-            #![trigger self.container_perms@.dom().contains(c_ptr), self.thread_perms@[t_ptr].value().state ]
+            #![trigger self.container_perms@.dom().contains(c_ptr), self.thread_perms@[t_ptr].value().state]
             self.container_perms@.dom().contains(c_ptr) &&  self.container_perms@[c_ptr].value().scheduler@.contains(t_ptr)
             ==>
             self.thread_perms@.dom().contains(t_ptr)
@@ -1900,6 +1893,7 @@ impl ProcessManager{
         assert(self.threads_endpoint_descriptors_wf());
         assert(self.endpoints_queue_wf()) by {
             seq_skip_lemma::<ThreadPtr>();
+            old(self).get_endpoint(endpoint_ptr).queue.unique_implys_no_duplicates();
         };
         assert(self.endpoints_container_wf());
         assert(self.schedulers_wf()) by {
@@ -1957,6 +1951,7 @@ impl ProcessManager{
             self.get_endpoint(old(self).get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int].unwrap()).owning_threads == old(self).get_endpoint(old(self).get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int].unwrap()).owning_threads,
             self.get_endpoint(old(self).get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int].unwrap()).queue@ == old(self).get_endpoint(old(self).get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int].unwrap()).queue@.push(thread_ptr),
     {
+        proof{old(self).get_endpoint(old(self).get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int].unwrap()).queue.unique_implys_no_duplicates();}
         let endpoint_ptr = self.get_thread(thread_ptr).endpoint_descriptors.get(endpoint_index).unwrap();
         let cpu_id = self.get_thread(thread_ptr).running_cpu.unwrap();
         let old_cpu = *self.cpu_list.get(cpu_id);
@@ -2051,6 +2046,7 @@ impl ProcessManager{
             self.get_endpoint(old(self).get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int].unwrap()).queue@ == old(self).get_endpoint(old(self).get_thread(thread_ptr).endpoint_descriptors@[endpoint_index as int].unwrap()).queue@.push(thread_ptr),
     {
         let endpoint_ptr = self.get_thread(thread_ptr).endpoint_descriptors.get(endpoint_index).unwrap();
+        proof{old(self).get_endpoint(endpoint_ptr).queue.unique_implys_no_duplicates();}
         let cpu_id = self.get_thread(thread_ptr).running_cpu.unwrap();
         let old_cpu = *self.cpu_list.get(cpu_id);
 
@@ -2362,6 +2358,89 @@ impl ProcessManager{
         assert(self.threads_cpu_wf());
         assert(self.threads_container_wf());
     }
+
+    pub fn pop_scheduler_for_idle_cpu(&mut self, cpu_id: CpuId)
+        requires
+            old(self).wf(),
+            0 <= cpu_id < NUM_CPUS,
+            old(self).cpu_list@[cpu_id as int].active == true,
+            old(self).cpu_list@[cpu_id as int].current_thread.is_None(),
+            old(self).get_container(old(self).cpu_list@[cpu_id as int].owning_container).scheduler.len() != 0,
+    {
+        let container_ptr = self.cpu_list.get(cpu_id).owning_container;
+        assert(self.container_perms@.dom().contains(container_ptr)) by {
+            assert(old(self).cpu_list@[cpu_id as int].owning_container == container_ptr);
+            assert(self.container_cpu_wf());
+            assert(
+                forall|cpu_i:CpuId|
+                #![auto]
+                0 <= cpu_i < NUM_CPUS 
+                ==> 
+                old(self).container_perms@.dom().contains(old(self).cpu_list@[cpu_i as int].owning_container)
+            );
+        };
+
+        let mut container_perm = Tracked(self.container_perms.borrow_mut().tracked_remove(container_ptr));
+        let (ret_thread_ptr, sll) = scheduler_pop_head(container_ptr,&mut container_perm);
+        proof {
+            self.container_perms.borrow_mut().tracked_insert(container_ptr, container_perm.get());
+        }
+        assert(old(self).get_container(container_ptr).scheduler@.contains(ret_thread_ptr));
+
+        let mut thread_perm = Tracked(self.thread_perms.borrow_mut().tracked_remove(ret_thread_ptr));
+        thread_set_current_cpu(ret_thread_ptr, &mut thread_perm, Some(cpu_id));
+        thread_set_state(ret_thread_ptr, &mut thread_perm, ThreadState::RUNNING);
+        proof {
+            self.thread_perms.borrow_mut().tracked_insert(ret_thread_ptr, thread_perm.get());
+        }
+
+        self.cpu_list.set(cpu_id, 
+            Cpu{
+                owning_container: container_ptr,
+                active: true,
+                current_thread: Some(ret_thread_ptr),
+            }
+        );
+
+        assert(self.cpus_wf());
+        assert(self.container_cpu_wf());
+        assert(self.memory_disjoint()) by {
+        };
+        assert(self.container_perms_wf());
+        assert(self.container_root_wf());
+        assert(self.container_tree_wf()) by {
+        };
+        assert(self.containers_linkedlist_wf()) by {
+        };
+        assert(self.processes_container_wf()) by {
+        };
+        assert(self.processes_wf());
+
+        assert(self.threads_process_wf()) by {
+        };
+        assert(self.threads_perms_wf());
+        assert(self.endpoint_perms_wf()) by {
+            seq_push_lemma::<ThreadPtr>();
+        };
+        assert(self.threads_endpoint_descriptors_wf()) by {
+            seq_update_lemma::<Option<EndpointPtr>>();
+        };
+        assert(self.endpoints_queue_wf()) by {
+        };
+        assert(self.endpoints_container_wf()) by {
+            seq_push_lemma::<EndpointPtr>();
+        };
+        assert(self.schedulers_wf()) by {
+            seq_skip_lemma::<ThreadPtr>();
+            assert(old(self).get_container(container_ptr).scheduler@.no_duplicates()) by {
+                old(self).get_container(container_ptr).scheduler.unique_implys_no_duplicates()
+            };
+        };
+        assert(self.pcid_ioid_wf());
+        assert(self.threads_cpu_wf());
+        assert(self.threads_container_wf());
+    }
+
 
 }
 

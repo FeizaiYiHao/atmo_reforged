@@ -52,6 +52,16 @@ use crate::lemma::lemma_u::*;
         {
             self.arr_seq@[i]
         }
+
+        pub proof fn unique_implys_no_duplicates(&self) 
+            requires
+                self.unique(),
+                self.wf(),
+            ensures
+                self@.no_duplicates()
+        {
+            assert( forall|i, j| (0 <= i < self.len() && 0 <= j < self.len() && i != j) ==> self@[i] != self@[j]);
+        }
     
         pub open spec fn unique(&self) -> bool {
             forall|i:int, j:int| 

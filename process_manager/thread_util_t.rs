@@ -147,4 +147,58 @@ pub fn thread_set_endpoint_descriptor(thread_ptr:ThreadPtr, thread_perm: &mut Tr
     }
 }
 
+#[verifier(external_body)]
+pub fn thread_set_state(thread_ptr:ThreadPtr, thread_perm: &mut Tracked<PointsTo<Thread>>, state:ThreadState) 
+    requires    
+        old(thread_perm)@.is_init(),
+        old(thread_perm)@.addr() == thread_ptr,
+    ensures
+        thread_perm@.is_init(),
+        thread_perm@.addr() == thread_ptr,
+        thread_perm@.value().owning_container == old(thread_perm)@.value().owning_container,
+        thread_perm@.value().owning_proc == old(thread_perm)@.value().owning_proc,
+        thread_perm@.value().state == state,
+        thread_perm@.value().proc_rev_ptr == old(thread_perm)@.value().proc_rev_ptr,
+        thread_perm@.value().scheduler_rev_ptr == old(thread_perm)@.value().scheduler_rev_ptr,
+        thread_perm@.value().blocking_endpoint_ptr == old(thread_perm)@.value().blocking_endpoint_ptr,
+        thread_perm@.value().endpoint_rev_ptr == old(thread_perm)@.value().endpoint_rev_ptr,
+        thread_perm@.value().running_cpu == old(thread_perm)@.value().running_cpu,
+        thread_perm@.value().endpoint_descriptors == old(thread_perm)@.value().endpoint_descriptors,
+        thread_perm@.value().ipc_payload == old(thread_perm)@.value().ipc_payload,
+        thread_perm@.value().error_code == old(thread_perm)@.value().error_code,
+        thread_perm@.value().trap_frame == old(thread_perm)@.value().trap_frame,
+{
+    unsafe{
+        let uptr = thread_ptr as *mut MaybeUninit<Thread>;
+        (*uptr).assume_init_mut().state = state;
+    }
+}
+
+#[verifier(external_body)]
+pub fn thread_set_current_cpu(thread_ptr:ThreadPtr, thread_perm: &mut Tracked<PointsTo<Thread>>, cpu_id:Option<CpuId>) 
+    requires    
+        old(thread_perm)@.is_init(),
+        old(thread_perm)@.addr() == thread_ptr,
+    ensures
+        thread_perm@.is_init(),
+        thread_perm@.addr() == thread_ptr,
+        thread_perm@.value().owning_container == old(thread_perm)@.value().owning_container,
+        thread_perm@.value().owning_proc == old(thread_perm)@.value().owning_proc,
+        thread_perm@.value().state == old(thread_perm)@.value().state ,
+        thread_perm@.value().proc_rev_ptr == old(thread_perm)@.value().proc_rev_ptr,
+        thread_perm@.value().scheduler_rev_ptr == old(thread_perm)@.value().scheduler_rev_ptr,
+        thread_perm@.value().blocking_endpoint_ptr == old(thread_perm)@.value().blocking_endpoint_ptr,
+        thread_perm@.value().endpoint_rev_ptr == old(thread_perm)@.value().endpoint_rev_ptr,
+        thread_perm@.value().running_cpu == cpu_id,
+        thread_perm@.value().endpoint_descriptors == old(thread_perm)@.value().endpoint_descriptors,
+        thread_perm@.value().ipc_payload == old(thread_perm)@.value().ipc_payload,
+        thread_perm@.value().error_code == old(thread_perm)@.value().error_code,
+        thread_perm@.value().trap_frame == old(thread_perm)@.value().trap_frame,
+{
+    unsafe{
+        let uptr = thread_ptr as *mut MaybeUninit<Thread>;
+        (*uptr).assume_init_mut().running_cpu = cpu_id;
+    }
+}
+
 }
